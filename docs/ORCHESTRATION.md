@@ -1,227 +1,266 @@
-# Gymkhana Core — Documento de Orquestração
+# Gymkhana Core — Orchestration Document
 
-> **Planning version:** Stage 4  
-> **Última sincronização:** 2026-07-12  
-> **Etapa atual:** Etapa 4 concluída  
-> **Fonte principal de verdade:** `Pherlsz/Gymkhana-Database/docs/ORCHESTRATION.md`  
-> **Responsabilidade deste repositório:** lógica Go reutilizável e independente de infraestrutura
+> **Planning version:** Stage 5  
+> **Last synchronized:** 2026-07-12  
+> **Current stage:** Stage 5 completed  
+> **Primary source of truth:** `Pherlsz/Gymkhana-Database/docs/ORCHESTRATION.md`  
+> **Repository responsibility:** reusable Go logic independent from infrastructure
 
-Este documento registra tudo que afeta o `Gymkhana-Core`. Em caso de divergência sobre o produto ou modelo de dados, o documento do `Gymkhana-Database` prevalece.
+This document records every approved decision that affects `Gymkhana-Core`. Product and persistence decisions are owned by the `Gymkhana-Database` orchestration document.
 
-## 1. Missão do repositório
+## 1. Repository mission
 
-Fornecer um módulo Go reutilizável para lógicas que não dependem do produto Gymkhana Database, do PostgreSQL, de HTTP, de provedores de IA ou de interface visual.
+Provide a small, deterministic, testable Go module for reusable logic that does not depend on Gymkhana Database persistence, HTTP, React, queue providers, storage providers, or AI SDKs.
 
-Responsabilidades esperadas:
+Expected responsibilities:
 
-- normalização de dados;
-- representação tipada de filtros e operadores;
-- AST do Query Engine;
-- matching genérico;
-- pontuação e explicações de duplicidade;
-- contratos neutros de IA;
-- orquestração neutra de ferramentas;
-- formatos de resultados e referências;
-- utilidades puras de datas civis, competência e valores canônicos quando realmente reutilizáveis.
+- data normalization;
+- civil date and year-month value types;
+- typed query operators and AST;
+- generic matching;
+- duplicate scoring and structured reasons;
+- neutral AI contracts;
+- neutral tool orchestration contracts;
+- result and reference formats;
+- pure validation functions where reuse is proven.
 
-O Core deve ser pequeno, testável, previsível e sem dependências de infraestrutura.
+## 2. Engineering language
 
-## 2. O que não pertence ao Core
+The following must be written in English:
 
-Não incluir:
+- source code identifiers and technical comments;
+- documentation;
+- commit messages;
+- pull request titles and descriptions;
+- changelog entries;
+- release notes;
+- workflow names and CI messages.
 
-- repositories PostgreSQL;
-- queries SQL;
-- `pgx`, sqlc ou migrations;
-- handlers HTTP;
-- OpenAPI gerado do produto;
-- autenticação e sessão;
-- River ou qualquer fila;
-- R2, S3 ou storage;
-- Google Forms;
-- SDK da OpenAI;
-- SDK do Google GenAI;
-- Vercel, Cloud Run, Neon ou Cloudflare;
-- React ou TypeScript;
-- componentes visuais;
-- regras específicas de página, formulário ou Data Grid;
-- entidades completas do produto sem valor real de reutilização;
-- permissões de MEMBER, ADMIN e SUPERADMIN;
-- tabelas e modelos de persistência do Gymkhana Database.
+The module must not contain product-facing Portuguese copy. Consumer applications are responsible for localization.
 
-## 3. Princípios aprovados
+## 3. What does not belong in Core
 
-- domínio e infraestrutura permanecem separados;
-- interfaces somente nos limites em que há substituição real;
-- nenhuma abstração antecipada sem caso de uso;
-- nenhuma dependência instalada para economizar poucas linhas;
-- nenhum tipo de package externo atravessa a API pública do Core sem necessidade;
-- nenhuma versão atualizada apenas por ser mais nova;
-- nenhum release com vulnerabilidade conhecida e aplicável;
-- funções puras quando possível;
-- resultados determinísticos para normalização e matching;
-- explicações estruturadas em vez de porcentagens arbitrárias;
-- IA nunca produz SQL arbitrário;
-- o Core descreve intenção e plano, mas não executa acesso a dados.
+Do not include:
 
-## 4. Stack aprovada
+- PostgreSQL repositories or SQL queries;
+- `pgx`, sqlc, or migrations;
+- HTTP handlers or OpenAPI-generated product types;
+- authentication, sessions, or product permissions;
+- River or any queue implementation;
+- R2, S3, or object storage;
+- Google Forms integration;
+- OpenAI or Google GenAI SDK types;
+- Vercel, Cloud Run, Neon, or Cloudflare configuration;
+- React, TypeScript, or UI components;
+- complete product entities without real reuse value;
+- MEMBER, ADMIN, or SUPERADMIN logic;
+- persistence models from Gymkhana Database.
+
+## 4. Core principles
+
+- Keep domain logic and infrastructure separate.
+- Add interfaces only at real substitution boundaries.
+- Avoid premature abstraction.
+- Do not install a dependency to save a few lines.
+- Do not expose external package types through public APIs unless unavoidable.
+- Do not upgrade only because a newer release exists.
+- Do not release with a known and applicable vulnerability.
+- Prefer pure functions and deterministic outputs.
+- Explain matching results with structured reasons, not arbitrary percentages.
+- Never produce or execute arbitrary SQL.
+- Describe intent and plans; leave data access to the consumer.
+- Keep the public API intentionally small.
+
+## 5. Approved stack
 
 - Go 1.26;
-- módulos Go;
-- biblioteca padrão como primeira opção;
+- Go modules;
+- standard library first;
 - `testing`;
-- fuzzing nativo;
-- race detector quando houver concorrência;
+- native fuzzing;
+- race detector where concurrency exists;
 - `gofmt`;
 - `go vet`;
 - `staticcheck`;
 - `govulncheck`;
 - OSV-Scanner;
 - Dependabot Alerts;
-- Dependency Review quando disponível.
+- Dependency Review when available.
 
-Não usar framework de aplicação, ORM, framework de agentes ou biblioteca de assertions inicialmente.
+Do not use an application framework, ORM, generic agent framework, or assertion framework initially.
 
-O patch exato será fixado na inicialização do repositório após revisão de compatibilidade, segurança e changelog.
+Exact patch versions are pinned during repository initialization after compatibility, changelog, and security review.
 
-## 5. Organização conceitual
+## 6. Repository structure
 
-Estrutura indicativa, a ser finalizada na Etapa 5:
+Public packages live directly at the repository root. Do not add a `pkg/` directory only by convention.
+
+Approved initial layout:
 
 ```text
-pkg/
+Gymkhana-Core/
 ├── normalize/
+├── civiltime/
 ├── query/
 ├── matching/
 ├── duplicates/
 ├── assistant/
 ├── tools/
 ├── result/
-└── civiltime/
-
-internal/
-└── testutil/
+├── internal/
+│   └── testutil/
+├── docs/
+├── go.mod
+├── go.sum
+├── CHANGELOG.md
+├── SECURITY.md
+└── README.md
 ```
 
-A estrutura final pode usar `pkg` ou packages na raiz. A decisão física será tomada na Etapa 5.
+A package is public only when Gymkhana Database actually imports it.
 
-## 6. Normalização
+Internal helpers stay under `internal/`.
 
-Normalizações reutilizáveis previstas:
+Do not create broad packages named:
 
-- nomes;
-- texto para Search;
-- espaços;
-- caixa;
-- acentos;
+- `utils`;
+- `helpers`;
+- `common`;
+- `shared`;
+- `core`.
+
+## 7. Module identity
+
+Go module path:
+
+```go
+module github.com/Pherlsz/Gymkhana-Core
+```
+
+Example imports:
+
+```go
+import (
+    "github.com/Pherlsz/Gymkhana-Core/normalize"
+    "github.com/Pherlsz/Gymkhana-Core/query"
+)
+```
+
+Gymkhana Database pins an exact tagged version.
+
+## 8. Normalization
+
+Potential reusable normalization areas:
+
+- names;
+- search text;
+- whitespace;
+- case;
+- accents and diacritics;
 - CPF;
-- telefones;
-- e-mail;
-- números de documentos;
-- identificadores alfanuméricos;
-- valores de opções;
-- datas civis;
-- competência mensal;
-- endereços textuais quando aplicável.
+- phone numbers;
+- email;
+- document identifiers;
+- alphanumeric values;
+- option keys;
+- civil dates;
+- year-month values;
+- address fragments when sufficiently generic.
 
-Regras importantes:
+Important rules:
 
-- preservar zeros à esquerda;
-- números de documentos permanecem texto;
-- letras canônicas em maiúsculas quando aplicável;
-- separadores visuais não fazem parte do valor canônico;
-- nomes devem preservar o valor de exibição fora da função de normalização de Search;
-- e-mail em minúsculas;
-- data civil não é um instante UTC;
-- `YEAR_MONTH` é diferente de `DATE` e `DATETIME`.
+- preserve leading zeros;
+- keep document identifiers as text;
+- use uppercase canonical letters when applicable;
+- remove visual separators from canonical identifiers;
+- preserve display values outside search-normalization functions;
+- lowercase email;
+- keep civil dates separate from UTC instants;
+- keep `YEAR_MONTH`, `DATE`, and `DATETIME` conceptually distinct.
 
-O Core não decide como esses valores são persistidos. Ele apenas oferece tipos e funções neutras.
+Core does not decide persistence format or database columns.
 
-## 7. Tipos temporais neutros
+## 9. Neutral temporal types
 
-Separação obrigatória:
+Required conceptual separation:
 
-- `CivilDate`: ano, mês e dia sem timezone;
-- `YearMonth`: ano e mês;
-- `Instant`: instante real tratado pelo produto com `time.Time` e UTC.
+- `CivilDate`: year, month, and day without timezone;
+- `YearMonth`: year and month;
+- `Instant`: real instant represented by the consumer with UTC `time.Time`.
 
-O Core pode fornecer:
+Core may provide:
 
-- parsing estrito;
-- validação;
-- comparação;
-- avanço ou recuo de mês;
-- ano bissexto;
-- serialização canônica;
-- formatação neutra quando não depender de UI.
+- strict parsing;
+- validation;
+- comparison;
+- month navigation;
+- leap-year rules;
+- canonical serialization;
+- neutral formatting helpers when not tied to UI localization.
 
-Não deve conter regras visuais específicas de `pt-BR`; a camada de apresentação decide a exibição final.
+Core does not own `pt-BR` display formatting.
 
-## 8. Query Engine
+## 10. Query Engine model
 
-O Core define a linguagem estruturada de consulta, não o SQL.
+Core defines the structured query language, not SQL.
 
-Modelo conceitual:
+Conceptual API:
 
 ```go
 type QueryPlan struct {
-    Entity   EntityRef
-    Filters  []Filter
-    Includes []RelationRef
-    Sort     []Sort
-    Limit    int
+    Entity     EntityRef
+    Filters    []Filter
+    Includes   []RelationRef
+    Sort       []Sort
+    Projection []FieldRef
+    Grouping   []Group
+    Limit      int
 }
 ```
 
-Elementos previstos:
+Potential elements:
 
-- entidade alvo;
-- campo;
-- operador;
-- valor tipado;
-- composição lógica;
-- relações incluídas;
-- ordenação;
-- limite;
-- projeção de campos;
-- agrupamento quando necessário;
-- metadados de origem da intenção.
+- target entity;
+- fields;
+- typed values;
+- operators;
+- logical composition;
+- included relations;
+- projection;
+- ordering;
+- grouping;
+- limits;
+- intent metadata.
 
-Operadores genéricos previstos:
+Generic operators may include:
 
-- equal;
-- not equal;
+- equal and not equal;
 - contains;
-- starts with;
-- ends with;
-- in;
-- not in;
-- greater than;
-- greater or equal;
-- less than;
-- less or equal;
+- starts with and ends with;
+- in and not in;
+- greater/greater-or-equal;
+- less/less-or-equal;
 - between;
-- is empty;
-- is not empty;
-- matches normalized value;
-- approximate match quando o executor suportar.
+- is empty and is not empty;
+- normalized match;
+- approximate match when supported by the executor.
 
-O Core deve validar:
+Core validates:
 
-- operador compatível com o tipo do campo;
-- valores obrigatórios;
-- limites válidos;
-- composição lógica válida;
-- ausência de campos ou operadores desconhecidos;
-- profundidade e complexidade máximas configuráveis.
+- operator compatibility with field type;
+- required values;
+- valid limits;
+- logical composition;
+- unknown fields and operators;
+- configurable complexity and nesting limits.
 
-O Core não conhece nomes de colunas PostgreSQL, schemas, índices ou joins.
+Core does not know PostgreSQL column names, indexes, joins, or schemas.
 
-## 9. Catálogo de campos
+## 11. Field catalog
 
-O Query Engine recebe do produto um catálogo neutro de campos disponíveis.
+The consumer provides a neutral catalog of available fields.
 
-Exemplo conceitual:
+Conceptual model:
 
 ```go
 type FieldDefinition struct {
@@ -235,20 +274,19 @@ type FieldDefinition struct {
 }
 ```
 
-O produto monta o catálogo a partir de:
+Gymkhana Database builds the catalog from:
 
-- campos nativos;
-- tipos de documentos;
-- tipos de contas;
-- entidades customizadas;
-- campos customizados;
-- permissões do usuário.
+- native fields;
+- document and bill types;
+- custom entity types;
+- custom fields;
+- current user permissions.
 
-O Core valida o plano contra esse catálogo, mas não busca o catálogo no banco.
+Core validates plans against the catalog but never loads it from a database.
 
-## 10. Resultados e referências
+## 12. Results and references
 
-Formato neutro de resultado de Search ou consulta:
+Neutral result concepts:
 
 ```go
 type ResultReference struct {
@@ -259,85 +297,81 @@ type ResultReference struct {
 }
 
 type MatchResult struct {
-    Reference   ResultReference
+    Reference    ResultReference
     MatchedValue string
     Highlight    string
     Relevance    float64
 }
 ```
 
-O produto pode acrescentar URLs e permissões depois.
+The product may add URLs, labels, and permission-aware navigation afterward.
 
-O Core não cria rotas web, links absolutos ou referências a páginas específicas.
+Core does not create web routes or absolute URLs.
 
-## 11. Matching e duplicatas
+## 13. Generic matching and duplicates
 
-O Core oferece regras genéricas de comparação e explicações estruturadas.
-
-Níveis aprovados no produto:
+Approved product levels:
 
 - `VERY_STRONG`;
 - `PROBABLE`;
 - `POSSIBLE`.
 
-O Core não deve retornar uma porcentagem apresentada como certeza.
+Core returns structured reasons, not a confidence percentage presented as truth.
 
-A saída deve conter razões:
+Conceptual reason:
 
 ```go
 type DuplicateReason struct {
-    RuleKey   string
-    FieldKey  string
-    Strength  Strength
+    RuleKey    string
+    FieldKey   string
+    Strength   Strength
     MessageKey string
 }
 ```
 
-Exemplos de sinais reutilizáveis:
+Potential reusable signals:
 
-- CPF idêntico;
-- documento idêntico;
-- telefone idêntico;
-- e-mail idêntico;
-- nome normalizado semelhante;
-- data de nascimento igual;
-- filiação semelhante;
-- endereço semelhante;
-- combinação de sinais fracos.
+- identical CPF;
+- identical document identifier;
+- identical phone;
+- identical email;
+- similar normalized name;
+- equal birth date;
+- similar parent names;
+- similar address;
+- combinations of weaker signals.
 
-Nome nunca pode ser o único critério para uma sugestão forte.
+Name alone must never produce a strong duplicate result.
 
-O produto decide:
+Gymkhana Database decides:
 
-- quais campos existem;
-- quais pesos ou regras estão ativos;
-- quando criar revisão;
-- como persistir candidatos;
-- como executar merge;
-- como aplicar permissões.
+- available fields;
+- active rules and thresholds;
+- persistence of reviews;
+- merge behavior;
+- permissions;
+- when scans run.
 
-O Core calcula e explica.
+Core calculates and explains only.
 
-## 12. Regras de versão das duplicatas
+## 14. Rule versioning
 
-As configurações de matching podem ser versionadas.
+Matching evaluation may accept:
 
-A avaliação deve aceitar:
+- rule version;
+- source data versions;
+- normalization version;
+- thresholds by level.
 
-- versão das regras;
-- versão dos dados comparados;
-- configuração de normalização;
-- limiares por nível.
+This enables the consumer to decide whether a dismissed review should return after data or rule changes.
 
-Isso permite ao produto decidir se uma revisão descartada deve reaparecer quando dados ou regras mudarem.
+Core does not persist versions or review records.
 
-O Core não persiste versões nem revisões.
+## 15. Neutral AI contracts
 
-## 13. Contratos neutros de IA
+Core must not depend on provider SDKs.
 
-O Core não depende de SDK de provedor.
-
-Contratos conceituais:
+Conceptual contracts:
 
 ```go
 type GenerateRequest struct {
@@ -354,37 +388,37 @@ type GenerateResult struct {
 }
 ```
 
-O produto implementa adapters para OpenAI, Google ou outros provedores.
+Gymkhana Database implements OpenAI, Google, or future provider adapters.
 
-Nenhum tipo de `openai-go` ou `go-genai` pode aparecer na API pública do Core.
+No `openai-go` or `go-genai` type may appear in Core public APIs.
 
-## 14. Orquestração neutra do AI Chat
+## 16. Neutral AI orchestration
 
-Fluxo aprovado:
+Approved flow:
 
-1. receber pergunta;
-2. classificar ou interpretar intenção;
-3. construir plano tipado;
-4. validar plano contra catálogo e política;
-5. solicitar execução a uma tool neutra;
-6. receber resultado estruturado;
-7. sintetizar resposta;
-8. produzir referências.
+1. receive a question;
+2. interpret intent;
+3. create a typed plan;
+4. validate against catalog and policy;
+5. request execution through a neutral tool;
+6. receive structured results;
+7. synthesize a response;
+8. emit references.
 
-O Core pode fornecer uma máquina de estados simples e interfaces neutras.
+Core may provide a small state machine and neutral interfaces.
 
-Não usar:
+Do not use:
 
 - LangChain;
 - LangGraph;
 - CrewAI;
 - Semantic Kernel;
-- framework genérico de agentes;
-- SQL arbitrário;
-- credenciais de banco;
-- acesso direto a repositories.
+- a generic agent framework;
+- arbitrary SQL tools;
+- database credentials;
+- direct repository access.
 
-Exemplo de tool neutra:
+Example neutral executor:
 
 ```go
 type QueryExecutor interface {
@@ -392,40 +426,40 @@ type QueryExecutor interface {
 }
 ```
 
-O `Gymkhana-Database` implementa essa interface usando seus módulos e SQL seguro.
+Gymkhana Database implements the executor with safe domain modules and SQL.
 
-## 15. Tool calling
+## 17. Tool calling
 
-Tools devem ser pequenas, explícitas e tipadas.
+Tools must be small, explicit, and typed.
 
-Exemplos futuros:
+Potential tools:
 
-- consultar Profiles;
-- consultar documentos;
-- consultar contas;
-- consultar entidades customizadas;
-- obter detalhes de um registro;
-- gerar visão tabular navegável.
+- query Profiles;
+- query documents;
+- query bills;
+- query custom entities;
+- retrieve record details;
+- produce a navigable table result.
 
-Não criar uma tool genérica `execute_sql`.
+Never add a generic `execute_sql` tool.
 
-Cada tool deve declarar:
+Each tool declares:
 
-- nome estável;
-- descrição;
-- schema de entrada;
-- schema de saída;
-- permissões exigidas como metadado neutro;
-- limites de resultados;
-- erros técnicos estáveis.
+- stable name;
+- description;
+- input schema;
+- output schema;
+- neutral required-permission metadata;
+- result limits;
+- stable technical errors.
 
-O produto é responsável por autenticação e autorização reais.
+The consumer performs real authorization.
 
-## 16. Streaming
+## 18. Streaming events
 
-O produto usará SSE sobre HTTP, mas o Core não conhece SSE.
+Gymkhana Database uses SSE, but Core does not know HTTP or SSE.
 
-O Core pode expor eventos neutros:
+Core may expose neutral events:
 
 - `message.started`;
 - `text.delta`;
@@ -436,85 +470,73 @@ O Core pode expor eventos neutros:
 - `message.failed`;
 - `message.cancelled`.
 
-A camada HTTP do `Gymkhana-Database` converte esses eventos para SSE.
+The product maps them to its transport.
 
-## 17. OCR
+## 19. OCR-related logic
 
-O Core pode oferecer:
+Core may provide:
 
-- schema neutro de extração;
-- validação de resultado estruturado;
-- comparação entre valor atual e sugerido;
-- normalização dos valores extraídos;
-- classificação de campos aceitos, rejeitados ou conflitantes.
+- neutral extraction schemas;
+- structured result validation;
+- current-versus-suggested comparison;
+- normalization of extracted values;
+- classification of accepted, rejected, and conflicting fields.
 
-O Core não:
+Core does not:
 
-- baixa arquivos;
-- acessa R2;
-- chama OpenAI ou Google;
-- persiste resultados;
-- altera entidades;
-- decide autorização.
+- download files;
+- access R2;
+- call AI providers;
+- persist results;
+- modify entities;
+- authorize actions.
 
-Revisão humana obrigatória permanece regra do produto.
+Human review remains a product requirement.
 
-## 18. Custom fields
+## 20. Custom values
 
-O Core pode conhecer tipos genéricos de valor:
+Core may define generic value types:
 
-- text;
-- long text;
+- short and long text;
 - number;
 - money;
 - civil date;
 - datetime;
 - boolean;
-- single select;
-- multi select;
+- single and multi-select;
 - email;
 - phone;
 - URL;
 - attachment reference.
 
-Pode validar compatibilidade entre operador e tipo.
+It may validate operator compatibility and value conversion.
 
-Não conhece:
+It does not know database IDs, owner tables, storage, React widgets, or product import workflows.
 
-- IDs de banco;
-- tabelas `custom_fields`;
-- owners;
-- storage;
-- widgets React;
-- regras de import específicas do produto.
+## 21. Import-related pure logic
 
-## 19. Imports
+Core may provide pure functions for:
 
-O Core pode fornecer funções puras para:
+- header normalization;
+- textual value conversion;
+- row validation against a neutral schema;
+- field-level validation errors;
+- duplicate candidate generation from normalized values.
 
-- normalizar cabeçalhos;
-- converter valores textuais em tipos;
-- validar uma linha contra um schema neutro;
-- representar erros por campo;
-- gerar candidatos de duplicidade a partir de dados normalizados.
-
-Não inclui:
+Do not include:
 
 - Excelize;
 - R2;
 - `pgx.CopyFrom`;
-- staging no PostgreSQL;
-- jobs;
-- progresso;
+- PostgreSQL staging;
+- jobs and progress;
 - Google Forms.
 
-Essas responsabilidades permanecem no `Gymkhana-Database`.
+## 22. Errors
 
-## 20. Erros
+Core uses stable neutral technical errors.
 
-O Core usa erros técnicos estáveis e neutros.
-
-Exemplo:
+Conceptual field error:
 
 ```go
 type FieldError struct {
@@ -524,66 +546,61 @@ type FieldError struct {
 }
 ```
 
-Mensagens finais em português podem ser montadas pela aplicação.
+Gymkhana Database converts them to localized messages and HTTP envelopes.
 
-O Core não retorna envelopes HTTP nem status codes diretamente.
+Core does not return HTTP status codes.
 
-## 21. Testes
+## 23. Testing
 
-### 21.1 Unitários
+### 23.1 Unit tests
 
-Cobertura prioritária:
+Prioritize:
 
-- normalização Unicode;
-- acentos e espaços;
-- CPF e documentos;
-- telefones;
-- e-mail;
-- datas civis;
-- competência;
-- operadores;
-- validação de AST;
-- matching;
-- níveis de duplicidade;
+- Unicode normalization;
+- accents and whitespace;
+- CPF and document identifiers;
+- phones and email;
+- civil dates and year-month;
+- operators and AST validation;
+- matching and duplicate levels;
 - tool schemas;
-- transições da orquestração.
+- orchestration state transitions.
 
-### 21.2 Fuzzing
+### 23.2 Fuzzing
 
-Fuzzing nativo para:
+Use native fuzzing for:
 
 - Unicode;
-- documentos com caracteres arbitrários;
-- telefones;
-- datas;
-- parser de query;
-- normalizadores;
-- valores de filtro;
-- schemas de tools.
+- arbitrary document characters;
+- phone numbers;
+- dates;
+- query parsing;
+- normalizers;
+- filter values;
+- tool schemas.
 
-### 21.3 Determinismo
+### 23.3 Determinism
 
-Mesma entrada, configuração e versão das regras devem produzir a mesma saída.
+The same input, configuration, and rule version must produce the same output.
 
-Testes devem evitar dependência de relógio global, locale da máquina ou ordem de map.
+Tests must not rely on global clock state, machine locale, or map iteration order.
 
-## 22. Dependências e segurança
+## 24. Dependency and security policy
 
-Antes de adicionar uma package:
+Before adding a package:
 
-- comprovar necessidade;
-- revisar licença;
-- revisar manutenção;
-- revisar dependências transitivas;
-- verificar vulnerabilidades;
-- avaliar se a biblioteca padrão resolve;
-- impedir vazamento do tipo externo pela API pública.
+- prove the need;
+- review license;
+- review maintenance activity;
+- inspect transitive dependencies;
+- check known vulnerabilities;
+- assess whether the standard library is sufficient;
+- prevent external types from leaking into the public API.
 
-Pipeline:
+Checks:
 
-```bash
-gofmt
-
+```text
+gofmt check
 go vet ./...
 staticcheck ./...
 go test ./...
@@ -591,84 +608,314 @@ go test -race ./...
 govulncheck ./...
 ```
 
-Supply chain:
+Supply-chain controls:
 
-- versões fixadas;
-- `go.sum` versionado;
+- exact versions;
+- committed `go.sum`;
 - OSV-Scanner;
 - Dependabot Alerts;
-- Dependency Review quando disponível;
-- Actions por commit SHA;
-- nenhum merge automático de atualização.
+- Dependency Review when available;
+- GitHub Actions pinned by commit SHA;
+- no automatic merge of dependency updates.
 
-## 23. Relação com Gymkhana-Database
+## 25. Private consumption
 
-O produto consome uma versão fixa do Core.
+Gymkhana Database consumes Core as a private Go module:
 
-O `Gymkhana-Database` fornece implementações de:
+```go
+require github.com/Pherlsz/Gymkhana-Core v0.1.0
+```
 
-- catálogo de campos;
-- QueryExecutor;
-- repositories;
-- autorização;
-- adapters de IA;
-- persistência de threads e runs;
-- storage;
-- HTTP e SSE;
-- jobs;
-- configuração.
+Configuration:
 
-O Core fornece modelos e regras neutras.
+```text
+GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
+```
 
-## 24. Relação com Gymkhana-UI
+CI uses a fine-grained read-only token restricted to `Gymkhana-Core` with expiration and rotation.
 
-Não há dependência direta.
+Do not use permanent `replace` directives, branches, untagged commits, submodules, subtree, or source copying in production.
 
-Core é Go e UI é React/TypeScript.
+## 26. Local multi-repository development
 
-Não criar package multi-linguagem para “compartilhar tudo”.
+Repositories may be checked out side by side:
 
-A comunicação entre backend e frontend ocorre por OpenAPI no repositório do produto.
+```text
+Gymkhana/
+├── Gymkhana-Database/
+├── Gymkhana-Core/
+├── Gymkhana-UI/
+└── go.work
+```
 
-Conceitos equivalentes podem existir nas duas linguagens, mas são contratos separados e gerados quando apropriado.
+A local `go.work` may connect Database and Core, but it stays outside repositories and is not committed.
 
-## 25. Versionamento
+The committed `go.mod` always points to a tagged exact version.
 
-A estratégia física será definida na Etapa 5.
+No fourth coordination repository is created.
 
-Regras já aprovadas:
+## 27. Dependency direction
 
-- tags ou versões exatas;
-- nunca depender de branch flutuante;
-- breaking changes explícitas;
-- changelog para mudanças públicas;
-- API pública pequena;
-- packages internos por padrão;
-- exportar somente o que tiver consumidor real.
+Approved graph:
 
-## 26. Decisões adiadas
+```text
+Gymkhana-Database → Gymkhana-Core
+Gymkhana-Core     → no dependency on Database or UI
+```
 
-- package layout definitivo;
-- política exata de semantic versioning;
-- publicação pública ou privada;
-- catálogo completo de operadores;
-- parser de linguagem natural próprio;
-- regras finais de pontuação de duplicidade;
-- schemas finais de tools;
-- suporte a provedores além dos adapters do produto;
-- otimizações baseadas em benchmark.
+Core and UI have no direct dependency.
 
-## 27. Próxima etapa
+Go and TypeScript share product contracts through OpenAPI in Gymkhana Database, not through a multi-language “shared” package.
 
-Na Etapa 5 serão definidos:
+## 28. Versioning
 
-- estrutura física definitiva;
-- nome do módulo Go;
-- packages públicos e internos;
-- estratégia de tags e releases;
-- CI;
-- consumo pelo `Gymkhana-Database`;
-- política de compatibilidade;
-- ownership e revisão de mudanças públicas.
+Start at:
 
-Este documento deve ser atualizado novamente ao final da Etapa 5.
+```text
+v0.1.0
+```
+
+Use SemVer:
+
+- patch: compatible fix;
+- minor: compatible feature;
+- major: public API break.
+
+For Go major versions:
+
+```text
+v1: github.com/Pherlsz/Gymkhana-Core
+v2: github.com/Pherlsz/Gymkhana-Core/v2
+```
+
+Even during `0.x`, breaking changes must be explicit and documented.
+
+Reach `1.0.0` only after production use, stable public APIs, minimum documentation, and contract test coverage.
+
+## 29. Releases and changelog
+
+Do not use Changesets.
+
+Maintain `CHANGELOG.md` with:
+
+```text
+Unreleased
+Added
+Changed
+Fixed
+Security
+```
+
+A manually triggered release workflow accepts `patch`, `minor`, or `major`, runs all checks, validates the changelog, creates one release commit, tags the module, and creates a GitHub Release.
+
+Do not create a release for every merge.
+
+## 30. Branches, commits, and pull requests
+
+Development is based on `main` with short-lived branches:
+
+- `feature/*`;
+- `fix/*`;
+- `refactor/*`;
+- `chore/*`;
+- `agent/*`.
+
+No `develop` branch or Git Flow.
+
+Main protection when active development begins:
+
+- pull request required;
+- required checks;
+- resolved review threads;
+- no force push;
+- squash merge by default.
+
+All commit messages, PR titles, and PR descriptions are written in English.
+
+Remote pushes should be grouped to avoid unnecessary CI runs.
+
+## 31. CI
+
+PR checks:
+
+- format check;
+- `go vet`;
+- `staticcheck`;
+- unit tests;
+- vulnerability scan;
+- OSV scan.
+
+Race detector runs:
+
+- on `main`;
+- before release;
+- periodically when justified;
+- on PRs that change concurrency.
+
+New pushes cancel obsolete checks for the same branch. Release workflows are not cancelled this way.
+
+A Core release does not automatically trigger Database builds, dependency PRs, Vercel deploys, or cross-repository workflows.
+
+## 32. Compatibility strategy
+
+Gymkhana Database supports one exact Core version before `1.0`, but breaking changes are never silent.
+
+Safe incompatible change flow:
+
+1. add a new API while keeping the old API;
+2. publish a compatible release;
+3. migrate Gymkhana Database;
+4. validate production usage;
+5. remove the old API in a later incompatible release.
+
+Use Go deprecation comments:
+
+```go
+// Deprecated: use NewQueryPlan instead.
+```
+
+A breaking release documents:
+
+- changed API;
+- reason;
+- introduced version;
+- migration steps;
+- minimum compatible Database version;
+- deprecation window, when available.
+
+## 33. Reproducible builds
+
+Use:
+
+```text
+go mod download
+go test -mod=readonly ./...
+go build -mod=readonly
+```
+
+Rules:
+
+- no floating dependencies;
+- exact tool versions;
+- GitHub Actions pinned by SHA;
+- release built only by the official workflow;
+- caches never replace module checksums.
+
+## 34. Local commands
+
+Approved Makefile commands:
+
+```text
+make test
+make lint
+make fuzz
+make check
+```
+
+`make check` represents everything required before a pull request.
+
+Do not add Taskfile, Just, Mage, or another orchestration runtime initially.
+
+## 35. Documentation structure
+
+- `README.md`: purpose, requirements, setup, commands, links;
+- `docs/architecture/`: current architecture;
+- `docs/guides/`: procedures such as adding a package and publishing a release;
+- `docs/adr/`: only important architectural decisions;
+- `docs/ORCHESTRATION.md`: approved planning decisions;
+- `SECURITY.md`: private vulnerability reporting.
+
+Do not automatically copy orchestration documents between repositories. Keep the same planning version, synchronization date, source-of-truth reference, and repository-specific responsibilities.
+
+## 36. CODEOWNERS and review
+
+Initial ownership may point to one maintainer, with paths prepared for future specialization:
+
+```text
+/query/
+/duplicates/
+/assistant/
+```
+
+Changes requiring extra review attention:
+
+- Query AST and operator semantics;
+- duplicate scoring behavior;
+- neutral AI and tool contracts;
+- public package exports;
+- release workflows;
+- dependency and security configuration.
+
+No bot approval.
+
+## 37. Pull request and issue templates
+
+Use a short PR template:
+
+```text
+What changed
+Why
+How it was validated
+Contract or migration impact
+Security checklist
+```
+
+Issue templates:
+
+- Bug;
+- Feature;
+- Security, redirected to private reporting;
+- Technical debt.
+
+Security reports must not be public issues.
+
+## 38. Criteria for extracting logic to Core
+
+Move logic from Gymkhana Database to Core only when it satisfies most of these conditions:
+
+- independent from PostgreSQL;
+- independent from HTTP;
+- independent from UI;
+- independent from a specific persisted entity;
+- useful in more than one flow;
+- easily testable as a neutral function or contract;
+- sufficiently stable public API;
+- removes real duplication.
+
+When uncertain, keep the logic in Gymkhana Database and extract it after real reuse is demonstrated.
+
+## 39. Version policy
+
+Compare the most mature proven line with the latest stable line.
+
+Adopt a newer version only for:
+
+- applicable security fix;
+- relevant bug fix;
+- measurable performance gain;
+- required compatibility;
+- feature actually used;
+- clear complexity reduction.
+
+Betas and release candidates are limited to research branches. Production releases use stable versions.
+
+## 40. Deferred decisions
+
+- final complete operator catalog;
+- natural-language parser owned by Core;
+- final duplicate scoring rules;
+- final tool schemas;
+- support for additional AI provider concepts;
+- optimization before benchmarks;
+- a fourth workspace repository;
+- automatic cross-repository updates;
+- Changesets;
+- public module distribution.
+
+## 41. Next stage
+
+**Stage 6 — Design system and Data Grid** primarily affects Gymkhana UI and Gymkhana Database.
+
+Core should only be updated during Stage 6 if a truly reusable, infrastructure-independent contract is identified.
+
+Update this document again when Stage 6 is completed.
