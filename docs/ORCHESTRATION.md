@@ -1,12 +1,12 @@
 # Gymkhana Core — Orchestration Document
 
-> **Planning version:** Stage 5  
+> **Planning version:** Stage 6  
 > **Last synchronized:** 2026-07-12  
-> **Current stage:** Stage 5 completed  
+> **Current stage:** Stage 6 completed  
 > **Primary source of truth:** `Pherlsz/Gymkhana-Database/docs/ORCHESTRATION.md`  
 > **Repository responsibility:** reusable Go logic independent from infrastructure
 
-This document records every approved decision that affects `Gymkhana-Core`. Product and persistence decisions are owned by the `Gymkhana-Database` orchestration document.
+This document records every approved decision that affects `Gymkhana-Core`. Product, persistence, and visual design decisions are owned by the `Gymkhana-Database` and `Gymkhana-UI` orchestration documents.
 
 ## 1. Repository mission
 
@@ -21,7 +21,7 @@ Expected responsibilities:
 - duplicate scoring and structured reasons;
 - neutral AI contracts;
 - neutral tool orchestration contracts;
-- result and reference formats;
+- neutral result and reference formats;
 - pure validation functions where reuse is proven.
 
 ## 2. Engineering language
@@ -36,7 +36,7 @@ The following must be written in English:
 - release notes;
 - workflow names and CI messages.
 
-The module must not contain product-facing Portuguese copy. Consumer applications are responsible for localization.
+The module must not contain product-facing Portuguese copy. Consumer applications own localization.
 
 ## 3. What does not belong in Core
 
@@ -44,24 +44,24 @@ Do not include:
 
 - PostgreSQL repositories or SQL queries;
 - `pgx`, sqlc, or migrations;
-- HTTP handlers or OpenAPI-generated product types;
+- HTTP handlers or product OpenAPI-generated types;
 - authentication, sessions, or product permissions;
-- River or any queue implementation;
+- River or another queue implementation;
 - R2, S3, or object storage;
 - Google Forms integration;
 - OpenAI or Google GenAI SDK types;
 - Vercel, Cloud Run, Neon, or Cloudflare configuration;
-- React, TypeScript, or UI components;
-- complete product entities without real reuse value;
-- MEMBER, ADMIN, or SUPERADMIN logic;
+- React, TypeScript, UI components, design tokens, or Data Grid rendering;
+- complete product entities without proven reuse value;
+- MEMBER, ADMIN, or SUPERADMIN rules;
 - persistence models from Gymkhana Database.
 
 ## 4. Core principles
 
-- Keep domain logic and infrastructure separate.
+- Keep reusable logic and infrastructure separate.
 - Add interfaces only at real substitution boundaries.
 - Avoid premature abstraction.
-- Do not install a dependency to save a few lines.
+- Do not add dependencies to save a few lines.
 - Do not expose external package types through public APIs unless unavoidable.
 - Do not upgrade only because a newer release exists.
 - Do not release with a known and applicable vulnerability.
@@ -70,6 +70,7 @@ Do not include:
 - Never produce or execute arbitrary SQL.
 - Describe intent and plans; leave data access to the consumer.
 - Keep the public API intentionally small.
+- When uncertain, keep logic in Gymkhana Database until reuse is proven.
 
 ## 5. Approved stack
 
@@ -93,7 +94,7 @@ Exact patch versions are pinned during repository initialization after compatibi
 
 ## 6. Repository structure
 
-Public packages live directly at the repository root. Do not add a `pkg/` directory only by convention.
+Public packages live directly at the repository root. Do not add `pkg/` only by convention.
 
 Approved initial layout:
 
@@ -129,7 +130,7 @@ Do not create broad packages named:
 - `shared`;
 - `core`.
 
-## 7. Module identity
+## 7. Module identity and consumption
 
 Go module path:
 
@@ -147,6 +148,18 @@ import (
 ```
 
 Gymkhana Database pins an exact tagged version.
+
+Private-module configuration:
+
+```text
+GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
+```
+
+CI uses a fine-grained read-only token restricted to this repository.
+
+Do not use permanent `replace` directives, branches, untagged commits, submodules, subtree, or source copying in production.
+
+A local, uncommitted `go.work` outside the repositories may connect Core and Database during development.
 
 ## 8. Normalization
 
@@ -167,7 +180,7 @@ Potential reusable normalization areas:
 - year-month values;
 - address fragments when sufficiently generic.
 
-Important rules:
+Rules:
 
 - preserve leading zeros;
 - keep document identifiers as text;
@@ -178,7 +191,7 @@ Important rules:
 - keep civil dates separate from UTC instants;
 - keep `YEAR_MONTH`, `DATE`, and `DATETIME` conceptually distinct.
 
-Core does not decide persistence format or database columns.
+Core does not decide persistence format, SQL representation, masks, or UI display.
 
 ## 9. Neutral temporal types
 
@@ -186,7 +199,7 @@ Required conceptual separation:
 
 - `CivilDate`: year, month, and day without timezone;
 - `YearMonth`: year and month;
-- `Instant`: real instant represented by the consumer with UTC `time.Time`.
+- `Instant`: a real instant represented by the consumer with UTC `time.Time`.
 
 Core may provide:
 
@@ -196,13 +209,15 @@ Core may provide:
 - month navigation;
 - leap-year rules;
 - canonical serialization;
-- neutral formatting helpers when not tied to UI localization.
+- neutral operations not tied to UI localization.
 
-Core does not own `pt-BR` display formatting.
+Core does not own `pt-BR` formatting, calendar rendering, date-picker behavior, or application timezone choice.
+
+Stage 6 confirmed the same separation in Gymkhana UI. Shared value contracts may be aligned conceptually, but no Go-to-TypeScript package dependency is introduced.
 
 ## 10. Query Engine model
 
-Core defines the structured query language, not SQL.
+Core defines a structured query language, not SQL.
 
 Conceptual API:
 
@@ -256,9 +271,11 @@ Core validates:
 
 Core does not know PostgreSQL column names, indexes, joins, or schemas.
 
+Stage 6 established that Data Grid filtering, sorting, grouping, and aggregation are server-side product concerns. Core may define neutral query contracts used by those flows only after Stage 7 closes the catalog and AST. It must not contain React Data Grid state or URL serialization.
+
 ## 11. Field catalog
 
-The consumer provides a neutral catalog of available fields.
+The consumer provides a neutral catalog of available entities and fields.
 
 Conceptual model:
 
@@ -280,13 +297,15 @@ Gymkhana Database builds the catalog from:
 - document and bill types;
 - custom entity types;
 - custom fields;
-- current user permissions.
+- current-user permissions.
 
 Core validates plans against the catalog but never loads it from a database.
 
+Labels are descriptive metadata, not stable identifiers. Technical keys remain stable across display-label changes.
+
 ## 12. Results and references
 
-Neutral result concepts:
+Neutral result concepts may include:
 
 ```go
 type ResultReference struct {
@@ -304,9 +323,9 @@ type MatchResult struct {
 }
 ```
 
-The product may add URLs, labels, and permission-aware navigation afterward.
+The product may add URLs, localized labels, permissions, and navigation afterward.
 
-Core does not create web routes or absolute URLs.
+Core does not create web routes, absolute URLs, React nodes, Data Grid columns, or UI actions.
 
 ## 13. Generic matching and duplicates
 
@@ -354,7 +373,7 @@ Gymkhana Database decides:
 
 Core calculates and explains only.
 
-## 14. Rule versioning
+## 14. Rule versioning and determinism
 
 Matching evaluation may accept:
 
@@ -363,9 +382,11 @@ Matching evaluation may accept:
 - normalization version;
 - thresholds by level.
 
-This enables the consumer to decide whether a dismissed review should return after data or rule changes.
+The same input, configuration, and rule version must produce the same output.
 
-Core does not persist versions or review records.
+Core does not persist rule versions, reviews, or dismissal state.
+
+Tests must not depend on global clock state, machine locale, map iteration order, or infrastructure.
 
 ## 15. Neutral AI contracts
 
@@ -394,7 +415,7 @@ No `openai-go` or `go-genai` type may appear in Core public APIs.
 
 ## 16. Neutral AI orchestration
 
-Approved flow:
+Approved conceptual flow:
 
 1. receive a question;
 2. interpret intent;
@@ -426,7 +447,7 @@ type QueryExecutor interface {
 }
 ```
 
-Gymkhana Database implements the executor with safe domain modules and SQL.
+Gymkhana Database implements execution with safe domain modules and SQL.
 
 ## 17. Tool calling
 
@@ -453,13 +474,13 @@ Each tool declares:
 - result limits;
 - stable technical errors.
 
-The consumer performs real authorization.
+The consumer performs real authorization and data access.
 
 ## 18. Streaming events
 
 Gymkhana Database uses SSE, but Core does not know HTTP or SSE.
 
-Core may expose neutral events:
+Core may expose neutral events such as:
 
 - `message.started`;
 - `text.delta`;
@@ -470,7 +491,7 @@ Core may expose neutral events:
 - `message.failed`;
 - `message.cancelled`.
 
-The product maps them to its transport.
+The product maps them to transport and the UI decides visual presentation.
 
 ## 19. OCR-related logic
 
@@ -489,7 +510,8 @@ Core does not:
 - call AI providers;
 - persist results;
 - modify entities;
-- authorize actions.
+- authorize actions;
+- render review UI.
 
 Human review remains a product requirement.
 
@@ -511,7 +533,7 @@ Core may define generic value types:
 
 It may validate operator compatibility and value conversion.
 
-It does not know database IDs, owner tables, storage, React widgets, or product import workflows.
+It does not know database IDs, owner tables, storage, React widgets, Data Grid editors, or product import workflows.
 
 ## 21. Import-related pure logic
 
@@ -548,7 +570,7 @@ type FieldError struct {
 
 Gymkhana Database converts them to localized messages and HTTP envelopes.
 
-Core does not return HTTP status codes.
+Core does not return HTTP status codes or UI copy.
 
 ## 23. Testing
 
@@ -579,11 +601,11 @@ Use native fuzzing for:
 - filter values;
 - tool schemas.
 
-### 23.3 Determinism
+### 23.3 Integration boundary tests
 
-The same input, configuration, and rule version must produce the same output.
+Core tests neutral contracts and pure execution behavior only.
 
-Tests must not rely on global clock state, machine locale, or map iteration order.
+PostgreSQL, HTTP, SSE, River, R2, provider SDK, and React integration tests remain in Gymkhana Database or Gymkhana UI.
 
 ## 24. Dependency and security policy
 
@@ -618,56 +640,7 @@ Supply-chain controls:
 - GitHub Actions pinned by commit SHA;
 - no automatic merge of dependency updates.
 
-## 25. Private consumption
-
-Gymkhana Database consumes Core as a private Go module:
-
-```go
-require github.com/Pherlsz/Gymkhana-Core v0.1.0
-```
-
-Configuration:
-
-```text
-GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
-```
-
-CI uses a fine-grained read-only token restricted to `Gymkhana-Core` with expiration and rotation.
-
-Do not use permanent `replace` directives, branches, untagged commits, submodules, subtree, or source copying in production.
-
-## 26. Local multi-repository development
-
-Repositories may be checked out side by side:
-
-```text
-Gymkhana/
-├── Gymkhana-Database/
-├── Gymkhana-Core/
-├── Gymkhana-UI/
-└── go.work
-```
-
-A local `go.work` may connect Database and Core, but it stays outside repositories and is not committed.
-
-The committed `go.mod` always points to a tagged exact version.
-
-No fourth coordination repository is created.
-
-## 27. Dependency direction
-
-Approved graph:
-
-```text
-Gymkhana-Database → Gymkhana-Core
-Gymkhana-Core     → no dependency on Database or UI
-```
-
-Core and UI have no direct dependency.
-
-Go and TypeScript share product contracts through OpenAPI in Gymkhana Database, not through a multi-language “shared” package.
-
-## 28. Versioning
+## 25. Versioning and releases
 
 Start at:
 
@@ -688,29 +661,19 @@ v1: github.com/Pherlsz/Gymkhana-Core
 v2: github.com/Pherlsz/Gymkhana-Core/v2
 ```
 
-Even during `0.x`, breaking changes must be explicit and documented.
+Even during `0.x`, breaking changes are explicit and documented.
 
 Reach `1.0.0` only after production use, stable public APIs, minimum documentation, and contract test coverage.
 
-## 29. Releases and changelog
-
 Do not use Changesets.
 
-Maintain `CHANGELOG.md` with:
+Maintain `CHANGELOG.md` with Unreleased, Added, Changed, Fixed, and Security.
 
-```text
-Unreleased
-Added
-Changed
-Fixed
-Security
-```
-
-A manually triggered release workflow accepts `patch`, `minor`, or `major`, runs all checks, validates the changelog, creates one release commit, tags the module, and creates a GitHub Release.
+A manually triggered release workflow accepts patch, minor, or major, runs all checks, validates the changelog, creates one release commit, tags the module, and creates a GitHub Release.
 
 Do not create a release for every merge.
 
-## 30. Branches, commits, and pull requests
+## 26. Branches, commits, and pull requests
 
 Development is based on `main` with short-lived branches:
 
@@ -734,7 +697,7 @@ All commit messages, PR titles, and PR descriptions are written in English.
 
 Remote pushes should be grouped to avoid unnecessary CI runs.
 
-## 31. CI
+## 27. CI and reproducibility
 
 PR checks:
 
@@ -745,18 +708,23 @@ PR checks:
 - vulnerability scan;
 - OSV scan.
 
-Race detector runs:
+Race detector runs on `main`, before release, when concurrency changes, and periodically when justified.
 
-- on `main`;
-- before release;
-- periodically when justified;
-- on PRs that change concurrency.
-
-New pushes cancel obsolete checks for the same branch. Release workflows are not cancelled this way.
+New pushes cancel obsolete branch checks. Release workflows are not cancelled this way.
 
 A Core release does not automatically trigger Database builds, dependency PRs, Vercel deploys, or cross-repository workflows.
 
-## 32. Compatibility strategy
+Reproducible commands:
+
+```text
+go mod download
+go test -mod=readonly ./...
+go build -mod=readonly
+```
+
+Use exact tool versions, pinned GitHub Actions, and official release workflows.
+
+## 28. Compatibility strategy
 
 Gymkhana Database supports one exact Core version before `1.0`, but breaking changes are never silent.
 
@@ -774,34 +742,9 @@ Use Go deprecation comments:
 // Deprecated: use NewQueryPlan instead.
 ```
 
-A breaking release documents:
+A breaking release documents changed API, reason, version, migration steps, minimum compatible Database version, and deprecation window when available.
 
-- changed API;
-- reason;
-- introduced version;
-- migration steps;
-- minimum compatible Database version;
-- deprecation window, when available.
-
-## 33. Reproducible builds
-
-Use:
-
-```text
-go mod download
-go test -mod=readonly ./...
-go build -mod=readonly
-```
-
-Rules:
-
-- no floating dependencies;
-- exact tool versions;
-- GitHub Actions pinned by SHA;
-- release built only by the official workflow;
-- caches never replace module checksums.
-
-## 34. Local commands
+## 29. Local commands and documentation
 
 Approved Makefile commands:
 
@@ -816,18 +759,18 @@ make check
 
 Do not add Taskfile, Just, Mage, or another orchestration runtime initially.
 
-## 35. Documentation structure
+Documentation:
 
-- `README.md`: purpose, requirements, setup, commands, links;
-- `docs/architecture/`: current architecture;
-- `docs/guides/`: procedures such as adding a package and publishing a release;
-- `docs/adr/`: only important architectural decisions;
-- `docs/ORCHESTRATION.md`: approved planning decisions;
-- `SECURITY.md`: private vulnerability reporting.
+- `README.md`;
+- `docs/architecture/`;
+- `docs/guides/`;
+- `docs/adr/`;
+- `docs/ORCHESTRATION.md`;
+- `SECURITY.md`.
 
-Do not automatically copy orchestration documents between repositories. Keep the same planning version, synchronization date, source-of-truth reference, and repository-specific responsibilities.
+Do not automatically copy orchestration documents between repositories.
 
-## 36. CODEOWNERS and review
+## 30. CODEOWNERS and review
 
 Initial ownership may point to one maintainer, with paths prepared for future specialization:
 
@@ -848,28 +791,7 @@ Changes requiring extra review attention:
 
 No bot approval.
 
-## 37. Pull request and issue templates
-
-Use a short PR template:
-
-```text
-What changed
-Why
-How it was validated
-Contract or migration impact
-Security checklist
-```
-
-Issue templates:
-
-- Bug;
-- Feature;
-- Security, redirected to private reporting;
-- Technical debt.
-
-Security reports must not be public issues.
-
-## 38. Criteria for extracting logic to Core
+## 31. Criteria for extracting logic to Core
 
 Move logic from Gymkhana Database to Core only when it satisfies most of these conditions:
 
@@ -884,7 +806,28 @@ Move logic from Gymkhana Database to Core only when it satisfies most of these c
 
 When uncertain, keep the logic in Gymkhana Database and extract it after real reuse is demonstrated.
 
-## 39. Version policy
+## 32. Stage 6 impact
+
+Stage 6 primarily defined Gymkhana UI and product interaction behavior:
+
+- semantic design tokens and themes;
+- density and responsive behavior;
+- components, overlays, forms, dates, AppShell, and Page composition;
+- server-driven Data Grid state;
+- sorting, typed filters, grouping, aggregation, selection, and bulk actions;
+- preferences, inline editing, accessibility, virtualization, and mobile simplification.
+
+No new Core package is required solely because those visual decisions exist.
+
+The following boundaries are now explicit:
+
+- Core does not own Data Grid columns, React state, breakpoints, density, mobile behavior, or URL serialization;
+- Core may later own neutral field types, operators, filter AST, grouping, aggregation, query validation, and result references after Stage 7 closes those contracts;
+- product capabilities and permissions are evaluated by Gymkhana Database, not Core;
+- UI labels, Portuguese messages, focus behavior, and responsive omission of advanced actions remain in Gymkhana UI/Database;
+- `CivilDate` and `YearMonth` remain conceptually aligned across languages without creating shared generated runtime code between Go and TypeScript.
+
+## 33. Version policy
 
 Compare the most mature proven line with the latest stable line.
 
@@ -899,23 +842,36 @@ Adopt a newer version only for:
 
 Betas and release candidates are limited to research branches. Production releases use stable versions.
 
-## 40. Deferred decisions
+## 34. Deferred decisions
 
-- final complete operator catalog;
-- natural-language parser owned by Core;
+- final entity and field catalog;
+- complete operator catalog;
+- final query AST and logical composition limits;
+- natural-language parser ownership;
 - final duplicate scoring rules;
 - final tool schemas;
-- support for additional AI provider concepts;
+- additional AI-provider concepts;
 - optimization before benchmarks;
-- a fourth workspace repository;
+- fourth workspace repository;
 - automatic cross-repository updates;
 - Changesets;
-- public module distribution.
+- public module distribution;
+- any Data Grid or visual-design implementation inside Core.
 
-## 41. Next stage
+## 35. Next stage
 
-**Stage 6 — Design system and Data Grid** primarily affects Gymkhana UI and Gymkhana Database.
+**Stage 7 — Gymkhana Core, Query Engine, AI Chat, and OCR.**
 
-Core should only be updated during Stage 6 if a truly reusable, infrastructure-independent contract is identified.
+Stage 7 must close:
 
-Update this document again when Stage 6 is completed.
+- entity, field, value-type, and operator catalogs;
+- query AST, logical composition, grouping, aggregation, sorting, projection, and limits;
+- validation errors and canonical serialization where useful;
+- neutral executor, result, and reference contracts;
+- matching rules and duplicate evidence;
+- provider-neutral AI messages, structured outputs, tools, usage, and errors;
+- orchestration states and streaming events;
+- OCR extraction schemas, comparisons, and review-neutral results;
+- deterministic tests, fuzzing boundaries, and compatibility rules.
+
+Update this document again when Stage 7 is completed.
