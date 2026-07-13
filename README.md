@@ -4,7 +4,31 @@ Private Go module containing deterministic, infrastructure-independent contracts
 
 ## Status
 
-Milestone 0 bootstrap. Public domain packages are intentionally not created until their contracts are implemented in Milestone 1.
+Milestone 1 foundations. The first public packages are `normalize` and `civiltime`; the first release containing them is planned as `v0.2.0`.
+
+## Available packages
+
+### `normalize`
+
+Deterministic normalization for:
+
+- display and search text;
+- Unicode letters and digits;
+- CPF validation and canonicalization;
+- email canonicalization;
+- Brazilian phone validation and E.164 canonicalization.
+
+Normalization never logs or embeds the original value in validation errors.
+
+### `civiltime`
+
+Timezone-free value types for:
+
+- strict `CivilDate` parsing and serialization;
+- strict `YearMonth` parsing and serialization;
+- comparison, leap-year rules, month arithmetic, and month boundaries.
+
+Zero values represent absence and serialize as empty text or JSON `null`.
 
 ## Boundaries
 
@@ -45,7 +69,13 @@ Consumers configure:
 export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 ```
 
-Gymkhana Database consumes exact tagged versions. Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported.
+After `v0.2.0` is released, Gymkhana Database pins it explicitly:
+
+```sh
+go get github.com/Pherlsz/Gymkhana-Core@v0.2.0
+```
+
+Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported.
 
 ## Development
 
@@ -53,4 +83,4 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ORCHESTRATION.md](docs/ORCHEST
 
 ## Releases
 
-Releases are manual and grouped by coherent capability. The first `v0.1.0` release will only be created after the module has CI, documentation, a verified release workflow, and minimum real reusable content.
+Releases are manual and grouped by coherent capabilities. `v0.1.0` established the private module and release foundation; `v0.2.0` adds the first reusable public packages.
