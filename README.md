@@ -4,7 +4,7 @@ Private Go module containing deterministic, infrastructure-independent contracts
 
 ## Status
 
-Milestone 1 foundations. The first public packages are `normalize` and `civiltime`; the first release containing them is planned as `v0.2.0`.
+Milestone 1 foundations. The first public packages are `normalize` and `civiltime`; the first release containing them is `v0.2.0`.
 
 ## Available packages
 
@@ -69,7 +69,7 @@ Consumers configure:
 export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 ```
 
-After `v0.2.0` is released, Gymkhana Database pins it explicitly:
+Gymkhana Database pins the exact release:
 
 ```sh
 go get github.com/Pherlsz/Gymkhana-Core@v0.2.0
@@ -83,11 +83,19 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ORCHESTRATION.md](docs/ORCHEST
 
 ## Releases
 
-Release Please derives versions from the Conventional Commit used as the final squash or merge title:
+The functional pull request carries its own semantic version and changelog section. Before the final commit, run:
+
+```sh
+python scripts/release-version.py write \
+  --base-version <version-on-main> \
+  --title "<final-pr-title>"
+```
+
+The release check recalculates the expected version from the final pull request title:
 
 - `fix` increments the patch version;
 - `feat` increments the minor version;
 - a `!` or `BREAKING CHANGE` increments the minor version before `1.0.0` and the major version afterwards;
-- `chore`, `docs`, `test`, and other non-releasable commits do not create a version bump by themselves.
+- `chore`, `docs`, `test`, and other non-releasable changes keep the current version.
 
-A push to `main` validates the repository and creates or updates a release pull request. Merging that release pull request updates `CHANGELOG.md`, creates the `vX.Y.Z` tag, and publishes the GitHub Release. Releases remain grouped deliberately: ordinary feature merges prepare the release pull request but do not publish immediately.
+After merge, `main` runs all quality gates and creates the missing `vX.Y.Z` tag and GitHub Release directly. No generated release pull request is used.
