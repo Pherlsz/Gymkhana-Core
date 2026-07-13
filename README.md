@@ -83,4 +83,11 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ORCHESTRATION.md](docs/ORCHEST
 
 ## Releases
 
-Releases are manual and grouped by coherent capabilities. `v0.1.0` established the private module and release foundation; `v0.2.0` adds the first reusable public packages.
+Release Please derives versions from the Conventional Commit used as the final squash or merge title:
+
+- `fix` increments the patch version;
+- `feat` increments the minor version;
+- a `!` or `BREAKING CHANGE` increments the minor version before `1.0.0` and the major version afterwards;
+- `chore`, `docs`, `test`, and other non-releasable commits do not create a version bump by themselves.
+
+A push to `main` validates the repository and creates or updates a release pull request. Merging that release pull request updates `CHANGELOG.md`, creates the `vX.Y.Z` tag, and publishes the GitHub Release. Releases remain grouped deliberately: ordinary feature merges prepare the release pull request but do not publish immediately.
