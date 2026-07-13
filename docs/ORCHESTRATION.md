@@ -1,12 +1,12 @@
 # Gymkhana Core — Orchestration Document
 
-> **Planning version:** Stage 7  
-> **Last synchronized:** 2026-07-12  
-> **Current stage:** Stage 7 completed  
+> **Planning version:** Stage 8  
+> **Last synchronized:** 2026-07-13  
+> **Current stage:** Stage 8 completed  
 > **Primary source of truth:** `Pherlsz/Gymkhana-Database/docs/ORCHESTRATION.md`  
 > **Repository responsibility:** reusable Go logic independent from infrastructure
 
-This document records approved decisions that affect `Gymkhana-Core`. Product, persistence, HTTP, provider, and UI responsibilities remain in Gymkhana Database and Gymkhana UI.
+This document records approved decisions that affect `Gymkhana-Core`. Product, persistence, HTTP, OpenAPI, provider, worker, and UI responsibilities remain in Gymkhana Database and Gymkhana UI.
 
 ## 1. Mission
 
@@ -36,15 +36,17 @@ Core does not contain product-facing Portuguese strings. Consumers own localizat
 
 ## 3. What does not belong in Core
 
-- PostgreSQL repositories, SQL, pgx, sqlc, migrations, or indexes;
-- HTTP handlers, sessions, product permissions, OpenAPI-generated product types;
+- PostgreSQL repositories, SQL, pgx, sqlc, migrations, indexes, RLS, or transaction management;
+- HTTP handlers, status codes, cookies, sessions, CSRF, routing, or OpenAPI-generated product types;
+- product roles, permissions, authorization service, field visibility, or resource ownership;
 - River, R2/S3, signed URLs, file downloads, PDF rendering, Cloud Run, Neon, or Vercel;
 - OpenAI or Google SDK types;
-- product prompts or model assignments;
-- React, TypeScript, Data Grid, routes, UI copy, focus behavior, or responsive rules;
+- product prompts, provider secrets, model assignments, quotas, or prices;
+- React, TypeScript, Data Grid, routes, Query Keys, cache invalidation, forms, or responsive rules;
 - complete Profile/document/bill persistence models;
-- duplicate queue persistence or merge transactions;
+- duplicate queue persistence, merge transaction, lixeira, restore, or audit storage;
 - OCR operations, attachment access, or application of suggestions;
+- imports, XLSX parsing, Forms synchronization, exports, notifications, or operation polling;
 - direct execution of arbitrary code or SQL.
 
 ## 4. Principles
@@ -60,6 +62,7 @@ Core does not contain product-facing Portuguese strings. Consumers own localizat
 - Describe intent and plans; leave data access and authorization to the consumer.
 - Support broad capability through typed extensibility, not arbitrary scripts.
 - Do not rely on exact user keywords as a semantic contract.
+- Treat HTTP, OpenAPI, persistence, idempotency storage, and localization as adapters outside Core.
 
 ## 5. Stack and quality
 
@@ -113,7 +116,7 @@ Rules:
 - keep display value separate from normalized search value;
 - keep `CivilDate`, `YearMonth`, and real instants distinct.
 
-Core does not decide database representation or UI mask.
+Core does not decide database representation, uniqueness policy, UI mask, or API schema.
 
 ## 8. Temporal types
 
@@ -125,11 +128,11 @@ Conceptual public separation:
 
 Core may provide parsing, validation, comparison, serialization, leap-year behavior, and month navigation.
 
-It does not own locale formatting, date-picker behavior, or application timezone.
+It does not own locale formatting, date-picker behavior, product timezone, RFC3339 HTTP mapping, or persistence.
 
 ## 9. Query catalog contracts
 
-The consumer supplies a filtered catalog. Core validates against it but never loads it.
+The consumer supplies a permission-filtered catalog. Core validates against it but never loads it.
 
 Conceptual definitions:
 
@@ -189,7 +192,7 @@ attachment_reference
 
 `identifier` is not numeric and preserves leading zeros and letters.
 
-Typed values must have canonical JSON representation suitable for plan serialization and fingerprints.
+Typed values must have canonical JSON representation suitable for plan serialization and fingerprints. Core does not dictate HTTP decimal-string wrappers or localized labels.
 
 ## 11. Field paths and relations
 
@@ -332,6 +335,8 @@ minimum
 maximum
 ```
 
+Core does not map page/page_size query parameters or HTTP responses.
+
 ## 15. Execution Plan
 
 Complex work uses a DAG of typed steps:
@@ -358,7 +363,7 @@ summarize
 
 Dependencies reference structured step outputs. Cycles and unknown dependencies are invalid. Independent steps may be executed in parallel by the consumer.
 
-Core does not persist intermediate results or choose SQL/temp-table strategy.
+Core does not persist intermediate results, choose SQL/temp-table strategy, enqueue jobs, or create operation records.
 
 ## 16. Set operations and result grain
 
@@ -493,11 +498,13 @@ Query and Execution Plans use versioned canonical JSON:
 - stable ordering where semantics allow;
 - canonical dates and numbers;
 - technical keys, never display labels;
-- no SQL, credentials, provider types, or authentication data.
+- no SQL, credentials, provider types, authentication data, HTTP metadata, or locale strings.
 
 Fingerprints are derived from canonical plan plus catalog and permission-scope inputs supplied by the consumer.
 
-Uses include all-matching selection, job identity, audit references, result-set follow-ups, idempotency, and future caching.
+Uses include all-matching selection, job identity, audit references, result-set follow-ups, idempotency inputs, and future caching.
+
+Core can produce a deterministic fingerprint input; Database owns persistence, expiration, user scope, and conflict behavior for idempotency keys.
 
 ## 22. Query explanations
 
@@ -537,7 +544,7 @@ Values remain typed.
 
 References contain entity, ID, readable label metadata, and optional field path. The product creates URLs and checks visibility.
 
-Core may represent summaries and samples but does not fetch or persist records.
+Core may represent summaries and samples but does not fetch, paginate HTTP responses, persist result sets, or authorize access.
 
 ## 24. Semantic Assistant contracts
 
@@ -573,7 +580,7 @@ Core never includes physical schema names or data samples by default.
 
 No provider SDK type appears in public APIs.
 
-Conceptual interfaces:
+Conceptual interface:
 
 ```go
 type AIProvider interface {
@@ -585,7 +592,7 @@ Capabilities may declare streaming, structured output, tools, vision, prompt cac
 
 The consumer maps OpenAI, Google, or future providers.
 
-Core does not select configured models, prices, credentials, or fallback policy.
+Core does not select configured models, prices, credentials, fallback policy, or HTTP/SSE transport.
 
 ## 27. Tool contracts
 
@@ -647,7 +654,9 @@ run.cancelled
 heartbeat
 ```
 
-Core does not know SSE or HTTP; Database maps events to transport.
+Events can carry version and sequence metadata. Core does not know SSE, HTTP reconnect headers, sessions, thread ownership, or persistence.
+
+Declarative actions use a closed kind set and structured resource references; Database/UI decide which actions are allowed and rendered.
 
 ## 30. Conversation context references
 
@@ -655,7 +664,7 @@ Core may represent structured thread summaries, active constraints, referenced r
 
 This supports follow-ups such as “from those” without relying only on text.
 
-Core does not persist threads, decide retention, or create global user memory.
+Core does not persist threads, decide retention, enforce one active run per thread, or create global user memory.
 
 ## 31. Prompt-injection boundary
 
@@ -720,7 +729,7 @@ suggestion_invalid
 conflict_between_sources
 ```
 
-Core does not call providers, inspect R2, render PDFs, persist operations, authorize users, or apply accepted values.
+Core does not call providers, inspect R2, render PDFs, persist operations, authorize users, handle resource versions, or apply accepted values.
 
 ## 33. OCR evidence
 
@@ -797,9 +806,7 @@ Example vector contents:
 
 It must not require observations, full addresses, all documents, all bills, attachments, or custom records for every pair.
 
-Candidate generation, SQL evidence calculation, staging, pagination, aggregation, and Neon egress measurement remain in Gymkhana Database.
-
-This boundary allows PostgreSQL to reduce 10k–20k candidate pairs before application processing.
+Candidate generation, SQL evidence calculation, staging, pagination, aggregation, Neon egress measurement, queue persistence, review, and merge remain in Gymkhana Database.
 
 ## 37. Complex Gymkhana task contracts
 
@@ -816,7 +823,7 @@ A task plan may combine multiple categories simultaneously:
 
 No one-category restriction exists.
 
-Conceptual contracts:
+Conceptual contract:
 
 ```go
 type GymkhanaTaskPlan struct {
@@ -893,7 +900,7 @@ The solver should:
 - stop after the configured solution limit;
 - produce main and materially different alternative solutions.
 
-It does not fetch candidates or persist checkpoints. Database owns asynchronous execution and staging.
+It does not fetch candidates, persist checkpoints, create operations, or enforce retention. Database owns asynchronous execution and staging.
 
 ## 41. Task ranking and evidence
 
@@ -907,11 +914,56 @@ Core structures this evidence; the product minimizes sensitive output and create
 
 ## 42. Imports and pure conversion
 
-Core may provide pure functions for header normalization, typed value conversion, schema validation, row errors, and duplicate candidate features.
+Core may provide pure functions for:
 
-It does not import Excelize, run `CopyFrom`, create staging rows, interact with Google Forms, or report job progress.
+- header normalization;
+- typed value conversion;
+- schema validation;
+- row error structures;
+- mapping transformation definitions;
+- duplicate candidate features;
+- canonical row fingerprints when generic enough.
 
-## 43. Errors
+Allowed generic transformations may include trim, whitespace normalization, case conversion, mask removal, typed date/year-month/decimal parsing, option mapping, split, join, and constant values.
+
+Core does not import Excelize, run `CopyFrom`, create staging rows, interact with Google Forms, execute batches, decide row transactions, or report job progress.
+
+## 43. Neutral operation concepts
+
+Core may define small neutral enums or value objects when shared by multiple algorithms, such as:
+
+```text
+queued
+running
+waiting_for_review
+completed
+completed_with_errors
+failed
+cancel_requested
+cancelled
+expired
+```
+
+It may also represent determinate versus indeterminate progress and structured stage metadata.
+
+Database owns operation resources, River jobs, Cloud Run launch, polling, cancellation commands, reports, ownership, permissions, and retention.
+
+Feature-specific business statuses remain in Database unless a stable cross-feature contract is proven.
+
+## 44. Neutral change and conflict contracts
+
+Core may define reusable deterministic helpers for:
+
+- version comparison inputs;
+- current-versus-submitted value comparisons;
+- changed-field sets;
+- canonical request fingerprint inputs;
+- conflict reason codes;
+- field decision structures.
+
+It does not implement HTTP `412`, `409`, `If-Match`, database row locks, transactions, or frontend reconciliation.
+
+## 45. Errors
 
 Neutral errors use stable codes, paths, and arguments:
 
@@ -923,9 +975,73 @@ type FieldError struct {
 }
 ```
 
-No HTTP status, localized message, SQL, stack trace, or provider payload in public Core errors.
+No HTTP status, localized message, SQL, stack trace, request ID, or provider payload in public Core errors.
 
-## 44. Testing
+Database maps Core errors into the product error envelope and status codes.
+
+## 46. Stage 8 API boundary
+
+Stage 8 approved a REST/OpenAPI product contract, but Core remains transport-neutral.
+
+Core public APIs must not depend on:
+
+- `/api/v1` paths;
+- resource pluralization;
+- OpenAPI operation IDs;
+- request/response DTOs generated for HTTP;
+- pagination envelopes;
+- session or permission models;
+- roles;
+- CSRF or idempotency headers;
+- Query Key factories;
+- React route schemas;
+- field-level localization.
+
+Stable neutral domain contracts may be adapted into OpenAPI schemas by Gymkhana Database, but generated types do not become Core source-of-truth types.
+
+## 47. Authorization boundary
+
+The consumer passes only permitted catalog definitions, fields, references, records, and tool capabilities.
+
+Core validates consistency of the supplied scope but does not decide whether MEMBER, ADMIN, SUPERADMIN, or a particular user is allowed.
+
+Core explanations and results must preserve field keys so Database can enforce and audit sensitive access.
+
+No permission result is inferred from absent UI actions.
+
+## 48. Idempotency boundary
+
+Core may provide canonicalization and hashing inputs for commands or plans when generic and deterministic.
+
+Database owns:
+
+- `Idempotency-Key` header handling;
+- user/endpoint scope;
+- request body fingerprint association;
+- persistence and expiration;
+- in-progress/success/failure replay behavior;
+- conflict when one key is reused with another request.
+
+Core never stores idempotency records or repeats mutations.
+
+## 49. Pagination and projection boundary
+
+Core Query Plans may represent page, limit, projection, sort, grouping, and result mode.
+
+Database owns:
+
+- allowed page sizes;
+- HTTP query parameter syntax;
+- totals/page counts;
+- cursor or keyset use for internal jobs;
+- field-level permission filtering;
+- safe SQL implementation;
+- payload-size limits;
+- egress measurement.
+
+Core should never require `SELECT *` or complete records when references/typed projections are sufficient.
+
+## 50. Testing
 
 ### Unit tests
 
@@ -943,7 +1059,8 @@ No HTTP status, localized message, SQL, stack trace, or provider payload in publ
 - assistant/tool schemas;
 - OCR comparison/evidence validation;
 - duplicate rules, contradictions, determinism;
-- mixed Gymkhana task requirements and bindings.
+- mixed Gymkhana task requirements and bindings;
+- neutral operation/progress/value comparison structures when implemented.
 
 ### Fuzzing
 
@@ -955,13 +1072,20 @@ No HTTP status, localized message, SQL, stack trace, or provider payload in publ
 - cardinalities and combinations;
 - serialization round trips;
 - malformed tool/structured-output payloads;
-- duplicate inputs.
+- duplicate inputs;
+- canonical fingerprint stability.
+
+### Semantic test fixtures
+
+Core may provide expected typed plans for equivalent intents, while the provider/orchestrator evaluation stays in Database.
+
+Equivalent paraphrases must be compared by intent, fields, operators, bindings, and constraints rather than exact response text.
 
 ### Integration boundary tests
 
-Core tests only neutral contracts and pure algorithms. SQL, PostgreSQL, SSE, River, R2, providers, UI, merge transactions, and egress tests stay in Database/UI.
+Core tests only neutral contracts and pure algorithms. SQL, PostgreSQL, HTTP/OpenAPI, authorization, sessions, SSE, River, R2, providers, UI, merge transactions, imports, and egress tests stay in Database/UI.
 
-## 45. Versioning and releases
+## 51. Versioning and releases
 
 Start at `v0.1.0` and follow SemVer. Breaking changes are explicit even in `0.x`.
 
@@ -971,7 +1095,7 @@ Go v2 uses `/v2` module suffix.
 
 Manual-assisted release runs all checks, validates changelog, creates one release commit, tag, and GitHub Release. Do not release on every merge.
 
-## 46. Branches and CI
+## 52. Branches and CI
 
 Short-lived feature/fix/refactor/chore/agent branches from `main`, PR required during active development, resolved review threads, protected main, squash merge, and English commit/PR text.
 
@@ -990,11 +1114,11 @@ Race runs on main/release/concurrency-relevant changes and justified periodic ch
 
 A Core release does not automatically update or deploy Gymkhana Database.
 
-## 47. Extraction criteria
+## 53. Extraction criteria
 
 Move logic to Core only when it is:
 
-- independent from PostgreSQL, HTTP, UI, and provider SDKs;
+- independent from PostgreSQL, HTTP, OpenAPI, UI, permissions, and provider SDKs;
 - not tied to a specific persisted entity implementation;
 - reused by more than one flow;
 - deterministic and easily tested;
@@ -1003,7 +1127,7 @@ Move logic to Core only when it is:
 
 Otherwise keep it in Gymkhana Database until reuse is proven.
 
-## 48. Deferred decisions
+## 54. Deferred decisions
 
 - physical SQL compiler;
 - final provider/model choices;
@@ -1014,12 +1138,21 @@ Otherwise keep it in Gymkhana Database until reuse is proven.
 - automatic cross-repository updates;
 - Changesets;
 - final optimizations before benchmarks;
+- HTTP/OpenAPI contracts in Core;
+- authorization and role models in Core;
 - any React/Data Grid/mobile implementation in Core.
 
-## 49. Next stage
+## 55. Next stage
 
-**Stage 8 — APIs, permissions, and complete frontend/backend flows.**
+**Stage 9 — implementation plan, milestones, dependencies, and delivery order.**
 
-Core impact should be limited to stable neutral contracts discovered while defining API resources, authorization-independent validation, idempotency inputs, result envelopes, and operation states.
+Core planning should define:
 
-Update this document again when Stage 8 is completed.
+- the minimum package skeleton and stable types needed by Database;
+- delivery order for normalization, temporal types, query AST, plans, matching, Assistant/OCR contracts, and task solver;
+- benchmark and fuzz gates before tagging releases;
+- exact release points consumed by Gymkhana Database;
+- which logic remains local to Database until reuse is demonstrated;
+- compatibility and migration expectations between milestone tags.
+
+Update this document again when Stage 9 is completed.
