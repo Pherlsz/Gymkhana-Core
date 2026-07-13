@@ -1,0 +1,89 @@
+SHELL := /bin/sh
+
+GO ?= go
+BIN_DIR := $(CURDIR)/bin
+GOEXE := $(shell $(GO) env GOEXE 2>/dev/null)
+STATICCHECK := $(BIN_DIR)/staticcheck$(GOEXE)
+GOVULNCHECK := $(BIN_DIR)/govulncheck$(GOEXE)
+OSV_SCANNER := $(BIN_DIR)/osv-scanner$(GOEXE)
+
+STATICCHECK_VERSION := v0.7.0
+GOVULNCHECK_VERSION := v1.6.0
+OSV_SCANNER_VERSION := v2.4.0
+
+.PHONY: setup format format-check vet lint test test-race fuzz-smoke vuln osv security check clean
+
+setup:
+	@mkdir -p "$(BIN_DIR)"
+	@GOBIN="$(BIN_DIR)" $(GO) install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
+	@GOBIN="$(BIN_DIR)" $(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+	@GOBIN="$(BIN_DIR)" $(GO) install github.com/google/osv-scanner/v2/cmd/osv-scanner@$(OSV_SCANNER_VERSION)
+
+format:
+	@files="$$(find . -type f -name '*.go' -not -path './vendor/*')"; \
+	if [ -n "$$files" ]; then gofmt -w $$files; fi
+
+format-check:
+	@files="$$(find . -type f -name '*.go' -not -path './vendor/*')"; \
+	if [ -z "$$files" ]; then \
+		echo "No Go files yet; skipping gofmt check."; \
+		exit 0; \
+	fi; \
+	unformatted="$$(gofmt -l $$files)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "The following files are not formatted:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
+
+vet:
+	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
+		echo "No Go packages yet; skipping go vet."; \
+	else \
+		$(GO) vet ./...; \
+	fi
+
+lint:
+	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
+		echo "No Go packages yet; skipping staticcheck."; \
+	else \
+		"$(STATICCHECK)" ./...; \
+	fi
+
+test:
+	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
+		echo "No Go packages yet; skipping tests."; \
+	else \
+		$(GO) test ./...; \
+	fi
+
+test-race:
+	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
+		echo "No Go packages yet; skipping race tests."; \
+	else \
+		$(GO) test -race ./...; \
+	fi
+
+fuzz-smoke:
+	@if ! grep -R --include='*_test.go' -Eq 'func[[:space:]]+Fuzz' . 2>/dev/null; then \
+		echo "No fuzz tests yet; skipping fuzz smoke test."; \
+	else \
+		$(GO) test -run='^$$' -fuzz=. -fuzztime=5s ./...; \
+	fi
+
+vuln:
+	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
+		echo "No Go packages yet; skipping govulncheck."; \
+	else \
+		"$(GOVULNCHECK)" ./...; \
+	fi
+
+osv:
+	@"$(OSV_SCANNER)" scan source --recursive .
+
+security: setup vuln osv
+
+check: setup format-check vet lint test test-race vuln osv
+
+clean:
+	@rm -rf "$(BIN_DIR)" coverage
