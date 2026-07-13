@@ -11,11 +11,16 @@ STATICCHECK_VERSION := v0.7.0
 GOVULNCHECK_VERSION := v1.6.0
 OSV_SCANNER_VERSION := v2.4.0
 
-.PHONY: setup format format-check vet lint test test-race fuzz-smoke vuln osv security check clean
+.PHONY: setup setup-quality setup-security format format-check vet lint test test-race fuzz-smoke vuln osv security check clean
 
-setup:
+setup: setup-quality setup-security
+
+setup-quality:
 	@mkdir -p "$(BIN_DIR)"
 	@GOBIN="$(BIN_DIR)" $(GO) install honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION)
+
+setup-security:
+	@mkdir -p "$(BIN_DIR)"
 	@GOBIN="$(BIN_DIR)" $(GO) install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
 	@GOBIN="$(BIN_DIR)" $(GO) install github.com/google/osv-scanner/v2/cmd/osv-scanner@$(OSV_SCANNER_VERSION)
 
@@ -37,53 +42,32 @@ format-check:
 	fi
 
 vet:
-	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
-		echo "No Go packages yet; skipping go vet."; \
-	else \
-		$(GO) vet ./...; \
-	fi
+	@$(GO) vet ./...
 
 lint:
-	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
-		echo "No Go packages yet; skipping staticcheck."; \
-	else \
-		"$(STATICCHECK)" ./...; \
-	fi
+	@"$(STATICCHECK)" ./...
 
 test:
-	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
-		echo "No Go packages yet; skipping tests."; \
-	else \
-		$(GO) test ./...; \
-	fi
+	@$(GO) test ./...
 
 test-race:
-	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
-		echo "No Go packages yet; skipping race tests."; \
-	else \
-		$(GO) test -race ./...; \
-	fi
+	@$(GO) test -race ./...
 
 fuzz-smoke:
-	@if ! grep -R --include='*_test.go' -Eq 'func[[:space:]]+Fuzz' . 2>/dev/null; then \
-		echo "No fuzz tests yet; skipping fuzz smoke test."; \
-	else \
-		$(GO) test -run='^$$' -fuzz=. -fuzztime=5s ./...; \
-	fi
+	@$(GO) test -run='^$$' -fuzz='^FuzzSearchText$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
+	@$(GO) test -run='^$$' -fuzz='^FuzzCanonicalCPF$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
+	@$(GO) test -run='^$$' -fuzz='^FuzzParseCivilDate$$' -fuzztime=2s -timeout=30s -parallel=1 ./civiltime
+	@$(GO) test -run='^$$' -fuzz='^FuzzParseYearMonth$$' -fuzztime=2s -timeout=30s -parallel=1 ./civiltime
 
 vuln:
-	@if [ -z "$$($(GO) list ./... 2>/dev/null)" ]; then \
-		echo "No Go packages yet; skipping govulncheck."; \
-	else \
-		"$(GOVULNCHECK)" ./...; \
-	fi
+	@"$(GOVULNCHECK)" ./...
 
 osv:
 	@"$(OSV_SCANNER)" scan source --recursive .
 
-security: setup vuln osv
+security: setup-security vuln osv
 
-check: setup format-check vet lint test test-race vuln osv
+check: setup format-check vet lint test test-race fuzz-smoke vuln osv
 
 clean:
 	@rm -rf "$(BIN_DIR)" coverage

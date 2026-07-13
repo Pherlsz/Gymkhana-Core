@@ -32,5 +32,23 @@ jobs:
       - name: Verify toolchain
         run: go version
 
-      - name: Run quality gates
-        run: make check
+      - name: Install quality tools
+        run: make setup-quality
+
+      - name: Check formatting
+        run: make format-check
+
+      - name: Vet
+        run: make vet
+
+      - name: Staticcheck
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Race test
+        run: make test-race
+
+      - name: Fuzz smoke
+        run: make fuzz-smoke
