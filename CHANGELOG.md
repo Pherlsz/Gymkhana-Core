@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.2.1] - 2026-07-13
+
+### Fixed
+
+- Updated `golang.org/x/text` to `v0.40.0` for current Unicode normalization and malformed-input fixes.
+- Removed nonexistent custom labels from Dependabot configuration so scheduled updates open without warnings.
+
 ## [0.2.0] - 2026-07-13
 
 ### Added
