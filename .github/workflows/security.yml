@@ -2,25 +2,30 @@ name: Security
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    types: [opened, reopened, ready_for_review]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - ".github/workflows/security.yml"
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: "17 6 1,15 * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: security-${{ github.workflow }}-${{ github.ref }}
+  group: security-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   scan:
     name: Vulnerability scan
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
@@ -30,7 +35,7 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: 1.26.5
-          cache: false
+          cache: true
 
       - name: Run security scans
         run: make security

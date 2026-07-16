@@ -2,38 +2,63 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "**/*.go"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - "VERSION"
+      - "CHANGELOG.md"
+      - "scripts/release-version.py"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   quality:
     name: Quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: 1.26.5
-          cache: false
+          cache: true
 
-      - name: Verify toolchain
-        run: go version
-
-      - name: Install quality tools
-        run: make setup-quality
+      - name: Validate semantic version carried by this PR
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if base_version="$(git show "${BASE_SHA}:VERSION" 2>/dev/null)"; then
+            :
+          else
+            base_version="$(
+              git show "${BASE_SHA}:.release-please-manifest.json" |
+                python -c 'import json,sys; print(json.load(sys.stdin)["."])'
+            )"
+          fi
+          python scripts/release-version.py check \
+            --base-version "$base_version" \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY"
 
       - name: Check formatting
         run: make format-check
@@ -41,14 +66,21 @@ jobs:
       - name: Vet
         run: make vet
 
-      - name: Staticcheck
-        run: make lint
-
       - name: Test
         run: make test
 
+      - name: Install heavy quality tools
+        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
+        run: make setup-quality
+
+      - name: Staticcheck
+        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
+        run: make lint
+
       - name: Race test
+        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
         run: make test-race
 
       - name: Fuzz smoke
+        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
         run: make fuzz-smoke
