@@ -1,8 +1,8 @@
-name: CI
+name: CI final gate
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, ready_for_review, reopened]
     paths:
       - "**/*.go"
       - "go.mod"
@@ -10,36 +10,42 @@ on:
       - "Makefile"
       - "VERSION"
       - "CHANGELOG.md"
-      - "scripts/release-version.py"
-      - ".github/workflows/ci.yml"
+      - "scripts/**"
+      - ".github/workflows/**"
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Verification scope
+        required: true
+        default: full
+        type: choice
+        options:
+          - quick
+          - full
+          - security
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-final-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   quality:
-    name: Quality
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 15
-
+    timeout-minutes: 20
+    env:
+      VERIFY_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'full' }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: 1.26.5
           cache: true
-
       - name: Validate semantic version carried by this PR
         if: github.event_name == 'pull_request'
         env:
@@ -50,37 +56,10 @@ jobs:
           if base_version="$(git show "${BASE_SHA}:VERSION" 2>/dev/null)"; then
             :
           else
-            base_version="$(
-              git show "${BASE_SHA}:.release-please-manifest.json" |
-                python -c 'import json,sys; print(json.load(sys.stdin)["."])'
-            )"
+            base_version="$(git show "${BASE_SHA}:.release-please-manifest.json" | python -c 'import json,sys; print(json.load(sys.stdin)["."])')"
           fi
           python scripts/release-version.py check \
             --base-version "$base_version" \
             --title "$PR_TITLE" \
             --body "$PR_BODY"
-
-      - name: Check formatting
-        run: make format-check
-
-      - name: Vet
-        run: make vet
-
-      - name: Test
-        run: make test
-
-      - name: Install heavy quality tools
-        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
-        run: make setup-quality
-
-      - name: Staticcheck
-        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
-        run: make lint
-
-      - name: Race test
-        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
-        run: make test-race
-
-      - name: Fuzz smoke
-        if: github.event_name == 'workflow_dispatch' || github.event.action == 'opened' || github.event.action == 'reopened' || github.event.action == 'ready_for_review'
-        run: make fuzz-smoke
+      - run: scripts/verify-local.sh "$VERIFY_SCOPE"
