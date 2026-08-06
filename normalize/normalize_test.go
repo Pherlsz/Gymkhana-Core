@@ -49,6 +49,33 @@ func TestCanonicalCPF(t *testing.T) {
 	}
 }
 
+func TestMaskCPF(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"52998224725", "***.982.247-25"},
+		{"", ""},
+		{"1234567890", "1234567890"},  // too short
+		{"123456789012", "123456789012"}, // too long
+		{"5299822472a", "5299822472a"}, // non-digit
+		{"529.982.247-25", "529.982.247-25"}, // formatted, not canonical
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+			got := normalize.MaskCPF(tc.input)
+			if got != tc.expected {
+				t.Fatalf("MaskCPF(%q) = %q, want %q", tc.input, got, tc.expected)
+			}
+		})
+	}
+}
+
 func TestCanonicalEmail(t *testing.T) {
 	t.Parallel()
 
