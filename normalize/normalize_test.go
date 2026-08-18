@@ -49,6 +49,33 @@ func TestCanonicalCPF(t *testing.T) {
 	}
 }
 
+func TestCanonicalCNPJ(t *testing.T) {
+	t.Parallel()
+
+	got, err := normalize.CanonicalCNPJ("12.abc.345/01de-35")
+	if err != nil {
+		t.Fatalf("CanonicalCNPJ() error = %v", err)
+	}
+	if got != "12ABC34501DE35" {
+		t.Fatalf("CanonicalCNPJ() = %q", got)
+	}
+
+	got, err = normalize.CanonicalCNPJ("11.222.333/0001-81")
+	if err != nil {
+		t.Fatalf("CanonicalCNPJ() numeric error = %v", err)
+	}
+	if got != "11222333000181" {
+		t.Fatalf("CanonicalCNPJ() numeric = %q", got)
+	}
+
+	if _, err := normalize.CanonicalCNPJ("00.000.000/0000-00"); !normalize.IsCode(err, normalize.CodeInvalidChecksum) {
+		t.Fatalf("expected checksum error, got %v", err)
+	}
+	if _, err := normalize.CanonicalCNPJ("12.ABC.345/01DE-00"); !normalize.IsCode(err, normalize.CodeInvalidChecksum) {
+		t.Fatalf("expected alphanumeric checksum error, got %v", err)
+	}
+}
+
 func TestCanonicalEmail(t *testing.T) {
 	t.Parallel()
 

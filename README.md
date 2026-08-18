@@ -16,7 +16,14 @@ Deterministic normalization for:
 
 - display and search text;
 - Unicode letters and digits;
+- person names;
+- street, house number, block (`bl. A`), apartment (`apt. 202`), CEP, and UF;
+- city, neighborhood, country, and nationality;
+- gender, marital status, blood type, and club membership type;
+- team, sector, football club, health plan, card, collection, animal, and vehicle;
 - CPF validation and canonicalization;
+- CNPJ validation and canonicalization, including the alphanumeric Receita Federal form;
+- catalog document identifiers (canonical form, display formatting, UF folded into the identifier when the type is state-issued, and unique type inference from unlabeled numbers);
 - email canonicalization;
 - Brazilian phone validation and E.164 canonicalization.
 

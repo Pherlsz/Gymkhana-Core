@@ -10,8 +10,12 @@ type ValueKind string
 
 const (
 	KindCPF         ValueKind = "cpf"
+	KindCNPJ        ValueKind = "cnpj"
 	KindEmail       ValueKind = "email"
 	KindBrazilPhone ValueKind = "brazil_phone"
+	KindDocument    ValueKind = "document"
+	KindPostalCode  ValueKind = "postal_code"
+	KindPlate       ValueKind = "vehicle_plate"
 )
 
 // ErrorCode identifies a stable validation failure without exposing the input.
@@ -24,6 +28,10 @@ const (
 	CodeInvalidChecksum ErrorCode = "invalid_checksum"
 	CodeInvalidAreaCode ErrorCode = "invalid_area_code"
 	CodeInvalidNumber   ErrorCode = "invalid_number"
+	CodeUnknownKind     ErrorCode = "unknown_kind"
+	CodeMissingState    ErrorCode = "missing_state"
+	CodeInvalidState    ErrorCode = "invalid_state"
+	CodeAmbiguous       ErrorCode = "ambiguous"
 )
 
 // ValidationError is returned when a value cannot be canonicalized safely.

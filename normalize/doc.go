@@ -1,5 +1,6 @@
 // Package normalize provides deterministic, infrastructure-independent
-// canonicalization for text, identifiers, and common contact values.
+// canonicalization for text, identifiers, contact values, and profile field
+// formatters used by forms, mass import, and manual create.
 package normalize
 
 // RulesVersion identifies the persisted canonicalization behavior implemented
