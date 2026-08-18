@@ -4,7 +4,7 @@ Private Go module containing deterministic, infrastructure-independent contracts
 
 ## Repository role
 
-Gymkhana Core owns reusable Go logic that does not depend on product infrastructure. The product roadmap, current milestone, and next action remain centralized in the [Gymkhana Database master tracker #31](https://github.com/Pherlsz/Gymkhana-Database/issues/31).
+Gymkhana Core owns reusable Go logic that does not depend on product infrastructure.
 
 This repository receives work only when a Database delivery requires a reusable contract or when Core has an independently approved maintenance need. It does not maintain a competing product roadmap.
 
