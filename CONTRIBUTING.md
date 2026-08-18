@@ -42,15 +42,263 @@ Version impact is derived from that final title:
 
 ## Release preparation
 
-The functional pull request must include its own `VERSION` and `CHANGELOG.md` updates. Prepare them before the final commit:
+Every functional pull request must carry its own version and changelog updates when the change is releasable.
+
+Versioning follows Semantic Versioning and is derived from the **final pull request title** using Conventional Commits.
+
+### Version rules
+
+Given a base version such as `0.2.2`:
+
+| Pull request title                           | Version impact | Result                 |
+| -------------------------------------------- | -------------- | ---------------------- |
+| `fix(normalize): correct CPF formatting`     | Patch          | `0.2.3`                |
+| `feat(normalize): add address normalization` | Minor          | `0.3.0`                |
+| `feat(normalize)!: replace address contract` | Breaking       | `0.3.0` before `1.0.0` |
+| `feat(api)!: replace public API`             | Breaking       | `2.0.0` from `1.x.x`   |
+| `chore: update tooling`                      | None           | unchanged              |
+| `docs: improve documentation`                | None           | unchanged              |
+| `test: add normalization coverage`           | None           | unchanged              |
+| `refactor: reorganize internals`             | None           | unchanged              |
+
+A pull request is also treated as breaking when its body contains:
+
+```text
+BREAKING CHANGE:
+```
+
+Breaking changes increment the minor version while the project is below `1.0.0`. Starting from `1.0.0`, they increment the major version.
+
+### Preparing a release locally
+
+Before the final commit, determine the version currently present on the pull request base branch, normally `main`.
+
+For example, if `main` currently contains:
+
+```text
+0.2.2
+```
+
+and the final pull request title will be:
+
+```text
+feat(normalize): add canonical address normalization
+```
+
+run:
 
 ```sh
 python scripts/release-version.py write \
-  --base-version <version-on-main> \
-  --title "<final-pr-title>"
+  --base-version 0.2.2 \
+  --title "feat(normalize): add canonical address normalization"
 ```
 
-CI runs the same calculation in check mode. A version mismatch or missing changelog section blocks the pull request. After a protected PR merge changes `VERSION`, the release workflow creates the tag and GitHub Release directly from `main`; it never opens a second pull request or reruns the complete quality suite.
+The command prints the calculated version:
+
+```text
+0.3.0
+```
+
+and updates the repository release metadata.
+
+For a releasable change, `write` updates:
+
+* `VERSION` with the calculated semantic version;
+* `CHANGELOG.md` with a release section for that version.
+
+Review the generated changes before committing:
+
+```sh
+git diff -- VERSION CHANGELOG.md
+```
+
+The generated `VERSION` and `CHANGELOG.md` changes belong to the same functional pull request. Do not create a separate release-preparation pull request.
+
+### Base version
+
+`--base-version` is always the version from the pull request base branch **before the current pull request is applied**.
+
+It is not necessarily the value currently present in your working tree after running the script.
+
+For example:
+
+```text
+main VERSION:          0.2.2
+feature branch VERSION after write: 0.3.0
+--base-version:        0.2.2
+```
+
+Do not run the next command using `0.3.0` as the base version for the same pull request.
+
+When needed, inspect the version on `main` directly:
+
+```sh
+git show origin/main:VERSION
+```
+
+### Pull request title consistency
+
+The title passed to `release-version.py write` must match the final semantic meaning of the pull request title.
+
+For example:
+
+```sh
+python scripts/release-version.py write \
+  --base-version 0.2.2 \
+  --title "feat(normalize): add canonical address normalization"
+```
+
+expects the pull request to remain a `feat`.
+
+If the pull request is later changed to:
+
+```text
+fix(normalize): correct canonical address normalization
+```
+
+the expected version changes from:
+
+```text
+0.3.0
+```
+
+to:
+
+```text
+0.2.3
+```
+
+Run `write` again using the same original base version and the new final title before marking the pull request ready for review.
+
+### Pull requests with breaking changes
+
+Breaking changes can be declared using `!` in the title:
+
+```sh
+python scripts/release-version.py write \
+  --base-version 0.2.2 \
+  --title "feat(normalize)!: replace the public address contract"
+```
+
+or through the pull request body:
+
+```text
+BREAKING CHANGE: callers must migrate to the new address representation.
+```
+
+When the breaking declaration exists only in the pull request body, pass it locally with `--body`:
+
+```sh
+python scripts/release-version.py write \
+  --base-version 0.2.2 \
+  --title "feat(normalize): replace the public address contract" \
+  --body "BREAKING CHANGE: callers must migrate to the new address representation."
+```
+
+### Changelog generation
+
+The script derives the changelog category from the change type:
+
+| Change          | Changelog section |
+| --------------- | ----------------- |
+| `feat`          | `Added`           |
+| `fix`           | `Fixed`           |
+| Breaking change | `Changed`         |
+
+For example:
+
+```text
+feat(normalize): add canonical address normalization
+```
+
+may generate:
+
+```md
+## [0.3.0] - YYYY-MM-DD
+
+### Added
+
+- Add canonical address normalization.
+```
+
+The current date is used by default.
+
+A specific date can be supplied when necessary:
+
+```sh
+python scripts/release-version.py write \
+  --base-version 0.2.2 \
+  --title "feat(normalize): add canonical address normalization" \
+  --date 2026-08-18
+```
+
+Do not manually create another section for the same version after the script has generated one.
+
+### Validation mode
+
+The script also provides a non-mutating validation mode:
+
+```sh
+python scripts/release-version.py check \
+  --base-version 0.2.2 \
+  --title "feat(normalize): add canonical address normalization"
+```
+
+`check` recalculates the expected version and verifies that:
+
+1. `VERSION` contains a valid semantic version;
+2. `VERSION` matches the version required by the pull request title and body;
+3. `CHANGELOG.md` contains the corresponding release section when the change requires a new release.
+
+A successful validation prints information similar to:
+
+```json
+{"base":"0.2.2","expected":"0.3.0","actual":"0.3.0"}
+```
+
+`check` does not prepare a release and should not be used instead of `write` when release metadata still needs to be generated.
+
+### CI validation
+
+CI performs the same version calculation using:
+
+* the `VERSION` value from the pull request base commit;
+* the current pull request title;
+* the current pull request body.
+
+A mismatch between the calculated version and the committed `VERSION`, or a missing changelog section for a releasable change, blocks the pull request.
+
+This means changing the pull request title or adding/removing a breaking-change declaration can change the required version.
+
+When that happens, run `write` again locally using the original base version and commit the resulting metadata changes.
+
+### Recommended workflow
+
+For a releasable pull request:
+
+```sh
+# 1. Determine the version currently on main.
+git show origin/main:VERSION
+
+# 2. Prepare VERSION and CHANGELOG.md using the final PR title.
+python scripts/release-version.py write \
+  --base-version 0.2.2 \
+  --title "feat(normalize): add canonical address normalization"
+
+# 3. Review the generated release metadata.
+git diff -- VERSION CHANGELOG.md
+
+# 4. Run repository validation.
+make check
+
+# 5. Commit VERSION and CHANGELOG.md together with the functional change.
+git add .
+git commit
+```
+
+After the protected pull request is merged, release automation observes the new `VERSION` on `main` and creates the corresponding tag and GitHub Release.
+
+`release-version.py` itself does **not** create commits, tags, pushes, or GitHub Releases. Its responsibility is limited to preparing and validating the semantic version and changelog metadata carried by the pull request.
 
 ## Local checks and hosted Actions
 
