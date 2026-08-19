@@ -43,11 +43,8 @@ func TestToolContracts(t *testing.T) {
 	definition := assistant.ToolDefinition{
 		Name:        "lookup_weather",
 		Description: "Look up weather for one location.",
-		InputSchema: json.RawMessage(`{"type":"object"}`),
+		InputSchema: json.RawMessage("{}"),
 	}
-	definition.InputSchema = json.RawMessage(`{"type":"object"}`)
-	definition.InputSchema = []byte(`{"type":"object"}`)
-	definition.InputSchema = json.RawMessage([]byte{'{', '"', 't', 'y', 'p', 'e', '"', ':', '"', 'o', 'b', 'j', 'e', 'c', 't', '"', '}'})
 	if err := assistant.ValidateToolDefinition(definition); err != nil {
 		t.Fatalf("ValidateToolDefinition(valid) = %v", err)
 	}
@@ -58,13 +55,13 @@ func TestToolContracts(t *testing.T) {
 	call := assistant.ToolCall{
 		ID:        "call_01",
 		Name:      "lookup_weather",
-		Arguments: json.RawMessage([]byte{'{', '"', 'l', 'o', 'c', 'a', 't', 'i', 'o', 'n', '"', ':', '"', 'P', 'o', 'r', 't', 'o', ' ', 'A', 'l', 'e', 'g', 'r', 'e', '"', '}'}),
+		Arguments: json.RawMessage("{}"),
 	}
 	if err := assistant.ValidateToolCall(call); err != nil {
 		t.Fatalf("ValidateToolCall(valid) = %v", err)
 	}
 
-	call.Arguments = json.RawMessage(`[]`)
+	call.Arguments = json.RawMessage("[]")
 	assertCode(t, assistant.ValidateToolCall(call), assistant.CodeInvalidJSON)
 
 	result := assistant.ToolResult{
@@ -83,7 +80,7 @@ func TestToolContracts(t *testing.T) {
 		ToolCall: &assistant.ToolCall{
 			ID:        "nested",
 			Name:      "lookup_weather",
-			Arguments: json.RawMessage(`{}`),
+			Arguments: json.RawMessage("{}"),
 		},
 	}}
 	assertCode(t, assistant.ValidateToolResult(result), assistant.CodeInvalidToolResult)
@@ -124,7 +121,7 @@ func TestMessageJSONRoundTrip(t *testing.T) {
 			ToolCall: &assistant.ToolCall{
 				ID:        "call_01",
 				Name:      "lookup_weather",
-				Arguments: json.RawMessage(`{}`),
+				Arguments: json.RawMessage("{}"),
 			},
 		}},
 	}
