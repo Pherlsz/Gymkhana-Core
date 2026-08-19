@@ -5,6 +5,11 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	maxModelCandidates = 4096
+	maxModelCatalog    = 10000
+)
+
 // ProviderID is a stable provider namespace supplied by a provider adapter.
 // Core does not restrict providers to a closed enum.
 type ProviderID string
@@ -106,6 +111,9 @@ func ValidateModelPolicy(policy ModelPolicy) error {
 	if !policy.Mode.Valid() {
 		return validationError(CodeInvalidModelPolicy, "model_policy.mode")
 	}
+	if len(policy.Candidates) > maxModelCandidates || len(policy.AllowedProviders) > 256 || len(policy.RequiredCapabilities) > 64 {
+		return validationError(CodeInvalidModelPolicy, "model_policy")
+	}
 	if policy.Manual != nil && !validModelRef(*policy.Manual) {
 		return validationError(CodeInvalidModel, "model_policy.manual")
 	}
@@ -181,6 +189,14 @@ func RequiredCapabilitiesForModules(modules []ModuleID) []Capability {
 			add(CapabilityVideoInput)
 		case ModuleFileInput:
 			add(CapabilityFileInput)
+		case ModuleImageOutput:
+			add(CapabilityImageOutput)
+		case ModuleAudioOutput:
+			add(CapabilityAudioOutput)
+		case ModuleVideoOutput:
+			add(CapabilityVideoOutput)
+		case ModuleFileOutput:
+			add(CapabilityFileOutput)
 		case ModuleTools:
 			add(CapabilityToolCalling)
 		case ModuleStructuredOutput:
@@ -216,6 +232,9 @@ func ResolveAssistantModels(def AssistantDefinition, catalog []ModelDescriptor) 
 func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]ModelRef, error) {
 	if err := ValidateModelPolicy(policy); err != nil {
 		return nil, err
+	}
+	if len(catalog) > maxModelCatalog {
+		return nil, validationError(CodeInvalidModel, "catalog")
 	}
 	byRef := make(map[ModelRef]ModelDescriptor, len(catalog))
 	for _, model := range catalog {
@@ -289,7 +308,7 @@ func ValidateModelDescriptor(model ModelDescriptor) error {
 	if model.ContextWindow < 0 || model.ContextWindow > maxPortableJSONInteger || model.MaxOutputTokens < 0 || model.MaxOutputTokens > maxPortableJSONInteger {
 		return validationError(CodeInvalidModel, "model.limits")
 	}
-	if len(model.Roles) == 0 {
+	if len(model.Roles) == 0 || len(model.Roles) > 8 || len(model.Capabilities) > 64 {
 		return validationError(CodeInvalidModel, "model.roles")
 	}
 	seenRoles := make(map[ModelRole]struct{}, len(model.Roles))
@@ -311,7 +330,7 @@ func ValidateModelDescriptor(model ModelDescriptor) error {
 // ResolveModelRole validates that a concrete catalog model exists and advertises
 // the requested semantic role, for example embedding or reranking in a RAG stack.
 func ResolveModelRole(ref ModelRef, role ModelRole, catalog []ModelDescriptor) (ModelDescriptor, error) {
-	if !validModelRef(ref) || !role.Valid() {
+	if !validModelRef(ref) || !role.Valid() || len(catalog) > maxModelCatalog {
 		return ModelDescriptor{}, validationError(CodeInvalidModel, "model_role")
 	}
 	for _, model := range catalog {
