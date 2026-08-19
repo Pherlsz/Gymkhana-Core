@@ -66,6 +66,19 @@ func TestIdentifyDocumentUsesLabelAndDoesNotReassign(t *testing.T) {
 	}
 }
 
+func TestIdentifyDocumentRejectsConflictingExplicitLabels(t *testing.T) {
+	t.Parallel()
+
+	const input = "CPF CNH 529.982.247-25"
+	_, err := normalize.IdentifyDocument(input)
+	if !normalize.IsCode(err, normalize.CodeInvalidFormat) {
+		t.Fatalf("IdentifyDocument(%q) error = %v, want invalid_format", input, err)
+	}
+	if matches := normalize.IdentifyDocumentMatches(input); len(matches) != 0 {
+		t.Fatalf("IdentifyDocumentMatches(%q) = %#v, want no materialized matches", input, matches)
+	}
+}
+
 func TestIdentifyDocumentRejectsWeakBareNumbers(t *testing.T) {
 	t.Parallel()
 

@@ -91,7 +91,7 @@ func identifyDocuments(value string) ([]DocumentMatch, error) {
 	if len(labels) > 0 {
 		kind, ok := uniqueLabeledKind(labels)
 		if !ok {
-			return nil, validationError(KindDocument, CodeAmbiguous)
+			return nil, validationError(KindDocument, CodeInvalidFormat)
 		}
 		canonical, err := CanonicalDocument(kind, identifierWithoutTypeLabels(value))
 		if err != nil {
