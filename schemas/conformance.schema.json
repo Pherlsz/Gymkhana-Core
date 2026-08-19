@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://core.pherls.dev/schemas/conformance.schema.json",
+  "title": "Gymkhana Core conformance suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_version", "suite", "cases"],
+  "properties": {
+    "spec_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "suite": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "operation", "input"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "input": {
+          "type": "string"
+        },
+        "output": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["output"],
+          "not": {"required": ["error"]}
+        },
+        {
+          "required": ["error"],
+          "not": {"required": ["output"]}
+        }
+      ]
+    }
+  }
+}
