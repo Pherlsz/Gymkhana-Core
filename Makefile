@@ -11,7 +11,7 @@ STATICCHECK_VERSION := v0.7.0
 GOVULNCHECK_VERSION := v1.6.0
 OSV_SCANNER_VERSION := v2.4.0
 
-.PHONY: setup setup-quality setup-security format format-check vet lint test test-race fuzz-smoke vuln osv security check clean
+.PHONY: setup setup-quality setup-security format format-check vet lint test conformance test-race fuzz-smoke vuln osv security check clean
 
 setup: setup-quality setup-security
 
@@ -50,12 +50,19 @@ lint:
 test:
 	@$(GO) test ./...
 
+conformance:
+	@$(GO) test ./conformance
+
 test-race:
 	@$(GO) test -race ./...
 
 fuzz-smoke:
 	@$(GO) test -run='^$$' -fuzz='^FuzzSearchText$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
 	@$(GO) test -run='^$$' -fuzz='^FuzzCanonicalCPF$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
+	@$(GO) test -run='^$$' -fuzz='^FuzzCanonicalCNPJ$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
+	@$(GO) test -run='^$$' -fuzz='^FuzzCanonicalDocument$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
+	@$(GO) test -run='^$$' -fuzz='^FuzzIdentifyDocument$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
+	@$(GO) test -run='^$$' -fuzz='^FuzzFormatAddressSlots$$' -fuzztime=2s -timeout=30s -parallel=1 ./normalize
 	@$(GO) test -run='^$$' -fuzz='^FuzzParseCivilDate$$' -fuzztime=2s -timeout=30s -parallel=1 ./civiltime
 	@$(GO) test -run='^$$' -fuzz='^FuzzParseYearMonth$$' -fuzztime=2s -timeout=30s -parallel=1 ./civiltime
 
