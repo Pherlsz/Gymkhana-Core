@@ -2,7 +2,7 @@
 
 Status: Core Spec `0.3` / Go `0.5.0` workstream (`feat/assistant-foundation`).
 
-This document records correctness, security, portability, and performance issues discovered while stress-testing the initial Assistant contracts before the first public release. It is decision history rather than a replacement for normative material under `spec/assistant/`.
+This document records correctness, security, portability, and performance issues discovered while stress-testing the initial Assistant contracts before the first public release. It is decision history rather than a replacement for normative material under `spec/assistant/` and `spec/json/`.
 
 ## Correctness bugs found and addressed
 
@@ -22,19 +22,31 @@ Resolution: role/content rules plus `ValidateConversation` enforce call/result l
 
 A tool schema could describe a non-object root while `ToolCall.arguments` is always an object.
 
-Resolution: `ValidatePortableToolSchema` requires an object-root portable schema or the explicit `{}` unconstrained-object compatibility form.
+Resolution: Assistant requires the generic portable schema to have an object root or use the explicit `{}` unconstrained-object compatibility form.
 
 ### JSON duplicate keys were runtime-dependent
 
 Standard JSON parsers differ on duplicate property names. Depending on runtime, first/last/merged/error behavior can differ and create cross-language security/semantic drift.
 
-Resolution: portable JSON rejects duplicate keys at every nesting level before language-native object decoding is treated as semantic input.
+Resolution: the generic `portablejson` package rejects duplicate keys at every nesting level before language-native object decoding is treated as semantic input.
 
 ### Malformed Unicode could normalize differently between runtimes
 
 Escaped unpaired UTF-16 surrogates can be replaced or rejected differently by language JSON decoders.
 
-Resolution: portable JSON rejects unpaired surrogate escapes before semantic decoding.
+Resolution: `portablejson` rejects unpaired surrogate escapes before semantic decoding.
+
+### Decimal comparison could drift through floating-point rounding
+
+Schema numeric bounds and enum values were initially compared through `float64`, which could make distinct JSON decimals compare equal after binary floating-point rounding.
+
+Resolution: portable schema/instance number comparison uses exact rational decimal semantics while keeping the portable magnitude bound.
+
+### Nullable enum could accidentally accept undeclared null
+
+A nullable type was initially able to return successfully for `null` before applying an `enum` restriction.
+
+Resolution: enum membership is evaluated before the nullable early return, so `null` is valid only when the enum itself includes it.
 
 ### Provider response could invoke undeclared tools
 
@@ -105,19 +117,27 @@ Credential failover is separate from model/provider failover.
 
 ## Portability decisions
 
+### Portable JSON is generic Core, not Assistant
+
+The first Assistant implementation contained strict JSON and `portable_json_schema/v1` directly under `assistant`. The semantics are useful beyond LLMs, including future OCR/extraction, matching, solver, workflow, and other structured-data domains.
+
+Resolution: the implementation and normative ownership moved to the generic `portablejson` package and `spec/json/`. Assistant retains compatibility wrappers for the original `assistant.ValidatePortable*` API and keeps only Assistant-specific integration such as object-root tool schemas and `ValidateToolArguments`.
+
+This preserves code/API value while preventing future Core domains from importing Assistant solely to validate structured JSON.
+
 ### `portable_json_schema/v1`
 
-Full JSON Schema is not treated as a provider-neutral capability. Core defines a conservative subset and requires adapters to reject translations they cannot preserve instead of silently weakening validation.
+Full JSON Schema is not treated as a provider-neutral capability. Core defines a conservative subset and requires consumers/adapters to reject translations they cannot preserve instead of silently weakening validation.
 
 The profile is strict by design:
 
 - explicit type;
 - bounded nesting/properties/arrays;
-- no unknown keywords;
+- no unknown or type-inapplicable keywords;
 - strict typed objects use `additionalProperties=false`;
 - all declared object properties are required; nullable fields express optional semantic values;
-- `{}` is the explicit unconstrained-object escape hatch;
-- tool schemas must have object root.
+- `{}` is the explicit unconstrained-object form;
+- domain-specific consumers may impose stricter roots, such as Assistant tool schemas requiring an object.
 
 ### JSON-safe integer counters
 
@@ -143,7 +163,7 @@ Untrusted collection sizes are bounded before expensive traversal/allocation:
 - learning evidence count;
 - quota windows.
 
-Dynamic model routing remains deterministic and uses bounded catalog sorting. Benchmarks under `assistant/benchmark_test.go` provide baselines for a 10k-model catalog, portable JSON validation, and portable schema validation without adding benchmark cost to hosted CI.
+Dynamic model routing remains deterministic and uses bounded catalog sorting. `assistant/benchmark_test.go` tracks the 10k-model routing path; `portablejson/benchmark_test.go` tracks strict JSON/schema validation. Benchmarks remain local and do not add hosted CI cost.
 
 ## Deliberately deferred from `0.5.0`
 
@@ -178,6 +198,19 @@ Dynamic routing and Skill Build will eventually need task-scoped eval data rathe
 
 MCP or other tool protocols should adapt into the existing Core tool catalog. They must not bypass `ToolPolicy`, application authorization, consent, or data-sharing boundaries.
 
+## Host boundary
+
+Assistant owns contracts, portable semantics, invariants, and deterministic policy decisions. The consuming host/application owns:
+
+- provider SDK/HTTP execution;
+- raw secret storage/resolution;
+- user/tenant authorization and tool side effects;
+- persistence for memory, usage, traces, and learning revisions;
+- RAG indexes, embedding storage, and infrastructure;
+- orchestration loops, jobs, UI, billing, and product-specific behavior.
+
+The Go `AdapterRegistry` is an implementation convenience for the current Go runtime, not a requirement that every conforming language expose the same registry shape.
+
 ## Validation before Ready for review
 
 Run locally after updating the branch:
@@ -192,10 +225,11 @@ make fuzz-smoke
 make check
 ```
 
-Useful manual performance baseline:
+Useful manual performance baselines:
 
 ```sh
-go test -run '^$' -bench 'Benchmark(ResolveModelCandidates10000|ValidatePortableJSON)' -benchmem ./assistant
+go test -run '^$' -bench 'BenchmarkResolveModelCandidates10000' -benchmem ./assistant
+go test -run '^$' -bench 'BenchmarkValidate(Object64K|Schema)' -benchmem ./portablejson
 ```
 
 Do not mark the PR Ready until the full local gate passes. Hosted CI/Security remains the final integration gate rather than the development loop.
