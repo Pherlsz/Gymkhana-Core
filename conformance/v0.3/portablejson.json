@@ -1,0 +1,141 @@
+{
+  "spec_version": "0.3",
+  "suite": "portablejson",
+  "cases": [
+    {
+      "name": "validate strict JSON object",
+      "operation": "portablejson.object.validate",
+      "input": {"city": "Porto Alegre", "nested": {"value": 1}},
+      "output": true
+    },
+    {
+      "name": "reject duplicate JSON object keys",
+      "operation": "portablejson.object.validate",
+      "input": {"a": 1, "a": 2},
+      "error": "invalid_json"
+    },
+    {
+      "name": "reject unpaired UTF16 surrogate escape",
+      "operation": "portablejson.object.validate",
+      "input": {"value": "\ud800"},
+      "error": "invalid_json"
+    },
+    {
+      "name": "reject non object at object boundary",
+      "operation": "portablejson.object.validate",
+      "input": [1, 2, 3],
+      "error": "invalid_json"
+    },
+    {
+      "name": "validate arbitrary JSON value",
+      "operation": "portablejson.value.validate",
+      "input": [1, {"enabled": true}, null],
+      "output": true
+    },
+    {
+      "name": "validate portable strict schema",
+      "operation": "portablejson.schema.validate",
+      "input": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "age": {"type": ["integer", "null"], "minimum": 0, "maximum": 200}
+        },
+        "required": ["name", "age"],
+        "additionalProperties": false
+      },
+      "output": true
+    },
+    {
+      "name": "reject unsupported schema keyword",
+      "operation": "portablejson.schema.validate",
+      "input": {"type": "string", "pattern": ".*"},
+      "error": "invalid_schema"
+    },
+    {
+      "name": "reject keyword on incompatible schema type",
+      "operation": "portablejson.schema.validate",
+      "input": {"type": "string", "minimum": 0},
+      "error": "invalid_schema"
+    },
+    {
+      "name": "object schema requires object root",
+      "operation": "portablejson.object_schema.validate",
+      "input": {"type": "string"},
+      "error": "invalid_schema"
+    },
+    {
+      "name": "validate schema instance",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {
+          "type": "object",
+          "properties": {"value": {"type": "integer"}},
+          "required": ["value"],
+          "additionalProperties": false
+        },
+        "instance": {"value": 42}
+      },
+      "output": true
+    },
+    {
+      "name": "reject integer above JSON safe range",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {
+          "type": "object",
+          "properties": {"value": {"type": "integer"}},
+          "required": ["value"],
+          "additionalProperties": false
+        },
+        "instance": {"value": 9007199254740992}
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "keep distinct exact decimal enum values",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": "number", "enum": [0.1]},
+        "instance": 0.10000000000000001
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "reject excessive decimal exponent",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": "number"},
+        "instance": 1e-1025
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "portable integer rejects fractional lexical form",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": "integer"},
+        "instance": 1.0
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "nullable enum still constrains null",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": ["string", "null"], "enum": ["active"]},
+        "instance": null
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "nullable enum accepts declared null",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": ["string", "null"], "enum": ["active", null]},
+        "instance": null
+      },
+      "output": true
+    }
+  ]
+}

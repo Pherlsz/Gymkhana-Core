@@ -10,7 +10,7 @@ Gymkhana Core is intentionally:
 
 - **language-neutral** — semantics are designed to be implementable in Go, TypeScript/Node.js, Java, .NET/C#, Python, Rust, PHP, and future languages;
 - **product-neutral** — Gymkhana Database and other applications are consumers, not owners of Core semantics or roadmap;
-- **provider-neutral** — model/provider SDKs, cloud vendors, credentials, pricing, transport, and deployment remain outside Core;
+- **provider-neutral** — model/provider SDKs, raw credentials, volatile pricing, transport, and deployment remain outside Core contracts;
 - **jurisdiction-neutral** — Brazil-specific behavior is one jurisdictional module among international standards and future country modules;
 - **infrastructure-independent** — persistence, HTTP, queues, UI, workers, and deployment are consumer concerns;
 - **deterministic where possible** — equivalent semantic inputs produce equivalent canonical outputs across conforming implementations.
@@ -27,6 +27,8 @@ Gymkhana-Core/
 ├── normalize/     # current Go implementation
 ├── civiltime/     # current Go implementation
 ├── fingerprint/   # current Go implementation
+├── portablejson/  # generic strict JSON/schema implementation
+├── assistant/     # provider-neutral Assistant implementation
 └── ...            # future language implementations/packages as justified
 ```
 
@@ -79,17 +81,61 @@ Portable deterministic fingerprint primitives for:
 
 Fingerprints are not encryption, anonymization, authentication, or password hashing. Hashing low-entropy sensitive identifiers does not make them private.
 
+### `portablejson`
+
+Generic strict structured-data primitives reusable across Core domains:
+
+- UTF-8 JSON value/object validation with duplicate-key rejection;
+- malformed surrogate, trailing-value, byte/depth/node bounds;
+- conservative `portable_json_schema/v1` validation;
+- explicit object-root schema validation for domains that require structured objects;
+- schema-instance validation before structured data is trusted by a consumer;
+- exact rational comparison for portable decimal bounds/enums rather than runtime-dependent binary floating-point equality;
+- bounded numeric lexemes/exponents and JSON-safe portable integer semantics.
+
+`portablejson` is not an Assistant package. Assistant tools/structured outputs consume it today; future OCR/extraction, matching, solver, workflow, or other domains can consume the same contract without importing AI semantics.
+
+The package deliberately does not implement full JSON Schema, canonical JSON serialization, persistence, transport, or provider-specific structured-output extensions.
+
+### `assistant`
+
+Provider-neutral, modular multimodal Assistant foundation for:
+
+- semantic message roles and ordered text/image/audio/video/file content;
+- portable tool definitions/calls/results, tool safety policy, and structured-output integration through `portablejson`;
+- versioned built-in skills, beginning with `token_economy/v1`;
+- multiple independent `AssistantDefinition` profiles for different functions;
+- default and optional modules that can be enabled/disabled per run;
+- managed credentials and BYOK through opaque credential references (never raw keys);
+- ordered credential fallback with explicit quota scopes plus usage/quota observation contracts;
+- live adapter-supplied model catalogs with `free`, `paid`, `local`, and `unknown` access metadata;
+- manual model selection, explicit ordered fallback, and deterministic dynamic routing;
+- automatic model-capability filtering and bounded provider/model fallback;
+- portable RAG policy with lexical/vector/hybrid retrieval, query transformation, candidate/context limits, reranking, grounding, citations, and evidence;
+- bounded memory and task-scoped learning policies without autonomous persistent self-modification;
+- content-free run traces for routing/usage diagnostics;
+- runtime-local Go provider adapter registration with no provider SDK types crossing the portable contract boundary;
+- stable validation errors without embedding prompt/tool/credential payload data.
+
+Convenience provider IDs currently include OpenAI, Anthropic, Google, OpenRouter, Groq, Ollama, Mistral, and xAI, but provider IDs are not a closed enum. Actual model names, free tiers, prices, and availability come from live adapters rather than a frozen Core table.
+
+`assistant` contains no OpenAI, Google, Anthropic, or other provider SDK types. Media URIs and credential handles are opaque references owned by consumers/adapters, and tool calls are data rather than authorization to execute side effects. The Go `AdapterRegistry` is an implementation convenience, not a language-neutral requirement that other ports reproduce the same registry shape.
+
+Spec `0.3` deliberately defines streaming as a capability without freezing a provider-neutral stream-event/delta shape yet. Concrete provider adapters, Context Planner/cache semantics, eval-driven routing, MCP integration, and OCR extraction remain separate workstreams after the Foundation contract is validated.
+
 ## Specification and conformance
 
 `spec/VERSION` identifies the language-neutral specification version independently from the Go module release.
 
-Core Spec `0.2` covers:
+Core Spec `0.3` covers:
 
 - global text semantics;
 - civil temporal semantics;
 - a generic identifier model;
 - explicit jurisdiction modules, beginning with Brazil because those capabilities already exist in Go;
 - deterministic fingerprint digest/framing semantics;
+- generic strict JSON and `portable_json_schema/v1` schema/instance semantics;
+- provider-neutral Assistant messages, multimodal media, tools, skills, modular definitions, model routing/fallback, BYOK references, RAG, memory, learning, quota/usage, and observability contracts;
 - an international-standards extension point;
 - stable non-localized error semantics;
 - machine-readable conformance suites executed by the current Go implementation.
@@ -104,14 +150,17 @@ Future Java, .NET, TypeScript, Python, Rust, PHP, or other implementations must 
 
 ## Architectural boundaries
 
-Core may contain coherent reusable packages such as:
+Core may contain coherent reusable packages/contracts such as:
 
 - text/normalization primitives;
 - civil temporal values;
 - typed identifiers and jurisdiction modules;
 - international standards;
+- strict portable structured JSON/schema semantics;
 - canonical serialization and fingerprints;
-- provider-neutral Assistant/tool contracts;
+- provider-neutral Assistant messages/tools/configuration/model routing;
+- opaque managed/BYOK credential-reference semantics;
+- provider-neutral RAG/evidence, memory, learning, quota/usage, and trace policy/contracts;
 - OCR suggestion/evidence contracts;
 - deterministic matching primitives;
 - generic constraint/composition solving algorithms.
@@ -122,10 +171,12 @@ Core must not contain:
 - HTTP handlers/status codes, sessions, permissions, or resource ownership;
 - React or product UI components;
 - River/R2/cloud deployment concerns;
-- OpenAI, Google, Anthropic, or other provider SDK types;
-- credentials, prompts tied to one application, pricing, or model selection;
+- OpenAI, Google, Anthropic, or other provider SDK types in portable contracts;
+- raw API keys/secrets, provider HTTP payloads, or hardcoded volatile price/model availability tables;
+- concrete tool side-effect authorization/execution, secret storage, memory/trace/usage persistence, or product billing;
+- consumer-specific prompt text embedded as Core library policy (applications may supply instruction blocks through portable definitions);
 - product-specific DTOs or complete Profile/document/bill models;
-- arbitrary SQL/code execution or autonomous agent loops.
+- arbitrary SQL/code execution or autonomous unbounded agent/orchestration loops.
 
 Do not create broad catch-all packages named `utils`, `helpers`, `common`, `shared`, or `core`.
 
@@ -177,7 +228,7 @@ export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 and pin an exact release:
 
 ```sh
-go get github.com/Pherlsz/Gymkhana-Core@v0.4.0
+go get github.com/Pherlsz/Gymkhana-Core@v0.5.0
 ```
 
 Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported as production dependency mechanisms.

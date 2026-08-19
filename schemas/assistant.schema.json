@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Pherlsz/Gymkhana-Core/schemas/assistant.schema.json",
+  "title": "Gymkhana Core Assistant contracts",
+  "$defs": {
+    "Role": {
+      "type": "string",
+      "enum": ["system", "developer", "user", "assistant", "tool"]
+    },
+    "ToolName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"
+    },
+    "CallID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "MediaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri"],
+      "properties": {
+        "uri": {"type": "string", "minLength": 1, "maxLength": 8192},
+        "media_type": {"type": "string", "maxLength": 256},
+        "name": {"type": "string", "maxLength": 512}
+      }
+    },
+    "ToolDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "input_schema"],
+      "properties": {
+        "name": {"$ref": "#/$defs/ToolName"},
+        "description": {"type": "string", "maxLength": 4096},
+        "input_schema": {
+          "type": "object",
+          "description": "Must also satisfy portable_json_schema/v1 semantic validation."
+        }
+      }
+    },
+    "ToolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "arguments"],
+      "properties": {
+        "id": {"$ref": "#/$defs/CallID"},
+        "name": {"$ref": "#/$defs/ToolName"},
+        "arguments": {
+          "type": "object",
+          "description": "Duplicate JSON keys and non-portable Unicode are rejected by semantic validation."
+        }
+      }
+    },
+    "TextPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": {"const": "text"},
+        "text": {"type": "string", "minLength": 1}
+      }
+    },
+    "ImagePart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {"type": {"const": "image"}, "media": {"$ref": "#/$defs/MediaRef"}}
+    },
+    "AudioPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {"type": {"const": "audio"}, "media": {"$ref": "#/$defs/MediaRef"}}
+    },
+    "VideoPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {"type": {"const": "video"}, "media": {"$ref": "#/$defs/MediaRef"}}
+    },
+    "FilePart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {"type": {"const": "file"}, "media": {"$ref": "#/$defs/MediaRef"}}
+    },
+    "ResultContentPart": {
+      "oneOf": [
+        {"$ref": "#/$defs/TextPart"},
+        {"$ref": "#/$defs/ImagePart"},
+        {"$ref": "#/$defs/AudioPart"},
+        {"$ref": "#/$defs/VideoPart"},
+        {"$ref": "#/$defs/FilePart"}
+      ]
+    },
+    "ToolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "content"],
+      "properties": {
+        "call_id": {"$ref": "#/$defs/CallID"},
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {"$ref": "#/$defs/ResultContentPart"}
+        },
+        "is_error": {"type": "boolean", "default": false}
+      }
+    },
+    "ToolCallPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tool_call"],
+      "properties": {"type": {"const": "tool_call"}, "tool_call": {"$ref": "#/$defs/ToolCall"}}
+    },
+    "ToolResultPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tool_result"],
+      "properties": {"type": {"const": "tool_result"}, "tool_result": {"$ref": "#/$defs/ToolResult"}}
+    },
+    "ContentPart": {
+      "oneOf": [
+        {"$ref": "#/$defs/TextPart"},
+        {"$ref": "#/$defs/ImagePart"},
+        {"$ref": "#/$defs/AudioPart"},
+        {"$ref": "#/$defs/VideoPart"},
+        {"$ref": "#/$defs/FilePart"},
+        {"$ref": "#/$defs/ToolCallPart"},
+        {"$ref": "#/$defs/ToolResultPart"}
+      ]
+    },
+    "Message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": {"$ref": "#/$defs/Role"},
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "items": {"$ref": "#/$defs/ContentPart"}
+        }
+      },
+      "description": "Role/content authority rules and cross-message tool linkage require semantic validation."
+    },
+    "FinishReason": {
+      "type": "string",
+      "enum": ["stop", "length", "tool_calls", "refusal", "paused", "content_filter", "error", "other"]
+    },
+    "Usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "output_tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "cached_input_tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+        "reasoning_tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+      }
+    },
+    "Capability": {
+      "type": "string",
+      "enum": [
+        "text",
+        "image_input", "image_output",
+        "audio_input", "audio_output",
+        "video_input", "video_output",
+        "file_input", "file_output",
+        "tool_calling",
+        "structured_output",
+        "streaming"
+      ]
+    },
+    "Capabilities": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/Capability"}
+    },
+    "TokenEconomyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserve_instruction_hierarchy", "preserve_unresolved_constraints"],
+      "properties": {
+        "prefer_concise_responses": {"type": "boolean"},
+        "avoid_restatement": {"type": "boolean"},
+        "reuse_prior_context": {"type": "boolean"},
+        "compact_tool_results": {"type": "boolean"},
+        "preserve_instruction_hierarchy": {"const": true},
+        "preserve_unresolved_constraints": {"const": true}
+      },
+      "anyOf": [
+        {"required": ["prefer_concise_responses"], "properties": {"prefer_concise_responses": {"const": true}}},
+        {"required": ["avoid_restatement"], "properties": {"avoid_restatement": {"const": true}}},
+        {"required": ["reuse_prior_context"], "properties": {"reuse_prior_context": {"const": true}}},
+        {"required": ["compact_tool_results"], "properties": {"compact_tool_results": {"const": true}}}
+      ]
+    },
+    "TokenEconomySkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "token_economy"],
+      "properties": {
+        "id": {"const": "token_economy/v1"},
+        "token_economy": {"$ref": "#/$defs/TokenEconomyPolicy"}
+      }
+    },
+    "Skill": {"oneOf": [{"$ref": "#/$defs/TokenEconomySkill"}]},
+    "Skills": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/Skill"}
+    }
+  }
+}
