@@ -43,21 +43,21 @@ func TestValidateSkills(t *testing.T) {
 
 	invalid := assistant.BuiltinTokenEconomySkill()
 	invalid.TokenEconomy.PreserveInstructionHierarchy = false
-	assertCode(t, assistant.ValidateSkill(invalid), assistant.CodeInvalidSkill)
+	assertAssistantCode(t, assistant.ValidateSkill(invalid), assistant.CodeInvalidSkill)
 
 	noOptimization := assistant.BuiltinTokenEconomySkill()
 	noOptimization.TokenEconomy.PreferConciseResponses = false
 	noOptimization.TokenEconomy.AvoidRestatement = false
 	noOptimization.TokenEconomy.ReusePriorContext = false
 	noOptimization.TokenEconomy.CompactToolResults = false
-	assertCode(t, assistant.ValidateSkill(noOptimization), assistant.CodeInvalidSkill)
+	assertAssistantCode(t, assistant.ValidateSkill(noOptimization), assistant.CodeInvalidSkill)
 
 	unknown := assistant.Skill{ID: "provider_magic/v1"}
-	assertCode(t, assistant.ValidateSkill(unknown), assistant.CodeInvalidSkill)
+	assertAssistantCode(t, assistant.ValidateSkill(unknown), assistant.CodeInvalidSkill)
 
 	duplicate := []assistant.Skill{
 		assistant.BuiltinTokenEconomySkill(),
 		assistant.BuiltinTokenEconomySkill(),
 	}
-	assertCode(t, assistant.ValidateSkills(duplicate), assistant.CodeDuplicateSkill)
+	assertAssistantCode(t, assistant.ValidateSkills(duplicate), assistant.CodeDuplicateSkill)
 }
