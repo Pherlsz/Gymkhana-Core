@@ -36,12 +36,8 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_.]*$"
         },
-        "input": {
-          "type": "string"
-        },
-        "output": {
-          "type": "string"
-        },
+        "input": {},
+        "output": {},
         "error": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
