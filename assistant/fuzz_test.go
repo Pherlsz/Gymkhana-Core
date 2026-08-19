@@ -23,7 +23,6 @@ func FuzzAssistantMessageJSON(f *testing.F) {
 		if len(value) > 8192 {
 			return
 		}
-
 		var message assistant.Message
 		if err := json.Unmarshal([]byte(value), &message); err != nil {
 			return
@@ -31,7 +30,6 @@ func FuzzAssistantMessageJSON(f *testing.F) {
 		if err := assistant.ValidateMessage(message); err != nil {
 			return
 		}
-
 		encoded, err := json.Marshal(message)
 		if err != nil {
 			t.Fatalf("valid message failed to marshal: %v", err)
@@ -60,7 +58,6 @@ func FuzzAssistantDefinitionJSON(f *testing.F) {
 		if len(value) > 16384 {
 			return
 		}
-
 		var definition assistant.AssistantDefinition
 		if err := json.Unmarshal([]byte(value), &definition); err != nil {
 			return
@@ -68,7 +65,6 @@ func FuzzAssistantDefinitionJSON(f *testing.F) {
 		if err := assistant.ValidateAssistantDefinition(definition); err != nil {
 			return
 		}
-
 		encoded, err := json.Marshal(definition)
 		if err != nil {
 			t.Fatalf("valid AssistantDefinition failed to marshal: %v", err)
@@ -79,6 +75,62 @@ func FuzzAssistantDefinitionJSON(f *testing.F) {
 		}
 		if err := assistant.ValidateAssistantDefinition(roundTrip); err != nil {
 			t.Fatalf("valid AssistantDefinition became invalid after JSON round trip: %v", err)
+		}
+	})
+}
+
+func FuzzPortableJSONObject(f *testing.F) {
+	for _, seed := range []string{
+		`{}`,
+		`{"a":1}`,
+		`{"nested":{"x":[1,2,3]}}`,
+		`{"a":1,"a":2}`,
+		`{"value":"\ud800"}`,
+		`[]`,
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		if len(value) > 32768 {
+			return
+		}
+		raw := json.RawMessage(value)
+		if err := assistant.ValidatePortableJSONObject(raw); err != nil {
+			return
+		}
+		var object map[string]any
+		if err := json.Unmarshal(raw, &object); err != nil {
+			t.Fatalf("portable object failed standard JSON decode: %v", err)
+		}
+		encoded, err := json.Marshal(object)
+		if err != nil {
+			t.Fatalf("portable object failed JSON marshal: %v", err)
+		}
+		if err := assistant.ValidatePortableJSONObject(encoded); err != nil {
+			t.Fatalf("portable object became invalid after canonical Go round trip: %v", err)
+		}
+	})
+}
+
+func FuzzPortableJSONSchema(f *testing.F) {
+	for _, seed := range []string{
+		`{}`,
+		`{"type":"string"}`,
+		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}`,
+		`{"type":"string","pattern":".*"}`,
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		if len(value) > 32768 {
+			return
+		}
+		raw := json.RawMessage(value)
+		if err := assistant.ValidatePortableJSONSchema(raw); err != nil {
+			return
+		}
+		if err := assistant.ValidatePortableJSONObject(raw); err != nil {
+			t.Fatalf("valid portable schema is not a portable JSON object: %v", err)
 		}
 	})
 }
