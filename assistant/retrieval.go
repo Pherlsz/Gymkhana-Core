@@ -1,17 +1,17 @@
 package assistant
 
-// RetrievalMode controls when retrieval is used by an Assistant.
+// RetrievalMode controls when retrieval is used by an Assistant. A definition
+// without the retrieval module/policy has retrieval disabled.
 type RetrievalMode string
 
 const (
-	RetrievalDisabled RetrievalMode = "disabled"
 	RetrievalOnDemand RetrievalMode = "on_demand"
 	RetrievalAlways   RetrievalMode = "always"
 )
 
 func (mode RetrievalMode) Valid() bool {
 	switch mode {
-	case RetrievalDisabled, RetrievalOnDemand, RetrievalAlways:
+	case RetrievalOnDemand, RetrievalAlways:
 		return true
 	default:
 		return false
@@ -108,9 +108,6 @@ func ValidateRetrievalPolicy(policy RetrievalPolicy) error {
 	if !policy.Mode.Valid() || !policy.Search.Valid() || !policy.QueryTransform.Valid() || !policy.Grounding.Valid() {
 		return validationError(CodeInvalidRetrieval, "retrieval")
 	}
-	if policy.Mode == RetrievalDisabled {
-		return validationError(CodeInvalidRetrieval, "retrieval.mode")
-	}
 	if policy.CandidateLimit <= 0 || policy.ContextLimit <= 0 || policy.CandidateLimit < policy.ContextLimit {
 		return validationError(CodeInvalidRetrieval, "retrieval.limits")
 	}
@@ -119,10 +116,6 @@ func ValidateRetrievalPolicy(policy RetrievalPolicy) error {
 	}
 	if policy.RerankingModel != nil && !validModelRef(*policy.RerankingModel) {
 		return validationError(CodeInvalidModel, "retrieval.reranking_model")
-	}
-	if policy.Rerank && policy.RerankingModel == nil {
-		// A consumer-owned non-LLM reranker may be used, so no model is required.
-		return nil
 	}
 	return nil
 }
