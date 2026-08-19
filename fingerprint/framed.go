@@ -3,6 +3,7 @@ package fingerprint
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"unicode/utf8"
 )
 
 const MaxNamespaceBytes = 128
@@ -19,8 +20,13 @@ func Framed(namespace string, parts ...[]byte) (Digest, error) {
 }
 
 // FramedStrings is Framed for exact UTF-8 string bytes. It performs no Unicode
-// or application-level canonicalization.
+// or application-level canonicalization and rejects invalid UTF-8 strings.
 func FramedStrings(namespace string, parts ...string) (Digest, error) {
+	for _, part := range parts {
+		if !utf8.ValidString(part) {
+			return Digest{}, validationError(CodeInvalidUTF8)
+		}
+	}
 	return framed(namespace, len(parts), func(index int) []byte {
 		return []byte(parts[index])
 	})
