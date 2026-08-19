@@ -1,5 +1,7 @@
-// Package assistant provides provider-neutral contracts for assistant messages,
-// multimodal references, tool calls/results, usage, finish reasons, model
-// capabilities, and versioned built-in behavior skills. Provider SDKs,
-// transport, authentication, and orchestration remain consumer-owned.
+// Package assistant provides provider-neutral contracts for multimodal messages,
+// tools, reusable modular Assistant definitions, built-in skills, live model
+// catalogs/routing, opaque managed/BYOK credential references, RAG policy,
+// provider adapters, usage, finish reasons, and capabilities. Provider SDKs,
+// raw secrets, volatile pricing, HTTP transport, and persistence remain outside
+// portable Core contracts.
 package assistant
