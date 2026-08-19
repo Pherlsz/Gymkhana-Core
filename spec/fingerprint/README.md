@@ -59,6 +59,17 @@ cache.entity/v1
 
 Part order is significant. Empty parts are valid. A frame with zero parts is valid. The frame format ensures that `("ab", "c")` and `("a", "bc")` are different byte sequences before hashing.
 
+### Validation order
+
+Portable implementations validate framed inputs in this order:
+
+1. namespace syntax and length;
+2. representable part count;
+3. UTF-8 validity for text-oriented parts;
+4. frame encoding and hashing.
+
+When an input violates more than one condition, the first applicable error in this order is the observable result. Byte-oriented parts do not perform UTF-8 validation.
+
 ## Domain separation
 
 Consumers should prefer framed fingerprints for semantic identities shared across subsystems.
