@@ -44,6 +44,14 @@ func executeAssistant(testCase vector) (any, string) {
 			return nil, "invalid_conformance_input"
 		}
 		return assistantValidationResult(assistant.ValidateCapabilities(value))
+	case "assistant.skill.token_economy.builtin":
+		return assistant.BuiltinTokenEconomySkill(), ""
+	case "assistant.skills.validate":
+		var value []assistant.Skill
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateSkills(value))
 	default:
 		return nil, "unsupported_operation"
 	}
