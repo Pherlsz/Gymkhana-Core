@@ -8,22 +8,13 @@
 
 ## 1. Mission
 
-Gymkhana Core is a private foundation for reusable semantics and algorithms shared across applications, services, runtimes, and jurisdictions.
+Gymkhana Core is a private foundation for reusable semantics and algorithms shared across applications, services, runtimes, providers, languages, and jurisdictions.
 
 The repository is not the core layer of Gymkhana Database. Gymkhana Database is one consumer among current and future services.
 
 Go is the first implementation. Go source is not the architectural source of truth.
 
-Core is designed so conforming implementations can exist in:
-
-- Go;
-- TypeScript/Node.js;
-- Java;
-- .NET/C#;
-- Python;
-- Rust;
-- PHP;
-- future languages when justified.
+Core is designed so conforming implementations can exist in Go, TypeScript/Node.js, Java, .NET/C#, Python, Rust, PHP, and future languages when justified.
 
 ## 2. Architectural invariants
 
@@ -31,11 +22,11 @@ Core is:
 
 1. **Language-neutral** — semantics are specified independently from implementation syntax and runtime conventions.
 2. **Product-neutral** — no consumer application owns Core contracts or roadmap.
-3. **Provider-neutral** — provider SDKs, concrete model APIs, credentials, pricing, and cloud-specific behavior stay in adapters owned by consumers.
+3. **Provider-neutral** — portable provider/model/credential-reference semantics are allowed, while provider SDK types, raw secrets, provider HTTP payloads, and volatile pricing/model tables remain outside portable contracts.
 4. **Jurisdiction-neutral** — no country is the implicit default; country-specific behavior is namespaced and isolated.
 5. **Infrastructure-independent** — no persistence, HTTP, queue, UI, storage, or deployment dependency is required to execute Core logic.
 6. **Deterministic where possible** — the same semantic input produces the same canonical result across conforming implementations.
-7. **Explicitly bounded** — algorithms with nontrivial cost expose deterministic budgets/limits.
+7. **Explicitly bounded** — algorithms or agent-like workflows with nontrivial cost expose deterministic budgets/limits; zero-value budgets mean application defaults, never infinity.
 8. **Small at the public boundary** — do not create catch-all `utils`, `helpers`, `common`, `shared`, or `core` packages.
 
 ## 3. Sources of truth
@@ -75,21 +66,9 @@ Moving Go under an implementation subdirectory is deferred until there is enough
 
 ## 5. Specification version versus implementation version
 
-`spec/VERSION` versions the language-neutral semantics.
-
-Repository `VERSION` currently versions the Go implementation/release.
+`spec/VERSION` versions the language-neutral semantics. Repository `VERSION` currently versions the Go implementation/release.
 
 These versions are intentionally different concepts. Future language packages may have independent implementation SemVer while declaring which Core specification version they support.
-
-Example future model:
-
-```text
-Core Spec 2.1
-├── Go          0.9.2  -> spec 2.1
-├── TypeScript  0.7.0  -> spec 2.1
-├── Java        0.4.1  -> spec 2.0
-└── Python      0.3.0  -> spec 2.1
-```
 
 Do not force synchronized package releases once multiple language ecosystems exist.
 
@@ -103,6 +82,8 @@ Rules:
 - language-local tests may add coverage but may not contradict shared vectors;
 - errors are compared by stable semantic code, not localized text;
 - conformance data contains no product persistence or infrastructure assumptions;
+- model-routing vectors use synthetic model catalogs rather than freezing volatile provider availability/pricing;
+- BYOK vectors contain opaque credential references, never secrets;
 - changing existing observable behavior requires a specification version decision and updated vectors;
 - algorithms may have additional property/fuzz/benchmark requirements where fixed vectors are insufficient.
 
@@ -110,16 +91,7 @@ The current Go implementation executes the shared suites as part of `go test ./.
 
 ## 7. Global versus jurisdiction-specific behavior
 
-Global primitives include concepts such as:
-
-- Unicode/text canonicalization;
-- civil temporal values;
-- generic identifier semantics;
-- canonical encoding/fingerprints;
-- provider-neutral Assistant contracts;
-- OCR evidence contracts;
-- matching primitives;
-- generic bounded solver algorithms.
+Global primitives include Unicode/text canonicalization, civil temporal values, generic identifier semantics, canonical encoding/fingerprints, provider-neutral Assistant contracts, OCR evidence contracts, matching primitives, and generic bounded solver algorithms.
 
 Jurisdictional behavior uses explicit namespaces, for example:
 
@@ -135,14 +107,7 @@ Country, jurisdiction, language, locale, currency, and timezone are distinct con
 
 ## 8. International standards
 
-Cross-jurisdiction standards belong under `spec/standards/` when they form a stable reusable contract. Potential examples include:
-
-- ISO 3166;
-- ISO 4217;
-- BCP 47;
-- E.164;
-- IBAN;
-- BIC/SWIFT.
+Cross-jurisdiction standards belong under `spec/standards/` when they form a stable reusable contract. Potential examples include ISO 3166, ISO 4217, BCP 47, E.164, IBAN, and BIC/SWIFT.
 
 Do not add large standards datasets speculatively. A standard enters Core when behavior, maintenance/versioning, and consumer value are understood.
 
@@ -150,13 +115,9 @@ Do not add large standards datasets speculatively. A standard enters Core when b
 
 Core algorithms must not become a dumping ground for one application's dirty-data vocabulary.
 
-Distinguish:
+Distinguish normative reusable rules, reusable versioned datasets, and consumer-owned alias catalogs/migration cleanup heuristics.
 
-- normative reusable rules;
-- reusable versioned datasets;
-- consumer-owned alias catalogs and migration cleanup heuristics.
-
-For example, a generic alias matcher may belong in Core while mappings such as an application-specific shorthand for one city should normally remain consumer data unless a broader stable contract is demonstrated.
+A generic alias matcher may belong in Core while mappings such as an application-specific shorthand for one city should normally remain consumer data unless a broader stable contract is demonstrated.
 
 ## 10. Current Foundation areas
 
@@ -178,9 +139,24 @@ Exact SHA-256 identity plus versioned domain-separated framing for deterministic
 
 ### Assistant
 
-Provider-neutral messages, ordered content parts, external media references, tool definitions/calls/results, finish reasons, usage counters, capability names, portable schemas, and stable validation errors. Provider SDKs and transport remain outside Core.
+Core Spec `0.3`/Go `0.5.0` defines a modular multimodal Assistant foundation:
 
-Streaming is currently a capability only; a shared stream-event/delta contract is deliberately deferred until multiple provider adapters have exercised the semantics.
+- semantic roles and ordered text/image/audio/video/file/tool content;
+- built-in versioned skills such as `token_economy/v1`;
+- multiple reusable `AssistantDefinition` profiles;
+- default and optional modules with per-run enable/disable overrides;
+- tool allowlists and bounded execution budgets;
+- live provider-supplied model catalogs;
+- manual, ordered-fallback, and dynamic model routing;
+- free/paid/local/unknown access metadata without frozen Core price tables;
+- automatic model-capability filtering from active modules;
+- managed/BYOK credential policies using opaque per-provider references rather than raw secrets;
+- lexical/vector/hybrid RAG, query transformation, candidate/context limits, optional reranking, grounding, citations, and retrieval evidence;
+- Go provider-adapter/registry substitution boundaries with extensible provider IDs.
+
+Concrete provider network adapters may use SDKs/HTTP internally and may be delivered independently; their SDK types must never leak into portable Core contracts.
+
+Streaming remains a capability only; a shared stream-event/delta contract is deliberately deferred until multiple concrete provider adapters exercise the semantics.
 
 ### Errors
 
@@ -193,61 +169,71 @@ The Foundation roadmap is currently:
 1. Foundation specification/conformance infrastructure — **implemented**;
 2. global/jurisdiction separation for existing normalization — **established architecturally; incremental cleanup continues**;
 3. canonical `fingerprint` package/specification — **implemented in Core Spec 0.2 / Go 0.4.0**;
-4. provider-neutral `assistant` contracts — **implemented by Core Spec 0.3 / Go 0.5.0 workstream**;
-5. provider-neutral OCR/multimodal extraction contracts — **next planned capability**;
-6. generic matching/evidence primitives;
-7. generic solver/constraint/composition algorithms;
-8. first non-Go implementation, preferably TypeScript as the first portability stress test;
-9. Java, .NET/C#, Python, Rust, and PHP ports as real consumers justify them;
-10. package ecosystem publication and implementation/spec compatibility matrix.
+4. modular provider-neutral `assistant` contracts, model routing, BYOK references, RAG policy, and adapter boundary — **Core Spec 0.3 / Go 0.5.0 workstream**;
+5. concrete provider-adapter validation against several materially different provider families/gateways/local runtimes — **next integration stress test; may ship independently from Core semantics**;
+6. provider-neutral OCR/multimodal extraction contracts with conditional `data_identification/v1` — **next new Foundation capability**;
+7. generic matching/evidence primitives;
+8. generic solver/constraint/composition algorithms;
+9. first non-Go implementation, preferably TypeScript as the first portability stress test;
+10. Java, .NET/C#, Python, Rust, and PHP ports as real consumers justify them;
+11. package ecosystem publication and implementation/spec compatibility matrix.
 
-This ordering is guidance, not a coupling to any product milestone.
+Concrete adapter work and OCR may proceed in parallel when it does not destabilize the portable Assistant contract.
 
 ## 12. Assistant boundary
 
-The Assistant specification owns neutral concepts such as:
+The Assistant specification may own:
 
-- messages and semantic roles;
-- typed content parts;
-- external image/file references;
-- tool definitions, calls, and results;
-- capabilities;
-- finish reasons;
-- usage structures;
-- stable validation errors.
+- messages, semantic roles, and multimodal content references;
+- tool definitions/calls/results and structured-output contracts;
+- reusable Assistant definitions/modules/skills/budgets;
+- model/provider references, live catalog metadata, and deterministic routing policy;
+- managed/BYOK credential modes and opaque credential references;
+- RAG/retrieval/evidence/citation policy;
+- provider adapter substitution boundaries;
+- capabilities, finish reasons, usage, and stable errors.
 
 It does not own:
 
-- OpenAI, Gemini, Anthropic, or other SDK types;
-- API keys/secrets;
-- concrete model selection;
-- provider pricing;
-- application prompts;
-- persistence/session authorization;
-- provider HTTP/retry behavior;
+- OpenAI, Gemini, Anthropic, or other provider SDK types in portable APIs;
+- raw API keys/secrets or secret storage;
+- provider HTTP/retry payload formats;
+- volatile provider pricing/free-tier/model availability tables;
+- consumer-specific prompt policy embedded as Core behavior;
+- product persistence/session authorization;
 - autonomous unbounded agent loops.
 
-Streaming event semantics remain deferred. Provider adapters may expose native streaming while Core defines only the `streaming` capability until a portable event contract is proven.
+Provider/model references are not provider coupling: they are opaque portable identifiers resolved by adapters. Concrete model availability and access tier are runtime data.
 
-## 13. OCR/multimodal boundary
+## 13. RAG boundary
 
-A future OCR/multimodal specification may own provider-neutral suggestions, evidence, bounded regions, review states, and structured extraction results.
+Core owns provider-neutral retrieval policy and evidence semantics, but does not own a vector database, search product, ACL store, ingestion pipeline, or one universal chunking strategy.
+
+Authorization filtering must occur before retrieved evidence enters model context. Retrieved documents are untrusted data and cannot promote themselves into system/developer instruction authority.
+
+Retrieval/query/reranking changes should be evaluated against representative queries for relevance/recall, groundedness, citation correctness, latency, and token/cost usage rather than assumed universally optimal.
+
+## 14. OCR/multimodal extraction boundary
+
+The future OCR specification may own provider-neutral suggestions, candidate field identification, evidence, bounded regions/text spans, confidence/ambiguity, review states, and structured extraction results.
+
+When a target schema is already known, schema-guided extraction should skip generic discovery. `data_identification/v1` is intended only for unknown/unstructured discovery paths.
 
 Provider invocation, file storage, document rendering, permissions, persistence, and mutation/application remain consumer-owned.
 
-## 14. Matching boundary
+## 15. Matching boundary
 
 A future matching package may own deterministic evidence representation, comparisons, contradiction/support semantics, and ranking/assessment primitives.
 
 Product entities such as Profile, customer, document row, merge queue, or database transaction are not Core concepts.
 
-## 15. Solver boundary
+## 16. Solver boundary
 
 A future solver package may own candidates, slots/roles, generic constraints, deterministic enumeration/pruning, budgets, partial/incomplete outcomes, and evidence.
 
 It must not know Gymkhana-specific persistence, QueryPlan SQL compilation, Profiles, bills, permissions, or workers.
 
-## 16. Implementation design rules
+## 17. Implementation design rules
 
 For every public capability:
 
@@ -257,39 +243,34 @@ For every public capability:
 - define stable structured errors;
 - document canonical versus display representations;
 - preserve leading zeroes where identifiers require them;
-- fuzz malformed/untrusted inputs where appropriate;
+- fuzz malformed/untrusted structural inputs where appropriate;
 - benchmark nontrivial algorithms;
 - define explicit complexity/budget behavior;
-- avoid infrastructure types in public contracts;
+- avoid infrastructure types in portable public contracts;
 - add/update conformance vectors for portable observable semantics.
 
-## 17. What does not belong in Core
+## 18. What does not belong in Core
 
 - PostgreSQL repositories, pgx, sqlc, migrations, indexes, transactions;
 - HTTP handlers/status codes, cookies, sessions, CSRF, resource ownership;
 - permissions/roles and application audit storage;
 - River, R2, signed URLs, Cloud Run, Vercel, deployment topology;
 - React, routes, browser state, product forms, Data Grid components;
-- provider SDK types, credentials, concrete prompts/model choices/pricing;
+- provider SDK types/HTTP payloads/raw credentials/volatile pricing tables in portable contracts;
 - complete application domain/persistence models;
 - arbitrary SQL/code/expression execution;
+- autonomous unbounded agent loops;
 - consumer-specific migration scripts or one-off cleanup catalogs.
 
-## 18. Multi-language implementation policy
+## 19. Multi-language implementation policy
 
 Do not write seven ports preemptively.
 
-A new language implementation starts when there is a real consumer or portability need. It must:
-
-- declare the supported Core spec version;
-- consume the shared conformance vectors;
-- use idiomatic language APIs rather than mechanically mirroring Go syntax;
-- publish through the normal ecosystem package manager when distribution is needed;
-- keep implementation-specific dependencies out of the language-neutral spec.
+A new language implementation starts when there is a real consumer or portability need. It must declare the supported Core spec version, consume shared conformance vectors, use idiomatic APIs, publish through the normal ecosystem package manager when distribution is needed, and keep implementation/provider-specific dependencies out of language-neutral contracts.
 
 Contract/model generation from schemas is encouraged where appropriate. Nontrivial algorithms should normally be implemented idiomatically per language and proven by conformance/property tests rather than generated into unreadable source.
 
-## 19. Go implementation quality gates
+## 20. Go implementation quality gates
 
 Current Go development uses:
 
@@ -310,35 +291,14 @@ make check
 
 `make check` is the required local gate before marking a public-contract PR ready for review.
 
-Core tests do not spin up PostgreSQL, HTTP servers, provider APIs, or browser environments.
+Core tests do not spin up PostgreSQL, provider APIs, or browser environments.
 
-## 20. Pull request requirements
+## 21. Pull request requirements
 
-Core PRs describe:
-
-- objective and reusable scope;
-- originating consumer requirement when applicable;
-- specification impact;
-- public API impact per implementation;
-- determinism and budgets;
-- conformance/test/fuzz/benchmark coverage;
-- security/privacy implications;
-- consumer migration notes for breaking behavior;
-- release/version impact.
+Core PRs describe objective/reusable scope, specification impact, public API impact, determinism/budgets, conformance/test/fuzz coverage, security/privacy implications, migration notes for breaking behavior, and release/version impact.
 
 A consumer link is context, not architectural authority.
 
-## 21. Definition of Done for a portable Core capability
+## 22. Definition of Done for a portable Core capability
 
-A capability is complete when:
-
-- responsibility is coherent and reusable;
-- normative semantics are documented;
-- observable portable behavior has conformance vectors when applicable;
-- current implementation tests pass;
-- fuzz/property tests exist for untrusted/structural inputs when appropriate;
-- nontrivial algorithms have benchmarks and explicit budgets;
-- errors are stable and non-localized;
-- no infrastructure/provider/product leakage exists;
-- compatibility/version impact is documented;
-- a consumer can use it without importing another product repository.
+A capability is complete when responsibility is coherent/reusable, normative semantics are documented, portable behavior has conformance vectors when applicable, current implementation tests pass, fuzz/property tests cover untrusted structural inputs where appropriate, nontrivial algorithms have benchmarks/budgets, errors are stable/non-localized, no infrastructure/provider/product leakage violates the boundary, compatibility/version impact is documented, and a consumer can use it without importing another product repository.
