@@ -52,7 +52,7 @@ func ValidateCredentialPolicy(policy CredentialPolicy) error {
 
 // ValidateCredentialRef validates an opaque runtime credential binding.
 func ValidateCredentialRef(ref CredentialRef) error {
-	if !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validPortableID(ref.Reference, 256) {
+	if !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validOpaqueModelID(ref.Reference, 256) {
 		return validationError(CodeInvalidCredential, "credential")
 	}
 	return nil
