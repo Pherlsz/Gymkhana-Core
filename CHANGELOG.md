@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.5.0] - 2026-08-19
+
+### Added
+
+- Provider-neutral `assistant` Go package with portable message roles, ordered content parts, external image/file references, tool definitions/calls/results, finish reasons, usage counters, and capability identifiers.
+- Core Spec `0.3` Assistant semantics with explicit provider/transport boundaries, portable tool-name rules, stable validation errors, and security guidance for tool authorization and sensitive conversation data.
+- `schemas/assistant.schema.json` for language-neutral serialized Assistant contracts.
+- Complete `conformance/v0.3` suite set with Assistant message/tool/usage/capability vectors plus the existing normalize, temporal, and fingerprint suites.
+- Bounded Assistant JSON round-trip fuzzing integrated into `make fuzz-smoke`.
+
+### Changed
+
+- Core specification advances from `0.2` to `0.3` for the new Assistant contract family.
+- Streaming is represented as a portable capability but its event/delta wire contract is intentionally deferred until multiple provider adapters have exercised the semantics.
+
 ## [0.4.0] - 2026-08-18
 
 ### Added
