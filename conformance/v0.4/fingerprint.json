@@ -1,0 +1,20 @@
+{
+  "spec_version": "0.4",
+  "suite": "fingerprint",
+  "cases": [
+    {"name":"sha256 exact text","operation":"fingerprint.sha256.text","input":"abc","output":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
+    {"name":"sha256 empty text","operation":"fingerprint.sha256.text","input":"","output":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    {"name":"sha256 UTF-8 text","operation":"fingerprint.sha256.text","input":"João","output":"9c48393460d7a004f5d12abed54f76afcb21c0a18a5c22e48f44b2b14acb2f9d"},
+    {"name":"framed text portable vector","operation":"fingerprint.sha256.framed_text","input":{"namespace":"query.plan/v1","parts":["alpha","beta"]},"output":"8f92cbf0d8c72b614311eadbf43c8842fc53e77f5a3943448db7a1f12ea470fd"},
+    {"name":"framed UTF-8 text","operation":"fingerprint.sha256.framed_text","input":{"namespace":"unicode/v1","parts":["João","東京"]},"output":"c2d8a1218f73684c6d25558ceb90a5415514bc3c90edebcebee144402239a5e1"},
+    {"name":"framing preserves first part boundary","operation":"fingerprint.sha256.framed_text","input":{"namespace":"query.plan/v1","parts":["ab","c"]},"output":"c11f05098b6b7d39353d4d27379c6b20986c3913980cc469b19d8c69215eb4db"},
+    {"name":"framing preserves second part boundary","operation":"fingerprint.sha256.framed_text","input":{"namespace":"query.plan/v1","parts":["a","bc"]},"output":"abdf369e590f2d410218223981e5fdd2e083cf139d741b6d319249678e9ab37c"},
+    {"name":"framing separates namespace","operation":"fingerprint.sha256.framed_text","input":{"namespace":"task.spec/v1","parts":["alpha","beta"]},"output":"523108be2ff9018abd0266f968c0232651d6c0c1e8482843145d697f9093b78f"},
+    {"name":"framing supports zero parts","operation":"fingerprint.sha256.framed_text","input":{"namespace":"empty/v1","parts":[]},"output":"5a57cd4806fb6e845a350d798fe9e1346bfe2f22c0cea0e540c7bd1e0c7b0e08"},
+    {"name":"framing distinguishes one empty part from zero parts","operation":"fingerprint.sha256.framed_text","input":{"namespace":"empty/v1","parts":[""]},"output":"5d3c8cdd3b8bb65bb7b0192533816ff98df5ef007f3d9d385320ec12582d4e1f"},
+    {"name":"reject invalid fingerprint namespace","operation":"fingerprint.sha256.framed_text","input":{"namespace":"Query Plan","parts":["alpha"]},"error":"invalid_namespace"},
+    {"name":"parse uppercase digest to canonical lowercase","operation":"fingerprint.digest.parse","input":"BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD","output":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"},
+    {"name":"reject short digest","operation":"fingerprint.digest.parse","input":"abc","error":"invalid_length"},
+    {"name":"reject non hexadecimal digest","operation":"fingerprint.digest.parse","input":"zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz","error":"invalid_format"}
+  ]
+}

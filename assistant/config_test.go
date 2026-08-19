@@ -27,10 +27,6 @@ func TestValidateAssistantDefinition(t *testing.T) {
 	badInstruction := definition
 	badInstruction.Instructions = []assistant.InstructionBlock{{Role: assistant.RoleUser, Text: "not allowed"}}
 	assertAssistantCode(t, assistant.ValidateAssistantDefinition(badInstruction), assistant.CodeInvalidAssistant)
-
-	memoryWithoutPolicy := definition
-	memoryWithoutPolicy.OptionalModules = []assistant.ModuleID{assistant.ModuleMemory}
-	assertAssistantCode(t, assistant.ValidateAssistantDefinition(memoryWithoutPolicy), assistant.CodeInvalidAssistant)
 }
 
 func TestValidateAssistantCatalog(t *testing.T) {
@@ -205,7 +201,6 @@ func validAssistantDefinition() assistant.AssistantDefinition {
 		},
 		Credentials: assistant.CredentialPolicy{AllowedModes: []assistant.CredentialMode{assistant.CredentialManaged, assistant.CredentialBYOK}},
 		Retrieval:   retrievalPolicyPtr(validRetrievalPolicy()),
-		Learning:    learningPolicyPtr(assistant.DefaultLearningPolicy()),
 		Budget: assistant.ExecutionBudget{
 			MaxTurns:           8,
 			MaxToolCalls:       12,
@@ -229,10 +224,6 @@ func validRetrievalPolicy() assistant.RetrievalPolicy {
 }
 
 func retrievalPolicyPtr(value assistant.RetrievalPolicy) *assistant.RetrievalPolicy {
-	return &value
-}
-
-func learningPolicyPtr(value assistant.LearningPolicy) *assistant.LearningPolicy {
 	return &value
 }
 

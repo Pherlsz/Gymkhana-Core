@@ -1,0 +1,52 @@
+{
+  "spec_version": "0.4",
+  "suite": "assistant",
+  "cases": [
+    {"name":"validate user text message","operation":"assistant.message.validate","input":{"role":"user","content":[{"type":"text","text":"Hello"}]},"output":true},
+    {"name":"validate multimodal reference message","operation":"assistant.message.validate","input":{"role":"user","content":[{"type":"text","text":"Describe this image"},{"type":"image","media":{"uri":"https://example.test/image.png","media_type":"image/png"}}]},"output":true},
+    {"name":"validate assistant tool call","operation":"assistant.message.validate","input":{"role":"assistant","content":[{"type":"tool_call","tool_call":{"id":"call_01","name":"lookup_weather","arguments":{"location":"Tokyo"}}}]},"output":true},
+    {"name":"validate tool result","operation":"assistant.message.validate","input":{"role":"tool","content":[{"type":"tool_result","tool_result":{"call_id":"call_01","content":[{"type":"text","text":"21 C"}]}}]},"output":true},
+    {"name":"reject tool call in user authority","operation":"assistant.message.validate","input":{"role":"user","content":[{"type":"tool_call","tool_call":{"id":"call_01","name":"lookup_weather","arguments":{}}}]},"error":"invalid_role"},
+    {"name":"reject unknown role","operation":"assistant.message.validate","input":{"role":"provider_specific","content":[{"type":"text","text":"hello"}]},"error":"invalid_role"},
+    {"name":"reject empty message content","operation":"assistant.message.validate","input":{"role":"user","content":[]},"error":"empty"},
+    {"name":"reject unknown content type","operation":"assistant.message.validate","input":{"role":"user","content":[{"type":"provider_magic","text":"hello"}]},"error":"invalid_content_type"},
+    {"name":"reject mixed union payload","operation":"assistant.message.validate","input":{"role":"user","content":[{"type":"text","text":"hello","media":{"uri":"https://example.test/image.png"}}]},"error":"invalid_content"},
+    {"name":"validate portable strict tool definition","operation":"assistant.tool_definition.validate","input":{"name":"lookup_weather","description":"Look up weather.","input_schema":{"type":"object","properties":{"location":{"type":"string"}},"required":["location"],"additionalProperties":false}},"output":true},
+    {"name":"reject non portable tool name","operation":"assistant.tool_definition.validate","input":{"name":"lookup.weather","input_schema":{}},"error":"invalid_tool_name"},
+    {"name":"reject non object tool schema","operation":"assistant.tool_definition.validate","input":{"name":"lookup_weather","input_schema":["not","an","object"]},"error":"invalid_schema"},
+    {"name":"validate tool calls finish reason","operation":"assistant.finish_reason.validate","input":"tool_calls","output":true},
+    {"name":"validate refusal finish reason","operation":"assistant.finish_reason.validate","input":"refusal","output":true},
+    {"name":"validate paused finish reason","operation":"assistant.finish_reason.validate","input":"paused","output":true},
+    {"name":"reject provider finish reason","operation":"assistant.finish_reason.validate","input":"provider_reason","error":"invalid_finish_reason"},
+    {"name":"validate usage","operation":"assistant.usage.validate","input":{"input_tokens":20,"output_tokens":5,"cached_input_tokens":4,"reasoning_tokens":1},"output":true},
+    {"name":"reject negative usage","operation":"assistant.usage.validate","input":{"input_tokens":-1},"error":"invalid_usage"},
+    {"name":"reject usage above portable JSON safe integer","operation":"assistant.usage.validate","input":{"input_tokens":9007199254740992},"error":"invalid_usage"},
+    {"name":"validate capabilities","operation":"assistant.capabilities.validate","input":["text","image_input","audio_input","video_input","image_output","audio_output","video_output","file_output","tool_calling","streaming"],"output":true},
+    {"name":"reject duplicate capabilities","operation":"assistant.capabilities.validate","input":["text","text"],"error":"duplicate_capability"},
+    {"name":"reject unknown capability","operation":"assistant.capabilities.validate","input":["text","provider_magic"],"error":"invalid_capability"},
+    {
+      "name":"canonical built in token economy skill","operation":"assistant.skill.token_economy.builtin","input":null,
+      "output":{"id":"token_economy/v1","token_economy":{"prefer_concise_responses":true,"avoid_restatement":true,"reuse_prior_context":true,"compact_tool_results":true,"preserve_instruction_hierarchy":true,"preserve_unresolved_constraints":true}}
+    },
+    {
+      "name":"validate narrowed token economy skill","operation":"assistant.skills.validate",
+      "input":[{"id":"token_economy/v1","token_economy":{"prefer_concise_responses":true,"avoid_restatement":false,"reuse_prior_context":false,"compact_tool_results":false,"preserve_instruction_hierarchy":true,"preserve_unresolved_constraints":true}}],"output":true
+    },
+    {
+      "name":"reject token economy skill that weakens instruction hierarchy","operation":"assistant.skills.validate",
+      "input":[{"id":"token_economy/v1","token_economy":{"prefer_concise_responses":true,"avoid_restatement":true,"reuse_prior_context":true,"compact_tool_results":true,"preserve_instruction_hierarchy":false,"preserve_unresolved_constraints":true}}],"error":"invalid_skill"
+    },
+    {
+      "name":"reject token economy skill with no optimization enabled","operation":"assistant.skills.validate",
+      "input":[{"id":"token_economy/v1","token_economy":{"prefer_concise_responses":false,"avoid_restatement":false,"reuse_prior_context":false,"compact_tool_results":false,"preserve_instruction_hierarchy":true,"preserve_unresolved_constraints":true}}],"error":"invalid_skill"
+    },
+    {
+      "name":"reject duplicate assistant skills","operation":"assistant.skills.validate",
+      "input":[
+        {"id":"token_economy/v1","token_economy":{"prefer_concise_responses":true,"avoid_restatement":true,"reuse_prior_context":true,"compact_tool_results":true,"preserve_instruction_hierarchy":true,"preserve_unresolved_constraints":true}},
+        {"id":"token_economy/v1","token_economy":{"prefer_concise_responses":true,"avoid_restatement":false,"reuse_prior_context":false,"compact_tool_results":false,"preserve_instruction_hierarchy":true,"preserve_unresolved_constraints":true}}
+      ],"error":"duplicate_skill"
+    },
+    {"name":"reject unknown assistant skill","operation":"assistant.skills.validate","input":[{"id":"provider_magic/v1"}],"error":"invalid_skill"}
+  ]
+}

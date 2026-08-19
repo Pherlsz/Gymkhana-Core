@@ -1,6 +1,6 @@
 # Assistant configuration and model routing
 
-This document is normative for Core Spec `0.3`.
+This document is normative for Core Spec `0.4`.
 
 ## Assistant definitions
 
@@ -17,17 +17,15 @@ Portable configuration may include:
 - credential policy;
 - model/provider fallback policy;
 - optional RAG policy;
-- optional memory policy;
-- optional learning policy;
 - bounded execution budgets.
 
-Provider SDK objects, HTTP sessions, raw API secrets, persistence rows, and product authorization are not part of the definition.
+Provider SDK objects, HTTP sessions, raw API secrets, persistence rows, product memory, learning/promotion state, and product authorization are not part of the definition.
 
 ## Modules
 
 Default modules are listed in `modules`. Disabled-by-default capabilities available to a run are listed in `optional_modules`.
 
-Portable modules in Spec `0.3` are:
+Portable modules in Spec `0.4` are:
 
 - `text`;
 - `vision`;
@@ -40,7 +38,6 @@ Portable modules in Spec `0.3` are:
 - `file_output`;
 - `tools`;
 - `retrieval`;
-- `memory`;
 - `structured_output`.
 
 Default and optional module sets are disjoint. A run may enable only declared optional modules and disable only declared defaults. The effective set may not be empty.
@@ -61,9 +58,11 @@ Generation-model requirements are derived from active modules:
 | `tools` | `tool_calling` |
 | `structured_output` | `structured_output` |
 
-`retrieval` and `memory` may execute outside the generation model and therefore do not directly imply a model capability.
+`retrieval` may execute outside the generation model and therefore does not directly imply a model capability.
 
-Declaring the retrieval or memory module requires the corresponding policy even when the module is optional, so enabling it at runtime cannot activate undefined semantics.
+Declaring the retrieval module requires the corresponding policy even when the module is optional, so enabling it at runtime cannot activate undefined semantics.
+
+Product-owned persistent memory is deliberately not an Assistant module. Hosts may supply selected prior context through messages or retrieval.
 
 ## Provider adapters
 
@@ -128,7 +127,7 @@ Selecting candidate order and deciding whether to advance after a failure are se
 
 The default policy permits bounded fallback for operational conditions such as quota/rate-limit, timeout, unavailability, network failure, context-limit, or unsupported capability as appropriate.
 
-Authentication, safety/refusal policy, invalid-request, and caller-cancellation failures cannot be configured as automatic failover triggers in Spec `0.3`. Switching providers to bypass these failures would change authorization/safety semantics rather than provide operational resilience.
+Authentication, safety/refusal policy, invalid-request, and caller-cancellation failures cannot be configured as automatic failover triggers in Spec `0.4`. Switching providers to bypass these failures would change authorization/safety semantics rather than provide operational resilience.
 
 `NextModelCandidate`/equivalent consumes an already-resolved candidate list and distinguishes same-provider model fallback from cross-provider fallback.
 
@@ -197,15 +196,13 @@ See [`OBSERVABILITY.md`](OBSERVABILITY.md) for quota and usage attribution seman
 
 Overrides do not mutate the persisted definition and do not bypass model capabilities, credential modes, tool policies, or product authorization.
 
-## Tool, RAG, memory, and learning policy
+## Tool and RAG policy
 
 Tools require a declared tool module and are governed by [`TOOLS.md`](TOOLS.md).
 
 Retrieval requires a declared retrieval module and a `RetrievalPolicy`; see [`RAG.md`](RAG.md).
 
-Memory requires a declared memory module and a `MemoryPolicy`. Persistent writes are disabled, explicit, or confirmation-gated; there is no unrestricted automatic persistent-write mode in Spec `0.3`.
-
-`LearningPolicy` controls disabled/proposal/low-authority auto-promotion eligibility. See [`LEARNING.md`](LEARNING.md).
+Long-lived memory, task signatures, learning proposals, evaluation evidence, and promotion workflows belong to the host/application rather than the portable Assistant configuration.
 
 ## Execution budgets
 
@@ -213,4 +210,4 @@ Memory requires a declared memory module and a `MemoryPolicy`. Persistent writes
 
 Zero means use a bounded host/runtime default. Zero never means infinite execution.
 
-Spec `0.3` does not define an autonomous unbounded agent loop.
+Spec `0.4` does not define an autonomous unbounded agent loop.

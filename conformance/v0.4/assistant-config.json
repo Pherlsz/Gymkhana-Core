@@ -1,0 +1,61 @@
+{
+  "spec_version": "0.4",
+  "suite": "assistant-config",
+  "cases": [
+    {
+      "name":"validate modular multimodal RAG assistant","operation":"assistant.definition.validate",
+      "input":{
+        "id":"multimodal_researcher","name":"Multimodal Researcher",
+        "instructions":[{"role":"developer","text":"Ground answers in retrieved evidence."}],
+        "modules":["text","vision","tools","retrieval"],
+        "skills":[{"id":"token_economy/v1","token_economy":{"prefer_concise_responses":true,"avoid_restatement":true,"reuse_prior_context":true,"compact_tool_results":true,"preserve_instruction_hierarchy":true,"preserve_unresolved_constraints":true}}],
+        "tools":["search_docs"],
+        "tool_policies":[{"name":"search_docs","effect":"read_only","confirmation":"never","parallel_safe":true,"idempotent":true}],
+        "model_policy":{"mode":"dynamic","allowed_access":["free","paid"],"preferred_access":["free","paid"]},
+        "credentials":{"allowed_modes":["managed","byok"]},
+        "retrieval":{"mode":"on_demand","search":"hybrid","query_transform":"rewrite","candidate_limit":20,"context_limit":6,"rerank":true,"grounding":"required","require_citations":true},
+        "budget":{"max_turns":8,"max_tool_calls":12,"max_retrieval_rounds":3,"max_output_tokens":4096}
+      },"output":true
+    },
+    {
+      "name":"reject retrieval configuration when retrieval module is disabled","operation":"assistant.definition.validate",
+      "input":{"id":"plain_chat","name":"Plain Chat","modules":["text"],"model_policy":{"mode":"dynamic"},"credentials":{"allowed_modes":["managed"]},"retrieval":{"mode":"always","search":"hybrid","query_transform":"original","candidate_limit":10,"context_limit":5,"rerank":false,"grounding":"required","require_citations":true}},
+      "error":"invalid_assistant"
+    },
+    {"name":"validate BYOK credential reference","operation":"assistant.credential_ref.validate","input":{"id":"key_01","provider":"openai","mode":"byok","reference":"session:key_01","quota_scope":"project:primary"},"output":true},
+    {"name":"reject raw credential value without handle namespace","operation":"assistant.credential_ref.validate","input":{"id":"key_01","provider":"openai","mode":"byok","reference":"bare-secret-token"},"error":"invalid_credential"},
+    {"name":"reject unknown credential mode","operation":"assistant.credential_ref.validate","input":{"id":"key_01","provider":"openai","mode":"inline_secret","reference":"session:key_01"},"error":"invalid_credential"},
+    {"name":"reject RAG context larger than candidate set","operation":"assistant.retrieval.validate","input":{"mode":"on_demand","search":"hybrid","query_transform":"rewrite","candidate_limit":4,"context_limit":8,"rerank":true,"grounding":"required","require_citations":true},"error":"invalid_retrieval"},
+    {
+      "name":"dynamic routing prefers free eligible multimodal models","operation":"assistant.model.resolve",
+      "input":{"policy":{"mode":"dynamic","allowed_access":["free","paid"],"preferred_access":["free","paid"],"required_capabilities":["text","image_input"]},"catalog":[
+        {"ref":{"provider":"gateway","model":"basic/text:free"},"access":"free","roles":["generation"],"capabilities":["text"]},
+        {"ref":{"provider":"gateway","model":"vision/pro:paid"},"access":"paid","roles":["generation"],"capabilities":["text","image_input"]},
+        {"ref":{"provider":"gateway","model":"vision/fast:free"},"access":"free","roles":["generation"],"capabilities":["text","image_input"]}
+      ]},
+      "output":[{"provider":"gateway","model":"vision/fast:free"},{"provider":"gateway","model":"vision/pro:paid"}]
+    },
+    {
+      "name":"manual routing supports opaque provider model identifiers","operation":"assistant.model.resolve",
+      "input":{"policy":{"mode":"manual","manual":{"provider":"openrouter","model":"vendor/model:free"}},"catalog":[{"ref":{"provider":"openrouter","model":"vendor/model:free"},"access":"free","roles":["generation"],"capabilities":["text"]}]},
+      "output":[{"provider":"openrouter","model":"vendor/model:free"}]
+    },
+    {
+      "name":"model references with slash boundaries do not collide","operation":"assistant.model.resolve",
+      "input":{"policy":{"mode":"dynamic"},"catalog":[
+        {"ref":{"provider":"a","model":"b/c"},"access":"free","roles":["generation"],"capabilities":["text"]},
+        {"ref":{"provider":"a/b","model":"c"},"access":"free","roles":["generation"],"capabilities":["text"]}
+      ]},
+      "output":[{"provider":"a","model":"b/c"},{"provider":"a/b","model":"c"}]
+    },
+    {
+      "name":"assistant modules automatically constrain dynamic model routing","operation":"assistant.definition.resolve_models",
+      "input":{"assistant":{"id":"vision_tool_agent","name":"Vision Tool Agent","modules":["text","vision","tools"],"model_policy":{"mode":"dynamic","allowed_access":["free","paid"],"preferred_access":["free","paid"]},"credentials":{"allowed_modes":["managed","byok"]}},"catalog":[
+        {"ref":{"provider":"gateway","model":"text/free"},"access":"free","roles":["generation"],"capabilities":["text"]},
+        {"ref":{"provider":"gateway","model":"vision-tools/paid"},"access":"paid","roles":["generation"],"capabilities":["text","image_input","tool_calling"]},
+        {"ref":{"provider":"gateway","model":"vision-tools/free"},"access":"free","roles":["generation"],"capabilities":["text","image_input","tool_calling"]}
+      ]},
+      "output":[{"provider":"gateway","model":"vision-tools/free"},{"provider":"gateway","model":"vision-tools/paid"}]
+    }
+  ]
+}

@@ -128,24 +128,6 @@ func executeAssistantHardening(testCase vector) (any, string) {
 			return nil, "invalid_conformance_input"
 		}
 		return assistantValidationResult(assistant.ValidateToolPolicy(value))
-	case "assistant.memory.validate":
-		var value assistant.MemoryPolicy
-		if err := json.Unmarshal(testCase.Input, &value); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return assistantValidationResult(assistant.ValidateMemoryPolicy(value))
-	case "assistant.learning_policy.validate":
-		var value assistant.LearningPolicy
-		if err := json.Unmarshal(testCase.Input, &value); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return assistantValidationResult(assistant.ValidateLearningPolicy(value))
-	case "assistant.learning.validate":
-		var value assistant.SkillLearningProposal
-		if err := json.Unmarshal(testCase.Input, &value); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return assistantValidationResult(assistant.ValidateSkillLearningProposal(value))
 	case "assistant.quota.validate":
 		var value assistant.QuotaState
 		if err := json.Unmarshal(testCase.Input, &value); err != nil {

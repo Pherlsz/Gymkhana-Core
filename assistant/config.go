@@ -19,13 +19,12 @@ const (
 	ModuleFileOutput       ModuleID = "file_output"
 	ModuleTools            ModuleID = "tools"
 	ModuleRetrieval        ModuleID = "retrieval"
-	ModuleMemory           ModuleID = "memory"
 	ModuleStructuredOutput ModuleID = "structured_output"
 )
 
 func (id ModuleID) Valid() bool {
 	switch id {
-	case ModuleText, ModuleVision, ModuleAudioInput, ModuleVideoInput, ModuleFileInput, ModuleImageOutput, ModuleAudioOutput, ModuleVideoOutput, ModuleFileOutput, ModuleTools, ModuleRetrieval, ModuleMemory, ModuleStructuredOutput:
+	case ModuleText, ModuleVision, ModuleAudioInput, ModuleVideoInput, ModuleFileInput, ModuleImageOutput, ModuleAudioOutput, ModuleVideoOutput, ModuleFileOutput, ModuleTools, ModuleRetrieval, ModuleStructuredOutput:
 		return true
 	default:
 		return false
@@ -55,8 +54,6 @@ type AssistantDefinition struct {
 	Credentials     CredentialPolicy       `json:"credentials"`
 	RoutingFallback *RoutingFallbackPolicy `json:"routing_fallback,omitempty"`
 	Retrieval       *RetrievalPolicy       `json:"retrieval,omitempty"`
-	Memory          *MemoryPolicy          `json:"memory,omitempty"`
-	Learning        *LearningPolicy        `json:"learning,omitempty"`
 	Budget          ExecutionBudget        `json:"budget,omitempty"`
 }
 
@@ -138,21 +135,6 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 		}
 	} else if moduleEnabled(allModules, ModuleRetrieval) {
 		return validationError(CodeInvalidAssistant, "retrieval")
-	}
-	if def.Memory != nil {
-		if !moduleEnabled(allModules, ModuleMemory) {
-			return validationError(CodeInvalidAssistant, "memory")
-		}
-		if err := ValidateMemoryPolicy(*def.Memory); err != nil {
-			return err
-		}
-	} else if moduleEnabled(allModules, ModuleMemory) {
-		return validationError(CodeInvalidAssistant, "memory")
-	}
-	if def.Learning != nil {
-		if err := ValidateLearningPolicy(*def.Learning); err != nil {
-			return err
-		}
 	}
 	if err := ValidateModelPolicy(def.ModelPolicy); err != nil {
 		return err

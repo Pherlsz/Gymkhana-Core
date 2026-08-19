@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.6.0] - 2026-08-19
+
+### Added
+
+- Provider-neutral `ocr` Go package for bounded schema-guided and discovery extraction across document, image, text, audio, and video sources, with evidence references, raw observations, semantic field candidates, fixed-scale confidence, review/validation state, and stable non-sensitive errors.
+- Direct discovery invariants that preserve evidence and ambiguity, distinguish missing values from JSON `null`, avoid assumed jurisdiction, and permit normalization only through an explicit canonicalizer.
+- Core Spec `0.4`, `spec/ocr/`, `schemas/ocr.schema.json`, and `conformance/v0.4/ocr.json`, carrying forward the applicable Spec `0.3` semantics while reflecting the simplified `0.4` Assistant boundary.
+- Candidate-to-structured-data consistency checks using RFC 6901 JSON Pointers and exact mathematical numeric equality, plus bounded aggregate result-data validation.
+- OCR request/result fuzz targets integrated into `make fuzz-smoke`.
+
+### Changed
+
+- OCR/extraction is now a first-class Core domain that depends directly on generic `portablejson`; Assistant infrastructure remains optional host/adapter composition rather than a required OCR dependency.
+- Discovery correctness is part of the OCR contract directly; the separate `data_identification/v1` skill/API is removed from Core.
+- Assistant persistent-memory/module contracts and Skill Build/learning contracts are removed from the active Spec `0.4` public boundary. Hosts remain free to inject selected prior context through messages/RAG and to own evaluation, learning, promotion, identity, persistence, and retention workflows.
+- `docs/OCR-FOUNDATION.md` records rationale and deferred adapter/infrastructure work while the normative contract lives in `spec/ocr/`.
+
+### Breaking
+
+- Go `0.6.0` removes the `assistant` memory and learning APIs introduced in `0.5.0`, removes the `memory` Assistant module, and removes the OCR `data_identification/v1` skill helpers. The repository remains pre-`1.0.0`, and the release stays a minor increment from `0.5.0`.
+
 ## [0.5.0] - 2026-08-19
 
 ### Added

@@ -22,25 +22,6 @@ func TestToolPolicySafetyDefaults(t *testing.T) {
 	assertAssistantCode(t, assistant.ValidateToolPolicy(unsafe), assistant.CodeInvalidToolPolicy)
 }
 
-func TestMemoryPolicyRequiresControlledPersistentWrites(t *testing.T) {
-	t.Parallel()
-
-	policy := assistant.MemoryPolicy{
-		ReadScopes:   []assistant.MemoryScope{assistant.MemorySession, assistant.MemoryUser},
-		WriteMode:    assistant.MemoryWriteConfirmed,
-		WriteScope:   assistant.MemoryUser,
-		Sensitive:    assistant.MemorySensitiveExclude,
-		MaxItems:     100,
-		MaxItemBytes: 4096,
-	}
-	if err := assistant.ValidateMemoryPolicy(policy); err != nil {
-		t.Fatalf("ValidateMemoryPolicy(valid) = %v", err)
-	}
-
-	policy.WriteMode = assistant.MemoryWriteDisabled
-	assertAssistantCode(t, assistant.ValidateMemoryPolicy(policy), assistant.CodeInvalidMemory)
-}
-
 func TestNextModelCandidateDistinguishesModelAndProviderFallback(t *testing.T) {
 	t.Parallel()
 

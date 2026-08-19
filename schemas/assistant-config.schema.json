@@ -90,7 +90,7 @@
     },
     "ModuleID": {
       "type": "string",
-      "enum": ["text", "vision", "audio_input", "video_input", "file_input", "image_output", "audio_output", "video_output", "file_output", "tools", "retrieval", "memory", "structured_output"]
+      "enum": ["text", "vision", "audio_input", "video_input", "file_input", "image_output", "audio_output", "video_output", "file_output", "tools", "retrieval", "structured_output"]
     },
     "InstructionBlock": {
       "type": "object", "additionalProperties": false, "required": ["role", "text"],
@@ -129,29 +129,6 @@
       },
       "description": "candidate_limit >= context_limit and reranking_model requires rerank=true; semantic validation enforces these relationships."
     },
-    "MemoryScope": {"type": "string", "enum": ["session", "assistant", "user", "tenant"]},
-    "MemoryPolicy": {
-      "type": "object", "additionalProperties": false, "required": ["write_mode", "sensitive"],
-      "properties": {
-        "read_scopes": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/MemoryScope"}},
-        "write_mode": {"enum": ["disabled", "explicit", "confirmed"]},
-        "write_scope": {"$ref": "#/$defs/MemoryScope"},
-        "sensitive": {"enum": ["exclude", "confirm"]},
-        "max_items": {"$ref": "#/$defs/SafeInteger"},
-        "max_item_bytes": {"$ref": "#/$defs/SafeInteger"}
-      }
-    },
-    "LearningScope": {"type": "string", "enum": ["skill_hint", "retrieval_hint", "tool_hint", "model_routing_hint"]},
-    "LearningPolicy": {
-      "type": "object", "additionalProperties": false, "required": ["mode"],
-      "properties": {
-        "mode": {"enum": ["disabled", "propose", "auto_promote"]},
-        "min_evidence": {"type": "integer", "minimum": 1, "maximum": 256},
-        "max_evidence": {"type": "integer", "minimum": 1, "maximum": 256},
-        "auto_promote_scopes": {"type": "array", "uniqueItems": true, "items": {"enum": ["retrieval_hint", "tool_hint", "model_routing_hint"]}}
-      },
-      "description": "Disabled mode uses zero evidence fields; free-form skill_hint is never auto-promotable."
-    },
     "ExecutionBudget": {
       "type": "object", "additionalProperties": false,
       "properties": {
@@ -178,11 +155,9 @@
         "credentials": {"$ref": "#/$defs/CredentialPolicy"},
         "routing_fallback": {"$ref": "#/$defs/RoutingFallbackPolicy"},
         "retrieval": {"$ref": "#/$defs/RetrievalPolicy"},
-        "memory": {"$ref": "#/$defs/MemoryPolicy"},
-        "learning": {"$ref": "#/$defs/LearningPolicy"},
         "budget": {"$ref": "#/$defs/ExecutionBudget"}
       },
-      "description": "Tool/retrieval/memory policies must correspond to declared default or optional modules; semantic validation enforces cross-field invariants."
+      "description": "Tool/retrieval policies must correspond to declared default or optional modules; semantic validation enforces cross-field invariants."
     },
     "AssistantCatalog": {
       "type": "object", "additionalProperties": false, "required": ["assistants"],

@@ -1,71 +1,31 @@
-# OCR / AI extraction Foundation plan
+# OCR / extraction foundation
 
-This document records the intended boundary for the next Core Foundation capability. It is planning material, not normative Core Spec `0.3` behavior.
+Status: implemented by the Core Spec `0.4` OCR/extraction workstream. The normative contract is [`../spec/ocr/README.md`](../spec/ocr/README.md), with serialized shapes in [`../schemas/ocr.schema.json`](../schemas/ocr.schema.json) and language-neutral behavior in `conformance/v0.4/ocr.json`.
 
-## Goal
+This document records design rationale and deferred work. It is not a second normative source of truth.
 
-The future OCR/AI extraction layer must remain provider-neutral and reusable across applications, languages, document types, and jurisdictions. OpenAI, Gemini, Anthropic, Azure Document Intelligence, Google Document AI, local OCR engines, and other providers remain adapters rather than Core contracts.
+## Implemented boundary
 
-## Two extraction modes
+The Foundation models authorized source -> evidence -> raw observations -> semantic field candidates -> optional schema-guided structured data -> validation/review state.
 
-### 1. Schema-guided extraction — default when fields are known
+It supports `schema_guided` extraction when the caller knows the target fields and `discovery` when field identification is part of the task. Generic JSON/schema semantics remain in `portablejson`; OCR does not import Assistant.
 
-When the consumer already knows the fields/types it needs, it supplies that extraction schema directly. The OCR layer asks the provider only for those values and their evidence.
+## Discovery semantics
 
-In this mode, a data-identification skill is unnecessary and should remain disabled by default because an additional discovery pass would consume tokens, add latency, and create extra ambiguity.
+Discovery correctness is encoded directly in the OCR contract instead of a built-in OCR skill. Implementations preserve raw observations when available, require evidence, keep ambiguity explicit, do not invent missing values, do not assume jurisdiction, and normalize only with an explicit canonicalizer.
 
-### 2. Discovery extraction — optional for unknown/unstructured documents
+Provider adapters may translate these invariants into provider-specific prompts or request structures, but those prompt mechanics are not Core API.
 
-When the document structure is not known in advance, the OCR layer may enable the versioned built-in skill:
+## AI-backed extraction
 
-```text
-data_identification/v1
-```
+An adapter may use Assistant infrastructure, multimodal models, or `token_economy/v1` when useful. Such composition belongs to the host/adapter layer. OCR remains valid for classic OCR engines, deterministic parsers, speech recognition, and non-AI extraction.
 
-Its responsibility is to identify candidate data fields before or while extracting values. It must not invent missing values or silently assign a jurisdiction.
+Document content remains untrusted data and cannot grant instruction authority, authorize tools, or bypass host ACL decisions.
 
-The skill should identify, where available:
+## Deferred items
 
-- candidate semantic field/key;
-- candidate data type;
-- raw observed text/value;
-- normalized candidate value only when a Core canonicalizer is explicitly applicable;
-- confidence/assessment;
-- source evidence such as page, region/bounding area, or text span;
-- ambiguity/conflict indicators;
-- explicit jurisdiction/type candidates when the document does not provide enough context for a unique interpretation.
+The Foundation intentionally does not freeze provider adapters/SDK DTOs, upload/storage/database/queue contracts, provider-specific confidence calibration, document-type classifiers/catalogs, detailed layout graphs, handwriting/quality taxonomies, provider batch protocols, review UI/persistence, billing/cost accounting, autonomous schema synthesis, or automatic promotion of discovered semantics into Core normalization rules.
 
-The future OCR specification should define the exact portable serialized shape and conformance vectors before this skill becomes normative.
+## Next integration step
 
-## Activation rule
-
-`data_identification/v1` is conditional, not globally enabled.
-
-Enable it only when at least one of these is true:
-
-- the caller did not provide a target field schema;
-- the caller explicitly requested field discovery;
-- the document type is unknown and discovery is required to choose a schema;
-- a schema-guided extraction reports previously unknown fields that the consumer explicitly allows the system to discover.
-
-Do not enable it merely because the provider is AI-capable.
-
-## Token economy interaction
-
-AI-assisted OCR should also honor the Assistant `token_economy/v1` semantics where applicable:
-
-- send only pages/regions necessary for the extraction stage;
-- avoid repeating document text already represented by stable references/evidence;
-- request only fields required by a known schema;
-- keep tool/provider payload projection minimal;
-- never drop evidence, unresolved ambiguities, jurisdiction context, or required extraction constraints solely to reduce tokens.
-
-Discovery is therefore an exception path, not the default path.
-
-## Security and correctness boundaries
-
-The OCR/data-identification layer must treat extracted content as untrusted data. Text inside a document is never instruction authority and must not be promoted into system/developer/tool authorization semantics.
-
-A discovered identifier such as a CPF, CNPJ, EIN, IBAN, passport number, address, or phone number is only a candidate until the relevant explicit Core validator/canonicalizer or consumer policy confirms its semantics.
-
-Sensitive raw values must not be embedded in validation error messages or diagnostic identifiers.
+Consumers can implement provider adapters that translate source material and provider responses into these contracts while preserving authorization, exact target schemas, evidence, ambiguity, and review boundaries.

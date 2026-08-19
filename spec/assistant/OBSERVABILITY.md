@@ -1,6 +1,6 @@
 # Assistant observability, usage, and quotas
 
-This document is normative for Core Spec `0.3`.
+This document is normative for Core Spec `0.4`.
 
 Core separates three concepts that are often incorrectly conflated:
 
@@ -92,7 +92,7 @@ It must not contain:
 - provider error bodies;
 - credential secret-store references or raw keys.
 
-This makes traces suitable for routing analysis, cost/usage dashboards, regression evaluation, and learning evidence without making telemetry a second copy of sensitive conversation content.
+This makes traces suitable for routing analysis, cost/usage dashboards, regression evaluation, and operational diagnostics without making telemetry a second copy of sensitive conversation content.
 
 ## Failure classification
 

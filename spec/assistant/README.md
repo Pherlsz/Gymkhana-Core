@@ -1,8 +1,8 @@
 # Assistant semantics
 
-Core Assistant defines provider-neutral multimodal conversation, configuration, model-routing, BYOK-reference, retrieval, tool-safety, learning, usage/quota, and observability contracts without importing a model-provider SDK into domain code.
+Core Assistant defines provider-neutral multimodal conversation, configuration, model-routing, BYOK-reference, retrieval, tool-safety, usage/quota, and observability contracts without importing a model-provider SDK into domain code.
 
-The contract is transport-neutral. It does not define provider HTTP payloads, raw authentication secrets, volatile price tables, provider SDK objects, product persistence, or an autonomous unbounded agent loop.
+The contract is transport-neutral. It does not define provider HTTP payloads, raw authentication secrets, volatile price tables, provider SDK objects, product persistence, product-owned memory, learning/promotion workflows, or an autonomous unbounded agent loop.
 
 Normative companion documents:
 
@@ -10,7 +10,6 @@ Normative companion documents:
 - [`STRUCTURED-OUTPUT.md`](STRUCTURED-OUTPUT.md) — strict portable JSON/schema profile;
 - [`TOOLS.md`](TOOLS.md) — tool allowlist, side-effect policy, confirmation, and remote/MCP boundary;
 - [`RAG.md`](RAG.md) — retrieval and grounding;
-- [`LEARNING.md`](LEARNING.md) — task-scoped reviewable Skill Build;
 - [`OBSERVABILITY.md`](OBSERVABILITY.md) — usage, quotas, credential attribution, and content-free traces.
 
 ## Roles and conversation authority
@@ -46,9 +45,11 @@ Portable model capabilities include text, image/audio/video/file input, image/au
 
 ## Multiple modular Assistants
 
-Applications create separate `AssistantDefinition` values for different functions instead of mutating one global Assistant. A definition may configure instructions, default/optional modules, skills, tools and tool policies, model selection, credentials, routing fallback, RAG, memory, learning, and bounded execution budgets.
+Applications create separate `AssistantDefinition` values for different functions instead of mutating one global Assistant. A definition may configure instructions, default/optional modules, skills, tools and tool policies, model selection, credentials, routing fallback, RAG, and bounded execution budgets.
 
 Per-run overrides may enable declared optional modules, disable defaults, select a concrete model, bind ordered credentials, and override bounded fallback policy without changing the persisted Assistant definition.
+
+Long-lived user/tenant memory and learning/promotion workflows are host concerns. A host may project relevant prior context through messages or retrieval without requiring Core to own identity, persistence, retention, or self-modification semantics.
 
 ## Models and providers
 
@@ -92,7 +93,7 @@ Provider quotas are not assumed to be per API key. See [`OBSERVABILITY.md`](OBSE
 
 Adapters may normalize vendor/transport failures into stable classes including auth, rate-limit, quota, timeout, unavailable, network, context-limit, unsupported-capability, safety, invalid-request, cancelled, and unknown.
 
-Automatic model/provider fallback is bounded and permitted only for classes configured by `RoutingFallbackPolicy`. Authentication, safety, invalid-request, and caller-cancellation failures cannot be configured as automatic failover triggers in Spec `0.3`.
+Automatic model/provider fallback is bounded and permitted only for classes configured by `RoutingFallbackPolicy`. Authentication, safety, invalid-request, and caller-cancellation failures cannot be configured as automatic failover triggers in Spec `0.4`.
 
 ## Structured JSON
 
@@ -118,12 +119,6 @@ Authorization/filtering occurs before evidence reaches the model. Retrieved cont
 
 Evidence content/metadata, scores, counts, and model roles are validated/bounded before admission to portable RAG flows.
 
-## Memory
-
-The optional `memory` module requires an explicit `MemoryPolicy`. Persistent writes are disabled, explicit, or confirmation-gated; Spec `0.3` intentionally provides no unrestricted automatic-write mode.
-
-Read/write scope can be session, Assistant, user, or tenant. Sensitive data is excluded or confirmation-gated according to host classification. Core owns neither identity nor persistence.
-
 ## Built-in token economy
 
 `token_economy/v1` requests:
@@ -136,12 +131,6 @@ Read/write scope can be session, Assistant, user, or tenant. Sensitive data is e
 - mandatory preservation of unresolved constraints/state.
 
 It is a semantic profile rather than provider prompt text. It does not define a universal tokenizer, lossy summarizer, message-deletion algorithm, cache ID, or guaranteed savings percentage.
-
-## Skill Build / learning
-
-Learning is task-scoped and proposal-driven. A `TaskSignature` identifies a reusable task family without storing raw prompts. `SkillLearningProposal` references content-free run/evaluation evidence and may suggest retrieval, tool, routing, or behavior improvements.
-
-Core never rewrites an Assistant by itself. Free-form `skill_hint` proposals cannot auto-promote in Spec `0.3`; only low-authority policy scopes may become eligible for host-owned auto-promotion after evidence thresholds.
 
 ## Finish reasons
 
@@ -162,14 +151,14 @@ Portable finish reasons are:
 
 `Usage` contains provider-reported input/output/cached/reasoning token counters bounded to the JSON safe-integer range.
 
-`UsageLedgerEntry` attributes usage to run + attempt + Assistant + model + optional logical credential identity. `RunTrace` records content-free routing/fallback/tool/retrieval/usage metadata for observability and learning without duplicating prompts or provider error bodies.
+`UsageLedgerEntry` attributes usage to run + attempt + Assistant + model + optional logical credential identity. `RunTrace` records content-free routing/fallback/tool/retrieval/usage metadata for observability and diagnostics without duplicating prompts or provider error bodies.
 
 ## Streaming
 
-`streaming` remains a capability in Spec `0.3`; a provider-neutral stream-event wire shape is deliberately deferred until multiple concrete adapters prove the common event lifecycle. Providers differ in text deltas, partial tool arguments, pause/resume semantics, usage timing, and errors.
+`streaming` remains a capability in Spec `0.4`; a provider-neutral stream-event wire shape is deliberately deferred until multiple concrete adapters prove the common event lifecycle. Providers differ in text deltas, partial tool arguments, pause/resume semantics, usage timing, and errors.
 
 ## Security and privacy
 
 Core validation errors and observability structures must not embed prompt text, raw tool payloads, media URIs, retrieved content, provider error bodies, raw credentials, or secret-store reference handles.
 
-Consumers own encryption, redaction, persistence, retention, permissions, secret resolution, network policy, and user-facing consent.
+Consumers own encryption, redaction, persistence, retention, permissions, secret resolution, network policy, product memory, learning/evaluation workflows, and user-facing consent.
