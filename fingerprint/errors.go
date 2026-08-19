@@ -12,6 +12,7 @@ const (
 	CodeInvalidNamespace ErrorCode = "invalid_namespace"
 	CodeInvalidLength    ErrorCode = "invalid_length"
 	CodeInvalidFormat    ErrorCode = "invalid_format"
+	CodeInvalidUTF8      ErrorCode = "invalid_utf8"
 	CodeTooManyParts     ErrorCode = "too_many_parts"
 )
 
