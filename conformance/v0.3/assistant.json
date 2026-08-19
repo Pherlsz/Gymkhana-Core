@@ -197,6 +197,115 @@
       "operation": "assistant.capabilities.validate",
       "input": ["text", "provider_magic"],
       "error": "invalid_capability"
+    },
+    {
+      "name": "canonical built in token economy skill",
+      "operation": "assistant.skill.token_economy.builtin",
+      "input": null,
+      "output": {
+        "id": "token_economy/v1",
+        "token_economy": {
+          "prefer_concise_responses": true,
+          "avoid_restatement": true,
+          "reuse_prior_context": true,
+          "compact_tool_results": true,
+          "preserve_instruction_hierarchy": true,
+          "preserve_unresolved_constraints": true
+        }
+      }
+    },
+    {
+      "name": "validate narrowed token economy skill",
+      "operation": "assistant.skills.validate",
+      "input": [
+        {
+          "id": "token_economy/v1",
+          "token_economy": {
+            "prefer_concise_responses": true,
+            "avoid_restatement": false,
+            "reuse_prior_context": false,
+            "compact_tool_results": false,
+            "preserve_instruction_hierarchy": true,
+            "preserve_unresolved_constraints": true
+          }
+        }
+      ],
+      "output": true
+    },
+    {
+      "name": "reject token economy skill that weakens instruction hierarchy",
+      "operation": "assistant.skills.validate",
+      "input": [
+        {
+          "id": "token_economy/v1",
+          "token_economy": {
+            "prefer_concise_responses": true,
+            "avoid_restatement": true,
+            "reuse_prior_context": true,
+            "compact_tool_results": true,
+            "preserve_instruction_hierarchy": false,
+            "preserve_unresolved_constraints": true
+          }
+        }
+      ],
+      "error": "invalid_skill"
+    },
+    {
+      "name": "reject token economy skill with no optimization enabled",
+      "operation": "assistant.skills.validate",
+      "input": [
+        {
+          "id": "token_economy/v1",
+          "token_economy": {
+            "prefer_concise_responses": false,
+            "avoid_restatement": false,
+            "reuse_prior_context": false,
+            "compact_tool_results": false,
+            "preserve_instruction_hierarchy": true,
+            "preserve_unresolved_constraints": true
+          }
+        }
+      ],
+      "error": "invalid_skill"
+    },
+    {
+      "name": "reject duplicate assistant skills",
+      "operation": "assistant.skills.validate",
+      "input": [
+        {
+          "id": "token_economy/v1",
+          "token_economy": {
+            "prefer_concise_responses": true,
+            "avoid_restatement": true,
+            "reuse_prior_context": true,
+            "compact_tool_results": true,
+            "preserve_instruction_hierarchy": true,
+            "preserve_unresolved_constraints": true
+          }
+        },
+        {
+          "id": "token_economy/v1",
+          "token_economy": {
+            "prefer_concise_responses": true,
+            "avoid_restatement": false,
+            "reuse_prior_context": false,
+            "compact_tool_results": false,
+            "preserve_instruction_hierarchy": true,
+            "preserve_unresolved_constraints": true
+          }
+        }
+      ],
+      "error": "duplicate_skill"
+    },
+    {
+      "name": "reject unknown assistant skill",
+      "operation": "assistant.skills.validate",
+      "input": [
+        {
+          "id": "provider_magic/v1"
+        }
+      ],
+      "error": "invalid_skill"
     }
   ]
 }
