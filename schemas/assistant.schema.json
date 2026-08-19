@@ -50,6 +50,8 @@
       "oneOf": [
         {"$ref": "#/$defs/TextPart"},
         {"$ref": "#/$defs/ImagePart"},
+        {"$ref": "#/$defs/AudioPart"},
+        {"$ref": "#/$defs/VideoPart"},
         {"$ref": "#/$defs/FilePart"}
       ]
     },
@@ -85,6 +87,24 @@
         "media": {"$ref": "#/$defs/MediaRef"}
       }
     },
+    "AudioPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {
+        "type": {"const": "audio"},
+        "media": {"$ref": "#/$defs/MediaRef"}
+      }
+    },
+    "VideoPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {
+        "type": {"const": "video"},
+        "media": {"$ref": "#/$defs/MediaRef"}
+      }
+    },
     "FilePart": {
       "type": "object",
       "additionalProperties": false,
@@ -116,6 +136,8 @@
       "oneOf": [
         {"$ref": "#/$defs/TextPart"},
         {"$ref": "#/$defs/ImagePart"},
+        {"$ref": "#/$defs/AudioPart"},
+        {"$ref": "#/$defs/VideoPart"},
         {"$ref": "#/$defs/FilePart"},
         {"$ref": "#/$defs/ToolCallPart"},
         {"$ref": "#/$defs/ToolResultPart"}
@@ -150,7 +172,18 @@
     },
     "Capability": {
       "type": "string",
-      "enum": ["text", "image_input", "file_input", "tool_calling", "structured_output", "streaming"]
+      "enum": [
+        "text",
+        "image_input",
+        "image_output",
+        "audio_input",
+        "audio_output",
+        "video_input",
+        "file_input",
+        "tool_calling",
+        "structured_output",
+        "streaming"
+      ]
     },
     "Capabilities": {
       "type": "array",
