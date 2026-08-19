@@ -47,6 +47,22 @@ func validateInstanceNode(schema map[string]any, value any, depth int) error {
 	if err != nil || !instanceTypeMatches(value, types) {
 		return validationError(CodeInvalidSchema, "instance.type")
 	}
+	if enumRaw, ok := schema["enum"]; ok {
+		values, ok := enumRaw.([]any)
+		if !ok {
+			return validationError(CodeInvalidSchema, "instance.enum")
+		}
+		matched := false
+		for _, candidate := range values {
+			if scalarEqual(value, candidate) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return validationError(CodeInvalidSchema, "instance.enum")
+		}
+	}
 	if value == nil {
 		return nil
 	}
@@ -125,19 +141,6 @@ func validateInstanceNode(schema map[string]any, value any, depth int) error {
 			return validationError(CodeInvalidSchema, "instance.string")
 		}
 	case "boolean", "null":
-	}
-
-	if enumRaw, ok := schema["enum"]; ok {
-		values, ok := enumRaw.([]any)
-		if !ok {
-			return validationError(CodeInvalidSchema, "instance.enum")
-		}
-		for _, candidate := range values {
-			if scalarEqual(value, candidate) {
-				return nil
-			}
-		}
-		return validationError(CodeInvalidSchema, "instance.enum")
 	}
 	return nil
 }
