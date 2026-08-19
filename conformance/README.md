@@ -9,17 +9,23 @@ A language implementation that claims support for a specification version must p
 ```text
 conformance/
 ├── README.md
-├── conformance_test.go   # current Go conformance runner
+├── conformance_test.go   # shared Go runner for existing suites
+├── assistant_test.go     # current Go Assistant conformance adapter
 ├── v0.1/
 │   ├── normalize.json
 │   └── temporal.json
-└── v0.2/
+├── v0.2/
+│   ├── fingerprint.json
+│   ├── normalize.json
+│   └── temporal.json
+└── v0.3/
+    ├── assistant.json
     ├── fingerprint.json
     ├── normalize.json
     └── temporal.json
 ```
 
-Because `0.2` adds a new operation family, its target directory carries the complete applicable suite set for an implementation claiming Core Spec `0.2`. The `0.1` vectors remain historical and immutable in meaning.
+Each active specification-version directory carries the complete applicable suite set for an implementation claiming that version. Historical vectors remain immutable in meaning.
 
 Future implementations should consume the same JSON vectors rather than copying test cases into language-specific fixtures.
 
@@ -28,11 +34,11 @@ Future implementations should consume the same JSON vectors rather than copying 
 Each case has:
 
 - a stable human-readable `name`;
-- an operation key such as `identity.br.cpf.canonicalize` or `fingerprint.sha256.framed_text`;
-- JSON `input`, which may be a scalar or a structured object;
+- an operation key such as `identity.br.cpf.canonicalize`, `fingerprint.sha256.framed_text`, or `assistant.message.validate`;
+- JSON `input`, which may be a scalar, array, or structured object;
 - exactly one expected JSON `output` or stable `error` code.
 
-Structured inputs let conformance cover typed contracts such as `{ "kind": "oab", "value": "..." }` or framed fingerprint inputs without encoding multiple semantic arguments into an opaque string. Outputs may likewise become structured as future Assistant, OCR, matching, and solver contracts are added.
+Structured inputs let conformance cover typed contracts without encoding multiple semantic arguments into an opaque string. Assistant vectors validate provider-neutral messages, tool definitions, finish reasons, usage, and capability sets.
 
 ## Rules
 
@@ -40,6 +46,7 @@ Structured inputs let conformance cover typed contracts such as `{ "kind": "oab"
 - errors are asserted by stable semantic code, never localized message text;
 - sensitive original values must not appear in errors;
 - jurisdiction-specific operations use an explicit jurisdiction in their operation key;
+- provider-neutral Assistant vectors contain no provider SDK/model/transport fields;
 - equivalent cases must keep the same meaning across all supported languages;
 - implementations may use idiomatic APIs but adapters/runners must map them to the same operation semantics;
 - changing an existing vector's semantics requires a specification version change.
