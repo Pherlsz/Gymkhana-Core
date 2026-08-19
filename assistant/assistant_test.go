@@ -2,8 +2,8 @@ package assistant_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
-	"unicode/utf8"
 
 	"github.com/Pherlsz/Gymkhana-Core/assistant"
 )
@@ -54,7 +54,7 @@ func TestValidateContentParts(t *testing.T) {
 			part: assistant.ContentPart{Type: assistant.PartToolCall, ToolCall: &assistant.ToolCall{
 				ID:        "call_01",
 				Name:      "lookup_weather",
-				Arguments: json.RawMessage(`{"location":"Tokyo"}`),
+				Arguments: json.RawMessage("{\"location\":\"Tokyo\"}"),
 			}},
 		},
 		{
@@ -75,9 +75,6 @@ func TestValidateContentParts(t *testing.T) {
 			code: assistant.CodeInvalidContentType,
 		},
 	}
-
-	// Ensure the raw tool-call fixture is exact valid JSON.
-	tests[2].part.ToolCall.Arguments = json.RawMessage("{\"location\":\"Tokyo\"}")
 
 	for _, test := range tests {
 		test := test
@@ -126,7 +123,7 @@ func TestValidateToolCallIDUsesUnicodeScalarLimit(t *testing.T) {
 	t.Parallel()
 
 	call := assistant.ToolCall{
-		ID:        repeatRune('界', 256),
+		ID:        strings.Repeat("界", 256),
 		Name:      "lookup_weather",
 		Arguments: json.RawMessage(`{}`),
 	}
@@ -169,16 +166,6 @@ func TestValidationErrorDoesNotEchoSensitiveInput(t *testing.T) {
 	if contains(err.Error(), secret) {
 		t.Fatalf("error leaked original input: %q", err)
 	}
-}
-
-func repeatRune(value rune, count int) string {
-	buffer := make([]byte, 0, count*utf8.RuneLen(value))
-	encoded := make([]byte, utf8.UTFMax)
-	size := utf8.EncodeRune(encoded, value)
-	for range count {
-		buffer = append(buffer, encoded[:size]...)
-	}
-	return string(buffer)
 }
 
 func contains(value, substring string) bool {
