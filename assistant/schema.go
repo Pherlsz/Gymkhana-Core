@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"strconv"
 	"unicode/utf8"
 )
@@ -16,13 +17,15 @@ const (
 	maxJSONNodes         = 100000
 	maxSchemaDepth       = 16
 	maxSchemaProperties  = 256
+	maxSchemaArrayItems  = 10000
 )
 
 // ValidatePortableJSONObject validates an untrusted JSON object without
-// normalizing it. It rejects invalid UTF-8, duplicate object keys, excessive
-// depth/node counts, trailing values, and payloads above the portable bound.
+// normalizing it. It rejects invalid UTF-8, duplicate object keys, ambiguous
+// unpaired UTF-16 surrogate escapes, excessive depth/node counts, trailing
+// values, and payloads above the portable bound.
 func ValidatePortableJSONObject(raw json.RawMessage) error {
-	if len(raw) == 0 || len(raw) > maxPortableJSONBytes || !utf8.Valid(raw) {
+	if len(raw) == 0 || len(raw) > maxPortableJSONBytes || !utf8.Valid(raw) || !validJSONUnicodeEscapes(raw) {
 		return validationError(CodeInvalidJSON, "json")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -61,7 +64,7 @@ func scanJSONValue(decoder *json.Decoder, depth int, nodes *int, requireObject b
 	if depth > maxJSONDepth || *nodes >= maxJSONNodes {
 		return errors.New("json bound exceeded")
 	}
-	*nodes++
+	*nodes = *nodes + 1
 	token, err := decoder.Token()
 	if err != nil {
 		return err
@@ -117,6 +120,8 @@ func validateSchemaNode(node map[string]any, depth int) error {
 	if depth > maxSchemaDepth {
 		return validationError(CodeInvalidSchema, "schema.depth")
 	}
+	// `{}` is the explicit escape hatch for an unconstrained object. Any schema
+	// that declares a type must otherwise follow the portable strict profile.
 	if len(node) == 0 {
 		return nil
 	}
@@ -132,10 +137,7 @@ func validateSchemaNode(node map[string]any, depth int) error {
 	}
 
 	types, err := portableSchemaTypes(node["type"])
-	if err != nil {
-		return validationError(CodeInvalidSchema, "schema.type")
-	}
-	if len(types) == 0 {
+	if err != nil || len(types) == 0 {
 		return validationError(CodeInvalidSchema, "schema.type")
 	}
 	primary := types[0]
@@ -170,10 +172,7 @@ func validateSchemaNode(node map[string]any, depth int) error {
 			return err
 		}
 	case "integer", "number":
-		if err := validateSchemaNumber(node, "minimum"); err != nil {
-			return err
-		}
-		if err := validateSchemaNumber(node, "maximum"); err != nil {
+		if err := validateSchemaNumberPair(node); err != nil {
 			return err
 		}
 	case "string", "boolean", "null":
@@ -259,15 +258,6 @@ func validateObjectSchema(node map[string]any, depth int) error {
 			return err
 		}
 	}
-	if len(properties) == 0 {
-		if required, exists := node["required"]; exists {
-			values, ok := required.([]any)
-			if !ok || len(values) != 0 {
-				return validationError(CodeInvalidSchema, "schema.required")
-			}
-		}
-		return nil
-	}
 	additional, ok := node["additionalProperties"].(bool)
 	if !ok || additional {
 		return validationError(CodeInvalidSchema, "schema.additionalProperties")
@@ -302,7 +292,7 @@ func validateSchemaIntegerPair(node map[string]any, minKey, maxKey string) error
 	if err != nil {
 		return validationError(CodeInvalidSchema, "schema."+maxKey)
 	}
-	if minSet && maxSet && minValue > maxValue {
+	if (minSet && minValue > maxSchemaArrayItems) || (maxSet && maxValue > maxSchemaArrayItems) || (minSet && maxSet && minValue > maxValue) {
 		return validationError(CodeInvalidSchema, "schema."+maxKey)
 	}
 	return nil
@@ -323,15 +313,34 @@ func schemaNonNegativeInteger(raw any) (int64, bool, error) {
 	return value, true, nil
 }
 
-func validateSchemaNumber(node map[string]any, key string) error {
-	raw, exists := node[key]
-	if !exists {
-		return nil
+func validateSchemaNumberPair(node map[string]any) error {
+	minimum, minSet, err := portableSchemaNumber(node["minimum"])
+	if err != nil {
+		return validationError(CodeInvalidSchema, "schema.minimum")
 	}
-	if _, ok := raw.(json.Number); !ok {
-		return validationError(CodeInvalidSchema, "schema."+key)
+	maximum, maxSet, err := portableSchemaNumber(node["maximum"])
+	if err != nil {
+		return validationError(CodeInvalidSchema, "schema.maximum")
+	}
+	if minSet && maxSet && minimum > maximum {
+		return validationError(CodeInvalidSchema, "schema.maximum")
 	}
 	return nil
+}
+
+func portableSchemaNumber(raw any) (float64, bool, error) {
+	if raw == nil {
+		return 0, false, nil
+	}
+	number, ok := raw.(json.Number)
+	if !ok {
+		return 0, false, errors.New("number required")
+	}
+	value, err := strconv.ParseFloat(number.String(), 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > float64(maxPortableJSONInteger) {
+		return 0, false, errors.New("non-portable number")
+	}
+	return value, true, nil
 }
 
 func schemaEnumValueMatches(value any, types []string) bool {
@@ -342,7 +351,7 @@ func schemaEnumValueMatches(value any, types []string) bool {
 				return true
 			}
 		case "string":
-			if _, ok := value.(string); ok {
+			if text, ok := value.(string); ok && utf8.ValidString(text) && utf8.RuneCountInString(text) <= 4096 {
 				return true
 			}
 		case "boolean":
@@ -351,16 +360,84 @@ func schemaEnumValueMatches(value any, types []string) bool {
 			}
 		case "integer":
 			if number, ok := value.(json.Number); ok {
-				_, err := strconv.ParseInt(number.String(), 10, 64)
-				if err == nil {
+				parsed, err := strconv.ParseInt(number.String(), 10, 64)
+				if err == nil && parsed >= -maxPortableJSONInteger && parsed <= maxPortableJSONInteger {
 					return true
 				}
 			}
 		case "number":
-			if _, ok := value.(json.Number); ok {
-				return true
+			if number, ok := value.(json.Number); ok {
+				parsed, err := strconv.ParseFloat(number.String(), 64)
+				if err == nil && !math.IsNaN(parsed) && !math.IsInf(parsed, 0) && math.Abs(parsed) <= float64(maxPortableJSONInteger) {
+					return true
+				}
 			}
 		}
 	}
 	return false
+}
+
+func validJSONUnicodeEscapes(raw []byte) bool {
+	inString := false
+	for i := 0; i < len(raw); i++ {
+		switch raw[i] {
+		case '"':
+			inString = !inString
+		case '\\':
+			if !inString {
+				continue
+			}
+			i++
+			if i >= len(raw) {
+				return false
+			}
+			if raw[i] != 'u' {
+				continue
+			}
+			if i+4 >= len(raw) {
+				return false
+			}
+			first, ok := parseHex4(raw[i+1 : i+5])
+			if !ok {
+				return false
+			}
+			if first >= 0xD800 && first <= 0xDBFF {
+				if i+10 >= len(raw) || raw[i+5] != '\\' || raw[i+6] != 'u' {
+					return false
+				}
+				second, ok := parseHex4(raw[i+7 : i+11])
+				if !ok || second < 0xDC00 || second > 0xDFFF {
+					return false
+				}
+				i += 10
+				continue
+			}
+			if first >= 0xDC00 && first <= 0xDFFF {
+				return false
+			}
+			i += 4
+		}
+	}
+	return true
+}
+
+func parseHex4(value []byte) (uint16, bool) {
+	if len(value) != 4 {
+		return 0, false
+	}
+	var result uint16
+	for _, b := range value {
+		result <<= 4
+		switch {
+		case b >= '0' && b <= '9':
+			result |= uint16(b - '0')
+		case b >= 'a' && b <= 'f':
+			result |= uint16(b-'a') + 10
+		case b >= 'A' && b <= 'F':
+			result |= uint16(b-'A') + 10
+		default:
+			return 0, false
+		}
+	}
+	return result, true
 }
