@@ -51,6 +51,24 @@
       "output": "523108be2ff9018abd0266f968c0232651d6c0c1e8482843145d697f9093b78f"
     },
     {
+      "name": "framing supports zero parts",
+      "operation": "fingerprint.sha256.framed_text",
+      "input": {
+        "namespace": "empty/v1",
+        "parts": []
+      },
+      "output": "5a57cd4806fb6e845a350d798fe9e1346bfe2f22c0cea0e540c7bd1e0c7b0e08"
+    },
+    {
+      "name": "framing distinguishes one empty part from zero parts",
+      "operation": "fingerprint.sha256.framed_text",
+      "input": {
+        "namespace": "empty/v1",
+        "parts": [""]
+      },
+      "output": "5d3c8cdd3b8bb65bb7b0192533816ff98df5ef007f3d9d385320ec12582d4e1f"
+    },
+    {
       "name": "reject invalid fingerprint namespace",
       "operation": "fingerprint.sha256.framed_text",
       "input": {
