@@ -2,12 +2,13 @@ package assistant
 
 // RunOverrides applies temporary choices without mutating the persisted
 // AssistantDefinition. Optional modules may be enabled, default modules may be
-// disabled, and one concrete model/credential may be selected for the run.
+// disabled, one concrete model may be selected, and provider credential handles
+// may be supplied for dynamic/fallback routing.
 type RunOverrides struct {
-	EnableModules  []ModuleID     `json:"enable_modules,omitempty"`
-	DisableModules []ModuleID     `json:"disable_modules,omitempty"`
-	Model          *ModelRef      `json:"model,omitempty"`
-	Credential     *CredentialRef `json:"credential,omitempty"`
+	EnableModules  []ModuleID      `json:"enable_modules,omitempty"`
+	DisableModules []ModuleID      `json:"disable_modules,omitempty"`
+	Model          *ModelRef       `json:"model,omitempty"`
+	Credentials    []CredentialRef `json:"credentials,omitempty"`
 }
 
 // EffectiveModules returns deterministic effective modules for one run.
@@ -57,40 +58,53 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 		optionalModules[module] = struct{}{}
 	}
 
-	seen := make(map[ModuleID]struct{}, len(overrides.EnableModules)+len(overrides.DisableModules))
+	seenModules := make(map[ModuleID]struct{}, len(overrides.EnableModules)+len(overrides.DisableModules))
 	for _, module := range overrides.EnableModules {
 		if _, allowed := optionalModules[module]; !allowed {
 			return validationError(CodeInvalidModule, "run.enable_modules")
 		}
-		if _, duplicate := seen[module]; duplicate {
+		if _, duplicate := seenModules[module]; duplicate {
 			return validationError(CodeDuplicateModule, "run.modules")
 		}
-		seen[module] = struct{}{}
+		seenModules[module] = struct{}{}
 	}
 	for _, module := range overrides.DisableModules {
 		if _, allowed := defaultModules[module]; !allowed {
 			return validationError(CodeInvalidModule, "run.disable_modules")
 		}
-		if _, duplicate := seen[module]; duplicate {
+		if _, duplicate := seenModules[module]; duplicate {
 			return validationError(CodeDuplicateModule, "run.modules")
 		}
-		seen[module] = struct{}{}
+		seenModules[module] = struct{}{}
 	}
 	if overrides.Model != nil && !validModelRef(*overrides.Model) {
 		return validationError(CodeInvalidModel, "run.model")
 	}
-	if overrides.Credential != nil {
-		if err := ValidateCredentialRef(*overrides.Credential); err != nil {
+
+	seenProviders := make(map[ProviderID]struct{}, len(overrides.Credentials))
+	for _, credential := range overrides.Credentials {
+		if err := ValidateCredentialRef(credential); err != nil {
 			return err
 		}
-		if !def.Credentials.Allows(overrides.Credential.Mode) {
-			return validationError(CodeInvalidCredential, "run.credential")
+		if !def.Credentials.Allows(credential.Mode) {
+			return validationError(CodeInvalidCredential, "run.credentials")
 		}
-		if overrides.Model != nil && overrides.Credential.Provider != overrides.Model.Provider {
-			return validationError(CodeInvalidCredential, "run.credential.provider")
+		if _, duplicate := seenProviders[credential.Provider]; duplicate {
+			return validationError(CodeInvalidCredential, "run.credentials")
 		}
+		seenProviders[credential.Provider] = struct{}{}
 	}
 	return nil
+}
+
+// CredentialForProvider resolves a run-local credential binding for a provider.
+func CredentialForProvider(overrides RunOverrides, provider ProviderID) (*CredentialRef, bool) {
+	for i := range overrides.Credentials {
+		if overrides.Credentials[i].Provider == provider {
+			return &overrides.Credentials[i], true
+		}
+	}
+	return nil, false
 }
 
 // ResolveAssistantModelsForRun applies module and manual model overrides before
