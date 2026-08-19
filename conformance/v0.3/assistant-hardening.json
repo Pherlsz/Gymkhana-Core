@@ -1,0 +1,155 @@
+{
+  "spec_version": "0.3",
+  "suite": "assistant-hardening",
+  "cases": [
+    {
+      "name": "validate complete tool call lifecycle",
+      "operation": "assistant.conversation.validate",
+      "input": [
+        {"role": "user", "content": [{"type": "text", "text": "Weather?"}]},
+        {"role": "assistant", "content": [{"type": "tool_call", "tool_call": {"id": "call_01", "name": "lookup_weather", "arguments": {"city": "Porto Alegre"}}}]},
+        {"role": "tool", "content": [{"type": "tool_result", "tool_result": {"call_id": "call_01", "content": [{"type": "text", "text": "21 C"}]}}]}
+      ],
+      "output": true
+    },
+    {
+      "name": "reject unresolved tool call before next generation",
+      "operation": "assistant.conversation.validate",
+      "input": [
+        {"role": "user", "content": [{"type": "text", "text": "Weather?"}]},
+        {"role": "assistant", "content": [{"type": "tool_call", "tool_call": {"id": "call_01", "name": "lookup_weather", "arguments": {}}}]}
+      ],
+      "error": "unresolved_tool_call"
+    },
+    {
+      "name": "reject duplicate JSON object keys",
+      "operation": "assistant.json_object.validate",
+      "input": "{\"a\":1,\"a\":2}",
+      "error": "invalid_json"
+    },
+    {
+      "name": "reject unpaired UTF16 surrogate escape",
+      "operation": "assistant.json_object.validate",
+      "input": "{\"value\":\"\\ud800\"}",
+      "error": "invalid_json"
+    },
+    {
+      "name": "validate portable strict structured schema",
+      "operation": "assistant.schema.validate",
+      "input": "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":[\"integer\",\"null\"],\"minimum\":0,\"maximum\":200}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false}",
+      "output": true
+    },
+    {
+      "name": "reject unsupported structured schema keyword",
+      "operation": "assistant.schema.validate",
+      "input": "{\"type\":\"string\",\"pattern\":\".*\"}",
+      "error": "invalid_schema"
+    },
+    {
+      "name": "reject destructive tool without explicit confirmation",
+      "operation": "assistant.tool_policy.validate",
+      "input": {"name": "delete_account", "effect": "destructive", "confirmation": "never"},
+      "error": "invalid_tool_policy"
+    },
+    {
+      "name": "validate read only tool policy",
+      "operation": "assistant.tool_policy.validate",
+      "input": {"name": "search_docs", "effect": "read_only", "confirmation": "never", "parallel_safe": true, "idempotent": true},
+      "output": true
+    },
+    {
+      "name": "validate bounded confirmed memory",
+      "operation": "assistant.memory.validate",
+      "input": {"read_scopes": ["session", "user"], "write_mode": "confirmed", "write_scope": "user", "sensitive": "exclude", "max_items": 100, "max_item_bytes": 4096},
+      "output": true
+    },
+    {
+      "name": "reject automatic promotion of free form skill hints",
+      "operation": "assistant.learning_policy.validate",
+      "input": {"mode": "auto_promote", "min_evidence": 2, "max_evidence": 32, "auto_promote_scopes": ["skill_hint"]},
+      "error": "invalid_learning"
+    },
+    {
+      "name": "validate task scoped learning proposal",
+      "operation": "assistant.learning.validate",
+      "input": {
+        "id": "learn/retrieval_01",
+        "assistant_id": "research_assistant",
+        "task": {"family": "document_research", "version": 1, "traits": ["legal", "pt_br"]},
+        "scope": "retrieval_hint",
+        "summary": "Prefer hybrid retrieval before reranking for this task family.",
+        "revision": 1,
+        "evidence": [
+          {"run_id": "run-001", "outcome": "improved", "origin": "evaluation"},
+          {"run_id": "run-002", "outcome": "success", "origin": "runtime"}
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "validate provider quota observation",
+      "operation": "assistant.quota.validate",
+      "input": {
+        "credential": {"id": "key_01", "provider": "openai", "mode": "byok", "quota_scope": "project:primary"},
+        "known": true,
+        "limits": [{"dimension": "total_tokens", "limit": 1000, "used": 250, "remaining": 750, "window_seconds": 60}]
+      },
+      "output": true
+    },
+    {
+      "name": "validate idempotent usage ledger attribution",
+      "operation": "assistant.usage_ledger.validate",
+      "input": {
+        "run_id": "run-001",
+        "attempt": 0,
+        "assistant_id": "coding_assistant",
+        "credential": {"id": "key_01", "provider": "openai", "mode": "byok", "quota_scope": "project:primary"},
+        "model": {"provider": "openai", "model": "model/latest"},
+        "usage": {"input_tokens": 100, "output_tokens": 20}
+      },
+      "output": true
+    },
+    {
+      "name": "validate content free run trace",
+      "operation": "assistant.trace.validate",
+      "input": {
+        "run_id": "run-001",
+        "assistant_id": "coding_assistant",
+        "assistant_revision": 3,
+        "effective_modules": ["text", "tools"],
+        "attempts": [
+          {"index": 0, "model": {"provider": "openai", "model": "model/a"}, "credential": {"id": "key_01", "provider": "openai", "mode": "byok", "quota_scope": "project:primary"}, "failure": "rate_limit", "usage": {"input_tokens": 10}},
+          {"index": 1, "model": {"provider": "openai", "model": "model/b"}, "credential": {"id": "key_02", "provider": "openai", "mode": "byok", "quota_scope": "project:secondary"}, "usage": {"input_tokens": 20, "output_tokens": 5}}
+        ],
+        "finish_reason": "stop"
+      },
+      "output": true
+    },
+    {
+      "name": "validate bounded retrieval evidence",
+      "operation": "assistant.retrieval_evidence.validate",
+      "input": {"id": "ev-001", "content": "bounded evidence", "source": "document:42", "score": 0.9, "metadata": {"tenant": "example"}},
+      "output": true
+    },
+    {
+      "name": "credential fallback skips same quota scope",
+      "operation": "assistant.credential.next",
+      "input": {
+        "overrides": {
+          "credentials": [
+            {"id": "key_01", "provider": "gateway", "mode": "byok", "reference": "session:key_01", "quota_scope": "project:shared"},
+            {"id": "key_02", "provider": "gateway", "mode": "byok", "reference": "session:key_02", "quota_scope": "project:shared"},
+            {"id": "key_03", "provider": "gateway", "mode": "byok", "reference": "session:key_03", "quota_scope": "project:other"}
+          ]
+        },
+        "provider": "gateway",
+        "current": 0,
+        "failure": "quota"
+      },
+      "output": {
+        "credential": {"id": "key_03", "provider": "gateway", "mode": "byok", "reference": "session:key_03", "quota_scope": "project:other"},
+        "index": 2
+      }
+    }
+  ]
+}
