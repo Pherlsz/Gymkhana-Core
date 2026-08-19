@@ -2,6 +2,8 @@ package assistant
 
 import "unicode/utf8"
 
+const maxAssistantInstructionBytes = 1 << 20
+
 // ModuleID identifies one independently configurable Assistant capability.
 type ModuleID string
 
@@ -98,7 +100,7 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 		if instruction.Role != RoleSystem && instruction.Role != RoleDeveloper {
 			return validationError(CodeInvalidAssistant, "instructions.role")
 		}
-		if instruction.Text == "" || !utf8.ValidString(instruction.Text) || len(instruction.Text) > maxPortableJSONBytes {
+		if instruction.Text == "" || !utf8.ValidString(instruction.Text) || len(instruction.Text) > maxAssistantInstructionBytes {
 			return validationError(CodeInvalidAssistant, "instructions.text")
 		}
 	}
