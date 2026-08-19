@@ -1,5 +1,10 @@
 package assistant
 
+const (
+	maxToolTimeoutMillis = int64(24 * 60 * 60 * 1000)
+	maxToolResultBytes   = int64(64 << 20)
+)
+
 // ToolEffect classifies the side-effect risk of invoking a tool. Unknown is the
 // safe default for tools that have not been explicitly classified.
 type ToolEffect string
@@ -40,15 +45,17 @@ func (mode ToolConfirmation) Valid() bool {
 }
 
 // ToolPolicy adds execution semantics to one tool name without coupling Core to
-// the implementation or authorization system. MaxCalls=0 means use the broader
-// run/application limit rather than unlimited execution.
+// the implementation or authorization system. Zero numeric limits mean use a
+// bounded runtime/application default; zero never means unlimited execution.
 type ToolPolicy struct {
-	Name         string           `json:"name"`
-	Effect       ToolEffect       `json:"effect"`
-	Confirmation ToolConfirmation `json:"confirmation"`
-	ParallelSafe bool             `json:"parallel_safe,omitempty"`
-	Idempotent   bool             `json:"idempotent,omitempty"`
-	MaxCalls     int64            `json:"max_calls,omitempty"`
+	Name           string           `json:"name"`
+	Effect         ToolEffect       `json:"effect"`
+	Confirmation   ToolConfirmation `json:"confirmation"`
+	ParallelSafe   bool             `json:"parallel_safe,omitempty"`
+	Idempotent     bool             `json:"idempotent,omitempty"`
+	MaxCalls       int64            `json:"max_calls,omitempty"`
+	TimeoutMillis  int64            `json:"timeout_millis,omitempty"`
+	MaxResultBytes int64            `json:"max_result_bytes,omitempty"`
 }
 
 // DefaultToolPolicy is deliberately conservative for an unclassified tool.
@@ -64,7 +71,7 @@ func ValidateToolPolicy(policy ToolPolicy) error {
 	if err := ValidateToolName(policy.Name); err != nil {
 		return err
 	}
-	if !policy.Effect.Valid() || !policy.Confirmation.Valid() || policy.MaxCalls < 0 || policy.MaxCalls > maxPortableJSONInteger {
+	if !policy.Effect.Valid() || !policy.Confirmation.Valid() || policy.MaxCalls < 0 || policy.MaxCalls > maxPortableJSONInteger || policy.TimeoutMillis < 0 || policy.TimeoutMillis > maxToolTimeoutMillis || policy.MaxResultBytes < 0 || policy.MaxResultBytes > maxToolResultBytes {
 		return validationError(CodeInvalidToolPolicy, "tool_policy")
 	}
 	switch policy.Effect {
