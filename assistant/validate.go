@@ -35,7 +35,7 @@ func ValidateContentPart(part ContentPart) error {
 			return validationError(CodeInvalidContent, "content")
 		}
 		return nil
-	case PartImage, PartFile:
+	case PartImage, PartAudio, PartVideo, PartFile:
 		if part.Text != "" || part.Media == nil || part.ToolCall != nil || part.ToolResult != nil {
 			return validationError(CodeInvalidContent, "content")
 		}
