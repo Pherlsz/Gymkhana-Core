@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math/big"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -14,6 +15,8 @@ const (
 	MaxSchemaDepth       = 16
 	MaxSchemaProperties  = 256
 	MaxSchemaArrayItems  = 10000
+	MaxNumberLexemeBytes = 128
+	MaxDecimalExponent   = 1024
 	maxSchemaEnumValues  = 256
 	maxSchemaDescription = 4096
 	maxSchemaTitle       = 256
@@ -321,6 +324,15 @@ func schemaNumber(raw any) (*big.Rat, bool, error) {
 }
 
 func parsePortableNumber(text string) (*big.Rat, error) {
+	if len(text) == 0 || len(text) > MaxNumberLexemeBytes {
+		return nil, errors.New("numeric lexeme too large")
+	}
+	if exponentAt := strings.IndexAny(text, "eE"); exponentAt >= 0 {
+		exponent, err := strconv.ParseInt(text[exponentAt+1:], 10, 32)
+		if err != nil || exponent < -MaxDecimalExponent || exponent > MaxDecimalExponent {
+			return nil, errors.New("numeric exponent out of range")
+		}
+	}
 	value, ok := new(big.Rat).SetString(text)
 	if !ok {
 		return nil, errors.New("invalid JSON number")
