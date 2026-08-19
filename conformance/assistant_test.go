@@ -12,6 +12,10 @@ func TestAssistantConformance(t *testing.T) {
 	runSuite(t, "assistant.json", executeAssistant)
 }
 
+func TestAssistantMultimodalConformance(t *testing.T) {
+	runSuite(t, "assistant-multimodal.json", executeAssistant)
+}
+
 func TestAssistantConfigConformance(t *testing.T) {
 	runSuite(t, "assistant-config.json", executeAssistantConfig)
 }
