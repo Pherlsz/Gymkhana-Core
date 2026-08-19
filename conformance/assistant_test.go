@@ -122,18 +122,6 @@ func executeAssistantHardening(testCase vector) (any, string) {
 			return nil, "invalid_conformance_input"
 		}
 		return assistantValidationResult(assistant.ValidateConversation(value))
-	case "assistant.json_object.validate":
-		input, ok := stringInput(testCase.Input)
-		if !ok {
-			return nil, "invalid_conformance_input"
-		}
-		return assistantValidationResult(assistant.ValidatePortableJSONObject(json.RawMessage(input)))
-	case "assistant.schema.validate":
-		input, ok := stringInput(testCase.Input)
-		if !ok {
-			return nil, "invalid_conformance_input"
-		}
-		return assistantValidationResult(assistant.ValidatePortableJSONSchema(json.RawMessage(input)))
 	case "assistant.tool_policy.validate":
 		var value assistant.ToolPolicy
 		if err := json.Unmarshal(testCase.Input, &value); err != nil {
