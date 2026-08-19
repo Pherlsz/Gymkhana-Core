@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"math"
+	"math/big"
 	"strconv"
 	"unicode/utf8"
 )
@@ -299,25 +299,37 @@ func validateSchemaNumberPair(node map[string]any) error {
 	if err != nil {
 		return validationError(CodeInvalidSchema, "schema.maximum")
 	}
-	if minSet && maxSet && minimum > maximum {
+	if minSet && maxSet && minimum.Cmp(maximum) > 0 {
 		return validationError(CodeInvalidSchema, "schema.maximum")
 	}
 	return nil
 }
 
-func schemaNumber(raw any) (float64, bool, error) {
+func schemaNumber(raw any) (*big.Rat, bool, error) {
 	if raw == nil {
-		return 0, false, nil
+		return nil, false, nil
 	}
 	number, ok := raw.(json.Number)
 	if !ok {
-		return 0, false, errors.New("number required")
+		return nil, false, errors.New("number required")
 	}
-	value, err := strconv.ParseFloat(number.String(), 64)
-	if err != nil || math.IsNaN(value) || math.IsInf(value, 0) || math.Abs(value) > float64(MaxSafeInteger) {
-		return 0, false, errors.New("non-portable number")
+	value, err := parsePortableNumber(number.String())
+	if err != nil {
+		return nil, false, err
 	}
 	return value, true, nil
+}
+
+func parsePortableNumber(text string) (*big.Rat, error) {
+	value, ok := new(big.Rat).SetString(text)
+	if !ok {
+		return nil, errors.New("invalid JSON number")
+	}
+	limit := new(big.Rat).SetInt64(MaxSafeInteger)
+	if new(big.Rat).Abs(value).Cmp(limit) > 0 {
+		return nil, errors.New("non-portable number")
+	}
+	return value, nil
 }
 
 func schemaEnumValueMatches(value any, types []string) bool {
@@ -344,8 +356,7 @@ func schemaEnumValueMatches(value any, types []string) bool {
 			}
 		case "number":
 			if number, ok := value.(json.Number); ok {
-				parsed, err := strconv.ParseFloat(number.String(), 64)
-				if err == nil && !math.IsNaN(parsed) && !math.IsInf(parsed, 0) && math.Abs(parsed) <= float64(MaxSafeInteger) {
+				if _, err := parsePortableNumber(number.String()); err == nil {
 					return true
 				}
 			}
