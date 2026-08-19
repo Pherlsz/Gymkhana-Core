@@ -3,6 +3,7 @@ package portablejson_test
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/portablejson"
@@ -16,7 +17,7 @@ func TestValidateObject(t *testing.T) {
 	}
 	for name, raw := range map[string]json.RawMessage{
 		"duplicate_key": json.RawMessage("{\"a\":1,\"a\":2}"),
-		"array_root": json.RawMessage("[1,2,3]"),
+		"array_root":    json.RawMessage("[1,2,3]"),
 		"trailing_value": json.RawMessage("{} {}"),
 	} {
 		name, raw := name, raw
@@ -62,6 +63,19 @@ func TestExactDecimalSemantics(t *testing.T) {
 	}
 	if err := portablejson.ValidateInstance(schema, json.RawMessage("0.10000000000000001")); err == nil {
 		t.Fatal("distinct decimal unexpectedly matched enum")
+	}
+}
+
+func TestExactDecimalParsingIsBounded(t *testing.T) {
+	t.Parallel()
+	schema := json.RawMessage("{\"type\":\"number\"}")
+	for _, value := range []string{
+		"1e-1025",
+		"0." + strings.Repeat("0", portablejson.MaxNumberLexemeBytes) + "1",
+	} {
+		if err := portablejson.ValidateInstance(schema, json.RawMessage(value)); err == nil {
+			t.Fatalf("unbounded numeric value %q unexpectedly accepted", value)
+		}
 	}
 }
 
