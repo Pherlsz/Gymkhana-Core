@@ -54,7 +54,7 @@ func scanJSONValue(decoder *json.Decoder, depth int, nodes *int, requireObject b
 	if depth > MaxDepth || *nodes >= MaxNodes {
 		return errors.New("json bound exceeded")
 	}
-	*nodes++
+	*nodes = *nodes + 1
 	token, err := decoder.Token()
 	if err != nil {
 		return err
