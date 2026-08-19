@@ -10,7 +10,11 @@ import (
 func TestStringSHA256(t *testing.T) {
 	t.Parallel()
 
-	got := fingerprint.String("abc").String()
+	digest, err := fingerprint.String("abc")
+	if err != nil {
+		t.Fatalf("String() error = %v", err)
+	}
+	got := digest.String()
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 	if got != want {
 		t.Fatalf("String() = %q, want %q", got, want)
@@ -92,6 +96,23 @@ func TestFramedBytesMatchesStrings(t *testing.T) {
 	}
 }
 
+func TestStringAPIsRejectInvalidUTF8(t *testing.T) {
+	t.Parallel()
+
+	invalid := string([]byte{0xff, 'a'})
+	if _, err := fingerprint.String(invalid); !fingerprint.IsCode(err, fingerprint.CodeInvalidUTF8) {
+		t.Fatalf("String invalid UTF-8 error = %v", err)
+	}
+	if _, err := fingerprint.FramedStrings("example/v1", invalid); !fingerprint.IsCode(err, fingerprint.CodeInvalidUTF8) {
+		t.Fatalf("FramedStrings invalid UTF-8 error = %v", err)
+	}
+
+	// Arbitrary binary data remains valid through the byte API.
+	if _, err := fingerprint.Framed("example/v1", []byte{0xff, 'a'}); err != nil {
+		t.Fatalf("Framed binary input error = %v", err)
+	}
+}
+
 func TestFramedRejectsInvalidNamespace(t *testing.T) {
 	t.Parallel()
 
@@ -146,7 +167,10 @@ func TestDigestParseRejectsMalformedValues(t *testing.T) {
 func TestDigestBytesReturnsCopy(t *testing.T) {
 	t.Parallel()
 
-	digest := fingerprint.String("abc")
+	digest, err := fingerprint.String("abc")
+	if err != nil {
+		t.Fatal(err)
+	}
 	value := digest.Bytes()
 	value[0] ^= 0xff
 	if digest.String() != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" {
