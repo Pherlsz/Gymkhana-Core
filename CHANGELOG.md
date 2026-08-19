@@ -70,7 +70,7 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 
 ### Added
 
-- `fingerprint` Go package with exact SHA-256 fingerprints of bytes and UTF-8 strings, canonical lowercase hexadecimal digests, strict digest parsing, and stable validation errors.
+- `fingerprint` Go package with exact SHA-256 byte/string fingerprints, canonical lowercase hexadecimal digests, strict digest parsing, and stable validation errors.
 - Core FingerPrint frame v1 (`CFP\x01`) with explicit namespace, part count, and big-endian part lengths for portable domain separation and unambiguous ordered multipart fingerprints.
 - Language-neutral fingerprint specification and shared conformance vectors under Core Spec `0.2`, including exact digest, framing, namespace separation, boundary preservation, and parsing behavior.
 - Bounded fingerprint parse fuzzing integrated into `make fuzz-smoke`.
