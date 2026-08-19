@@ -3,6 +3,7 @@ package fingerprint
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"unicode/utf8"
 )
 
 // Digest is a SHA-256 fingerprint.
@@ -14,8 +15,13 @@ func Bytes(value []byte) Digest {
 }
 
 // String fingerprints the exact UTF-8 bytes of value without normalization.
-func String(value string) Digest {
-	return Bytes([]byte(value))
+// Invalid UTF-8 is rejected so the operation has the same semantics in
+// runtimes whose string types cannot represent arbitrary byte sequences.
+func String(value string) (Digest, error) {
+	if !utf8.ValidString(value) {
+		return Digest{}, validationError(CodeInvalidUTF8)
+	}
+	return Bytes([]byte(value)), nil
 }
 
 // Parse decodes a 64-character hexadecimal SHA-256 digest. Uppercase input is
