@@ -113,10 +113,12 @@ Provider-neutral, modular multimodal Assistant foundation for:
 - manual model selection, explicit ordered fallback, and deterministic dynamic routing;
 - automatic model-capability filtering and bounded provider/model fallback;
 - portable RAG policy with lexical/vector/hybrid retrieval, query transformation, candidate/context limits, reranking, grounding, citations, and evidence;
-- bounded memory and task-scoped learning policies without autonomous persistent self-modification;
+- bounded execution budgets without autonomous persistent self-modification;
 - content-free run traces for routing/usage diagnostics;
 - runtime-local Go provider adapter registration with no provider SDK types crossing the portable contract boundary;
 - stable validation errors without embedding prompt/tool/credential payload data.
+
+Persistent user/tenant memory, task signatures, learning proposals, evaluation evidence, and promotion workflows are host/application concerns. Relevant prior context may be projected through messages or RAG without making persistence or learning part of the portable Assistant contract.
 
 Convenience provider IDs currently include OpenAI, Anthropic, Google, OpenRouter, Groq, Ollama, Mistral, and xAI, but provider IDs are not a closed enum. Actual model names, free tiers, prices, and availability come from live adapters rather than a frozen Core table.
 
@@ -137,7 +139,7 @@ Provider-neutral OCR and structured-extraction contracts for:
 - optional normalized values only when an explicit canonicalizer namespace is named;
 - result validation/review state and stable non-sensitive warnings;
 - candidate-to-structured-data consistency and exact portable-number equality;
-- conditional built-in `data_identification/v1` discovery semantics.
+- direct discovery invariants that preserve evidence/ambiguity, avoid invented missing values or assumed jurisdiction, and require explicit canonicalizers for normalization.
 
 `ocr` is broader than image OCR. Adapters may use classic OCR engines, document parsers, speech recognition, multimodal models, deterministic parsers, or compositions of those techniques. Provider SDK objects, upload/storage, persistence, queues, billing, and authorization stay outside Core.
 
@@ -155,11 +157,13 @@ Core Spec `0.4` covers:
 - explicit jurisdiction modules, beginning with Brazil because those capabilities already exist in Go;
 - deterministic fingerprint digest/framing semantics;
 - generic strict JSON and `portable_json_schema/v1` schema/instance semantics;
-- provider-neutral Assistant messages, multimodal media, tools, skills, modular definitions, model routing/fallback, BYOK references, RAG, memory, learning, quota/usage, and observability contracts;
+- provider-neutral Assistant messages, multimodal media, tools, skills, modular definitions, model routing/fallback, BYOK references, RAG, quota/usage, and observability contracts;
 - provider-neutral OCR/extraction requests, evidence, observations, candidates, confidence, schema-guided output, discovery, validation, and review semantics;
 - an international-standards extension point;
 - stable non-localized error semantics;
 - machine-readable conformance suites executed by the current Go implementation.
+
+Spec `0.4` deliberately removes product-owned persistent memory and learning/promotion workflows from the Assistant boundary and encodes OCR discovery correctness directly rather than through a separate OCR skill API.
 
 Run the current Go conformance suites with:
 
@@ -181,7 +185,7 @@ Core may contain coherent reusable packages/contracts such as:
 - canonical serialization and fingerprints;
 - provider-neutral Assistant messages/tools/configuration/model routing;
 - opaque managed/BYOK credential-reference semantics;
-- provider-neutral RAG/evidence, memory, learning, quota/usage, and trace policy/contracts;
+- provider-neutral RAG/evidence, quota/usage, and trace contracts;
 - provider-neutral OCR/extraction source/evidence/candidate/review contracts;
 - deterministic matching primitives;
 - generic constraint/composition solving algorithms.
@@ -194,7 +198,7 @@ Core must not contain:
 - River/R2/cloud deployment concerns;
 - OpenAI, Google, Anthropic, or other provider SDK types in portable contracts;
 - raw API keys/secrets, provider HTTP payloads, or hardcoded volatile price/model availability tables;
-- concrete tool side-effect authorization/execution, secret storage, memory/trace/usage persistence, or product billing;
+- concrete tool side-effect authorization/execution, secret storage, product memory, learning/promotion state, trace/usage persistence, or product billing;
 - consumer-specific prompt text embedded as Core library policy (applications may supply instruction blocks through portable definitions);
 - product-specific DTOs or complete Profile/document/bill models;
 - arbitrary SQL/code execution or autonomous unbounded agent/orchestration loops.
