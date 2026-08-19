@@ -61,8 +61,10 @@ func TestQuotaAndUsageLedger(t *testing.T) {
 		Reference:  "session:key_01",
 		QuotaScope: "project:primary",
 	}
+	identity := credential.Identity()
 	quota := assistant.QuotaState{
-		Credential: credential.Identity(),
+		Provider:   "openai",
+		Credential: &identity,
 		Known:      true,
 		Limits: []assistant.QuotaWindow{{
 			Dimension:     assistant.QuotaTotalTokens,
@@ -80,14 +82,14 @@ func TestQuotaAndUsageLedger(t *testing.T) {
 		RunID:       "run-001",
 		Attempt:     0,
 		AssistantID: "coding_assistant",
-		Credential:  credential.Identity(),
+		Credential:  &identity,
 		Model:       assistant.ModelRef{Provider: "openai", Model: "model/latest"},
 		Usage:       assistant.Usage{InputTokens: 100, OutputTokens: 20},
 	}
 	if err := assistant.ValidateUsageLedgerEntry(entry); err != nil {
 		t.Fatalf("ValidateUsageLedgerEntry = %v", err)
 	}
-	if entry.Credential.ID != "key_01" {
+	if entry.Credential == nil || entry.Credential.ID != "key_01" {
 		t.Fatalf("credential identity = %#v", entry.Credential)
 	}
 }
