@@ -12,13 +12,15 @@ Its canonical textual form is exactly 64 lowercase hexadecimal ASCII characters.
 
 Operation keys:
 
-- `fingerprint.sha256.text` — SHA-256 of the exact UTF-8 bytes of a string;
-- `fingerprint.sha256.framed_text` — SHA-256 of the Core FingerPrint frame for a namespace plus ordered UTF-8 string parts;
+- `fingerprint.sha256.text` — SHA-256 of the exact UTF-8 bytes of a valid Unicode string;
+- `fingerprint.sha256.framed_text` — SHA-256 of the Core FingerPrint frame for a namespace plus ordered valid UTF-8 string parts;
 - `fingerprint.digest.parse` — validate a hexadecimal digest and return canonical lowercase text.
 
 ## Exact-input rule
 
 Fingerprinting does not perform Unicode normalization, whitespace normalization, case folding, JSON normalization, locale conversion, or application-specific canonicalization.
+
+String operations require input that can be represented as valid UTF-8 without replacement or repair. A runtime that can hold malformed string/code-unit sequences must reject them with `invalid_utf8`. Arbitrary binary values use the byte-oriented fingerprint operation/API instead.
 
 If two representations should be semantically equivalent, the consumer must first canonicalize them using an appropriate Core or application contract and then fingerprint the canonical representation.
 
@@ -63,7 +65,7 @@ Consumers should prefer framed fingerprints for semantic identities shared acros
 
 The same parts under different namespaces intentionally produce different digests. Namespace versions should change when the consumer changes the canonical meaning or ordering of the supplied parts.
 
-Raw `fingerprint.sha256.text` remains useful when the exact byte/string identity is itself the contract.
+Raw `fingerprint.sha256.text` remains useful when the exact string identity is itself the contract. Arbitrary bytes use the byte-oriented implementation API and the same SHA-256 digest representation.
 
 ## Security and privacy
 
