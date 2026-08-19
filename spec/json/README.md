@@ -70,6 +70,8 @@ Portable schema numeric comparison is mathematical rather than binary floating-p
 
 The absolute magnitude of a portable schema/instance number is bounded to `2^53-1`. This is a portability bound, not a statement that every decimal is exactly representable as an IEEE-754 double; conforming implementations must preserve the exact mathematical comparison semantics before converting to a provider/runtime representation.
 
+Exact decimal parsing is itself bounded to prevent adversarial big-number work: a numeric lexeme is at most 128 bytes and an explicit base-10 exponent is limited to the inclusive range `-1024..1024`. Conforming ports must apply equivalent bounds before constructing arbitrary-precision numeric representations.
+
 The portable `integer` type is deliberately stricter than mathematical JSON-Schema integer equivalence: its lexical JSON number must be representable as a base-10 integer without a fractional or exponent form and must fit `[-(2^53-1), 2^53-1]`. Thus `1` is an integer, while `1.0` and `1e0` are portable `number` values rather than portable `integer` values. This removes runtime-specific integer coercion from conformance.
 
 ## Instance validation
