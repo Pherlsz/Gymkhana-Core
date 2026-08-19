@@ -162,10 +162,15 @@ func ValidateGenerationRequest(request GenerationRequest) error {
 	return nil
 }
 
-// ValidateGenerationResponse validates normalized adapter output.
+// ValidateGenerationResponse validates normalized adapter output. Provider
+// generation output must be represented as an assistant-role message; tool
+// results remain separate tool-role input messages.
 func ValidateGenerationResponse(response GenerationResponse) error {
 	if !validModelRef(response.Model) {
 		return validationError(CodeInvalidModel, "generation_response.model")
+	}
+	if response.Message.Role != RoleAssistant {
+		return validationError(CodeInvalidProvider, "generation_response.message.role")
 	}
 	if err := ValidateMessage(response.Message); err != nil {
 		return err
