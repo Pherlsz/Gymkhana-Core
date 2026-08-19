@@ -1,12 +1,17 @@
 package assistant
 
 import (
-	"encoding/json"
 	"strings"
 	"unicode/utf8"
 )
 
-const maxPortableJSONInteger int64 = 1<<53 - 1
+const (
+	maxPortableJSONInteger   int64 = 1<<53 - 1
+	maxConversationMessages       = 4096
+	maxMessageParts               = 1024
+	maxTextPartBytes              = 1 << 20
+	maxToolResultParts            = 1024
+)
 
 // ValidateMessage validates portable message semantics including the allowed
 // tool-content relationship for each semantic role.
@@ -16,6 +21,9 @@ func ValidateMessage(message Message) error {
 	}
 	if len(message.Content) == 0 {
 		return validationError(CodeEmpty, "content")
+	}
+	if len(message.Content) > maxMessageParts {
+		return validationError(CodeInvalidContent, "content")
 	}
 	for _, part := range message.Content {
 		if err := ValidateContentPart(part); err != nil {
@@ -46,6 +54,9 @@ func ValidateMessage(message Message) error {
 func ValidateConversation(messages []Message) error {
 	if len(messages) == 0 {
 		return validationError(CodeEmpty, "messages")
+	}
+	if len(messages) > maxConversationMessages {
+		return validationError(CodeInvalidContent, "messages")
 	}
 	pending := make(map[string]struct{})
 	seenCalls := make(map[string]struct{})
@@ -84,7 +95,7 @@ func ValidateContentPart(part ContentPart) error {
 		if part.Text == "" {
 			return validationError(CodeEmpty, "text")
 		}
-		if !utf8.ValidString(part.Text) || part.Media != nil || part.ToolCall != nil || part.ToolResult != nil {
+		if !utf8.ValidString(part.Text) || len(part.Text) > maxTextPartBytes || part.Media != nil || part.ToolCall != nil || part.ToolResult != nil {
 			return validationError(CodeInvalidContent, "content")
 		}
 		return nil
@@ -200,6 +211,9 @@ func ValidateToolResult(result ToolResult) error {
 	if len(result.Content) == 0 {
 		return validationError(CodeEmpty, "content")
 	}
+	if len(result.Content) > maxToolResultParts {
+		return validationError(CodeInvalidToolResult, "content")
+	}
 	for _, part := range result.Content {
 		if part.Type == PartToolCall || part.Type == PartToolResult {
 			return validationError(CodeInvalidToolResult, "content")
@@ -213,10 +227,6 @@ func ValidateToolResult(result ToolResult) error {
 
 func validCallID(value string) bool {
 	return value != "" && utf8.ValidString(value) && utf8.RuneCountInString(value) <= 256
-}
-
-func validJSONObject(raw json.RawMessage) bool {
-	return ValidatePortableJSONObject(raw) == nil
 }
 
 // ValidateFinishReason validates one portable completion reason.
@@ -242,6 +252,9 @@ func ValidateUsage(usage Usage) error {
 // ValidateCapabilities validates known portable capability names and rejects
 // duplicates so serialized capability sets remain unambiguous.
 func ValidateCapabilities(capabilities []Capability) error {
+	if len(capabilities) > 64 {
+		return validationError(CodeInvalidCapability, "capabilities")
+	}
 	seen := make(map[Capability]struct{}, len(capabilities))
 	for _, capability := range capabilities {
 		if !capability.Valid() {
