@@ -1,214 +1,282 @@
-# Gymkhana Core — Orchestration Document
+# Gymkhana Core — Architecture and Orchestration
 
-> **Planning version:** Stage 10  
-> **Last synchronized:** 2026-07-13  
-> **Current stage:** Stage 10 completed — M0 implementation authorized  
-> **Primary source of truth:** `Pherlsz/Gymkhana-Database/docs/ORCHESTRATION.md`  
-> **Repository responsibility:** reusable Go logic independent from infrastructure
-
-This document records the approved implementation preparation for Gymkhana-Core. Product, persistence, HTTP, OpenAPI, provider adapters, workers, and UI remain outside this repository.
+> **Foundation architecture:** 1  
+> **Last synchronized:** 2026-08-18  
+> **Repository responsibility:** language-neutral reusable contracts and infrastructure-independent algorithms  
+> **Specification:** `spec/`  
+> **Behavioral source of truth:** `spec/` + versioned `conformance/` vectors
 
 ## 1. Mission
 
-Provide a small, deterministic, testable Go module for reusable logic that does not depend on PostgreSQL, HTTP, React, River, R2, Cloud Run, Vercel, or provider SDKs.
+Gymkhana Core is a private foundation for reusable semantics and algorithms shared across applications, services, runtimes, and jurisdictions.
 
-Core exists to host stable reusable contracts and algorithms such as:
+The repository is not the core layer of Gymkhana Database. Gymkhana Database is one consumer among current and future services.
 
-- normalization;
-- civil date and year-month handling;
-- canonical serialization and fingerprints;
-- Query catalog, AST, QueryPlan, and ExecutionPlan;
-- matching and duplicate assessment;
-- provider-neutral Assistant/tool contracts;
-- OCR suggestion/evidence contracts;
-- character selection/transformation;
-- combination solving and ranking.
+Go is the first implementation. Go source is not the architectural source of truth.
 
-Do not create broad packages named `utils`, `helpers`, `common`, `shared`, or `core`.
+Core is designed so conforming implementations can exist in:
 
-## 2. Approved principles
+- Go;
+- TypeScript/Node.js;
+- Java;
+- .NET/C#;
+- Python;
+- Rust;
+- PHP;
+- future languages when justified.
 
-- Go 1.26;
-- standard library first;
-- pure functions and deterministic output where possible;
-- interfaces only at real substitution boundaries;
-- small public API;
-- no infrastructure types in public contracts;
-- no HTTP status, SQL, database schema, roles, permissions, localized text, or provider SDK types;
-- no arbitrary SQL, code, expression runtime, or autonomous agent loop;
-- structured reasons and errors;
-- no score presented as probability without a validated probabilistic model;
-- no premature extraction from Gymkhana Database;
-- breaking changes before v1 remain explicit and documented.
+## 2. Architectural invariants
 
-## 3. What does not belong in Core
+Core is:
 
-- PostgreSQL repositories, pgx, sqlc, migrations, indexes, or transactions;
-- HTTP handlers, cookies, sessions, CSRF, idempotency persistence, or OpenAPI DTOs;
-- roles, permissions, field visibility, resource ownership, or audit storage;
-- River, R2, signed URLs, file downloads, PDF rendering, or Cloud Run;
-- OpenAI/Google SDK types, prompts, secrets, model choices, quotas, or pricing;
-- React, TypeScript, Data Grid, routes, forms, or Query Keys;
-- complete Profile/document/bill persistence models;
-- import execution, Forms synchronization, export generation, duplicate queue persistence, merge transactions, or OCR application.
+1. **Language-neutral** — semantics are specified independently from implementation syntax and runtime conventions.
+2. **Product-neutral** — no consumer application owns Core contracts or roadmap.
+3. **Provider-neutral** — provider SDKs, concrete model APIs, credentials, pricing, and cloud-specific behavior stay in adapters owned by consumers.
+4. **Jurisdiction-neutral** — no country is the implicit default; country-specific behavior is namespaced and isolated.
+5. **Infrastructure-independent** — no persistence, HTTP, queue, UI, storage, or deployment dependency is required to execute Core logic.
+6. **Deterministic where possible** — the same semantic input produces the same canonical result across conforming implementations.
+7. **Explicitly bounded** — algorithms with nontrivial cost expose deterministic budgets/limits.
+8. **Small at the public boundary** — do not create catch-all `utils`, `helpers`, `common`, `shared`, or `core` packages.
 
-## 4. Repository structure for M0
+## 3. Sources of truth
+
+Precedence for Core behavior:
+
+1. an explicit current architectural decision recorded in Core;
+2. the versioned language-neutral specification under `spec/`;
+3. versioned conformance vectors under `conformance/`;
+4. machine-readable schemas under `schemas/`;
+5. language implementation code and language-local tests;
+6. consumer integration behavior.
+
+A consumer issue can motivate a Core change but cannot redefine Core semantics implicitly.
+
+## 4. Repository layers
 
 ```text
 Gymkhana-Core/
-├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml
-│   │   ├── security.yml
-│   │   └── release.yml
-│   ├── dependabot.yml
-│   └── pull_request_template.md
-├── docs/ORCHESTRATION.md
-├── internal/
-│   └── testutil/
-├── .editorconfig
-├── .gitignore
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-├── SECURITY.md
-├── go.mod
-├── go.sum
-├── Makefile
-└── tools.go
+├── spec/          language-neutral normative semantics
+├── conformance/   shared observable behavior vectors
+├── schemas/       portable serialized contracts
+├── normalize/     current Go implementation
+├── civiltime/     current Go implementation
+└── future language/package implementations as justified
 ```
 
-`internal/testutil` is created only when real shared test support exists. Empty public packages are not committed as placeholders.
+The current Go module path remains stable while Go is the only implementation:
 
-## 5. Module contract
-
-```go
-module github.com/Pherlsz/Gymkhana-Core
-
-go 1.26
+```text
+github.com/Pherlsz/Gymkhana-Core
 ```
+
+Moving Go under an implementation subdirectory is deferred until there is enough multi-language value to justify a breaking import-path migration.
+
+## 5. Specification version versus implementation version
+
+`spec/VERSION` versions the language-neutral semantics.
+
+Repository `VERSION` currently versions the Go implementation/release.
+
+These versions are intentionally different concepts. Future language packages may have independent implementation SemVer while declaring which Core specification version they support.
+
+Example future model:
+
+```text
+Core Spec 2.1
+├── Go          0.9.2  -> spec 2.1
+├── TypeScript  0.7.0  -> spec 2.1
+├── Java        0.4.1  -> spec 2.0
+└── Python      0.3.0  -> spec 2.1
+```
+
+Do not force synchronized package releases once multiple language ecosystems exist.
+
+## 6. Conformance model
+
+Shared vectors under `conformance/` define observable behavior independently from implementation language.
 
 Rules:
 
-- no dependency on Gymkhana Database or Gymkhana UI;
-- no permanent `replace` directives;
-- exact dependency versions in `go.sum`;
-- no framework;
-- no PostgreSQL or provider SDK dependency;
-- private consumption through `GOPRIVATE=github.com/Pherlsz/Gymkhana-Core`;
-- Gymkhana Database pins exact tags.
+- every implementation claiming a specification version passes every applicable vector for that version;
+- language-local tests may add coverage but may not contradict shared vectors;
+- errors are compared by stable semantic code, not localized text;
+- conformance data contains no product persistence or infrastructure assumptions;
+- changing existing observable behavior requires a specification version decision and updated vectors;
+- algorithms may have additional property/fuzz/benchmark requirements where fixed vectors are insufficient.
 
-A local parent `go.work` may be used during development but is not committed as a production dependency mechanism.
+The current Go implementation executes the shared suites as part of `go test ./...` and through `make conformance`.
 
-## 6. Package creation order
+## 7. Global versus jurisdiction-specific behavior
 
-M0 starts without artificial public packages.
+Global primitives include concepts such as:
 
-M1 creates only stable foundation packages:
+- Unicode/text canonicalization;
+- civil temporal values;
+- generic identifier semantics;
+- canonical encoding/fingerprints;
+- provider-neutral Assistant contracts;
+- OCR evidence contracts;
+- matching primitives;
+- generic bounded solver algorithms.
+
+Jurisdictional behavior uses explicit namespaces, for example:
 
 ```text
-normalize
-civiltime
+identity.br.cpf
+identity.br.cnpj
+postal.br.cep
 ```
 
-Canonical fingerprint helpers may become a separate `fingerprint` package only when they form a coherent reusable API. Otherwise they remain close to consuming types until stabilized.
+Future modules may cover `us`, `pt`, `gb`, `ca`, and others without making any one jurisdiction the default.
 
-Future packages are added by milestone, not in M0:
+Country, jurisdiction, language, locale, currency, and timezone are distinct concepts and are never silently treated as synonyms.
 
-```text
-query        M10
-matching     M11
-assistant    M12
-ocr          M13
-solver       M14
-```
+## 8. International standards
 
-Package names remain concrete and responsibility-focused.
+Cross-jurisdiction standards belong under `spec/standards/` when they form a stable reusable contract. Potential examples include:
 
-## 7. M1 normalization scope
+- ISO 3166;
+- ISO 4217;
+- BCP 47;
+- E.164;
+- IBAN;
+- BIC/SWIFT.
 
-Potential `normalize` APIs cover:
+Do not add large standards datasets speculatively. A standard enters Core when behavior, maintenance/versioning, and consumer value are understood.
 
-- trim and whitespace collapse;
-- Unicode normalization;
-- case and accent-insensitive search forms;
-- punctuation handling;
-- CPF canonicalization and validation helpers;
-- alphanumeric document identifiers;
-- phone;
-- email;
-- preservation of leading zeros;
-- separate display and canonical values.
+## 9. Data and heuristic boundaries
 
-Normalization rules that affect persisted fingerprints, matching, or search receive explicit versions when needed.
+Core algorithms must not become a dumping ground for one application's dirty-data vocabulary.
 
-## 8. M1 temporal scope
+Distinguish:
 
-`civiltime` provides:
+- normative reusable rules;
+- reusable versioned datasets;
+- consumer-owned alias catalogs and migration cleanup heuristics.
 
-- `CivilDate`;
-- `YearMonth`;
-- parsing;
-- validation;
-- comparison;
-- leap-year rules;
-- month arithmetic;
-- canonical serialization.
+For example, a generic alias matcher may belong in Core while mappings such as an application-specific shorthand for one city should normally remain consumer data unless a broader stable contract is demonstrated.
 
-Civil dates and year-month values never depend on timezone. Real instants remain consumer-owned UTC `time.Time` values.
+## 10. Current Foundation areas
 
-## 9. Future milestone delivery
+### Text
 
-### M10 — Query contracts
+Language-neutral display/search text semantics and Unicode-aware canonicalization.
 
-- value types;
-- catalog entities, fields, relations, operators, capabilities, and sensitivity metadata;
-- field paths and relation quantifiers;
-- Predicate, RelationPredicate, And, Or, Not;
-- QueryPlan;
-- validation and budgets;
-- canonical serialization and fingerprints;
-- result and explanation contracts.
+### Temporal
 
-### M11 — Matching
+Timezone-free `CivilDate` and `YearMonth` semantics.
 
-- canonical ProfilePair;
-- compact evidence vector;
-- supporting/contradicting evidence;
-- levels VERY_STRONG, PROBABLE, POSSIBLE;
-- deterministic rules and fingerprints;
-- name alone never producing a strong level.
+### Identity
 
-### M12 — Assistant
+Generic typed identifier concepts with explicit jurisdiction keys. The current Go implementation already includes Brazilian CPF/CNPJ and document behavior; the specification treats Brazil as one jurisdiction module.
 
-- provider-neutral request/result/capabilities;
-- typed tool schemas;
-- structured result parts;
-- streaming event contracts;
-- no SDK types, SQL, code execution, or unbounded correction loops.
+### Errors
 
-### M13 — OCR
+Stable non-localized error codes without sensitive original-value leakage.
 
-- SuggestedValue;
-- evidence and normalized bounding boxes;
-- comparison status;
-- review decisions;
-- malformed structured-output validation;
-- no provider, storage, or mutation behavior.
+## 11. Planned capability order
 
-### M14 — Advanced execution and solver
+New areas should generally be added in this order, based on real reusable value rather than Database milestones:
 
-- ExecutionPlan DAG;
-- set operations and result grain;
-- contiguous, ordered subsequence, unordered subset, and permutation semantics;
-- binary/digit/character transforms;
-- combination slots, bindings, constraints, pruning, branch-and-bound, and bounded memoization;
-- deterministic ranking and evidence.
+1. Foundation specification/conformance infrastructure;
+2. global/jurisdiction separation for existing normalization;
+3. canonical `fingerprint` package/specification;
+4. provider-neutral `assistant` contracts;
+5. provider-neutral OCR/multimodal contracts;
+6. generic matching/evidence primitives;
+7. generic solver/constraint/composition algorithms;
+8. first non-Go implementation, preferably TypeScript as the first portability stress test;
+9. Java, .NET/C#, Python, Rust, and PHP ports as real consumers justify them;
+10. package ecosystem publication and implementation/spec compatibility matrix.
 
-## 10. Makefile commands
+This ordering is guidance, not a coupling to any product milestone.
 
-Initial targets:
+## 12. Assistant boundary
+
+A future Assistant specification may own neutral concepts such as:
+
+- messages and roles;
+- typed content parts;
+- tool definitions, calls, and results;
+- streaming event semantics;
+- capabilities;
+- finish reasons;
+- usage structures;
+- stable errors and bounded behavior.
+
+It must not own:
+
+- OpenAI, Gemini, Anthropic, or other SDK types;
+- API keys/secrets;
+- concrete model selection;
+- provider pricing;
+- application prompts;
+- persistence/session authorization;
+- autonomous unbounded agent loops.
+
+## 13. OCR/multimodal boundary
+
+A future OCR/multimodal specification may own provider-neutral suggestions, evidence, bounded regions, review states, and structured extraction results.
+
+Provider invocation, file storage, document rendering, permissions, persistence, and mutation/application remain consumer-owned.
+
+## 14. Matching boundary
+
+A future matching package may own deterministic evidence representation, comparisons, contradiction/support semantics, and ranking/assessment primitives.
+
+Product entities such as Profile, customer, document row, merge queue, or database transaction are not Core concepts.
+
+## 15. Solver boundary
+
+A future solver package may own candidates, slots/roles, generic constraints, deterministic enumeration/pruning, budgets, partial/incomplete outcomes, and evidence.
+
+It must not know Gymkhana-specific persistence, QueryPlan SQL compilation, Profiles, bills, permissions, or workers.
+
+## 16. Implementation design rules
+
+For every public capability:
+
+- prefer standard-library-first implementations;
+- use pure functions and immutable values where practical;
+- expose interfaces only at real substitution boundaries;
+- define stable structured errors;
+- document canonical versus display representations;
+- preserve leading zeroes where identifiers require them;
+- fuzz malformed/untrusted inputs where appropriate;
+- benchmark nontrivial algorithms;
+- define explicit complexity/budget behavior;
+- avoid infrastructure types in public contracts;
+- add/update conformance vectors for portable observable semantics.
+
+## 17. What does not belong in Core
+
+- PostgreSQL repositories, pgx, sqlc, migrations, indexes, transactions;
+- HTTP handlers/status codes, cookies, sessions, CSRF, resource ownership;
+- permissions/roles and application audit storage;
+- River, R2, signed URLs, Cloud Run, Vercel, deployment topology;
+- React, routes, browser state, product forms, Data Grid components;
+- provider SDK types, credentials, concrete prompts/model choices/pricing;
+- complete application domain/persistence models;
+- arbitrary SQL/code/expression execution;
+- consumer-specific migration scripts or one-off cleanup catalogs.
+
+## 18. Multi-language implementation policy
+
+Do not write seven ports preemptively.
+
+A new language implementation starts when there is a real consumer or portability need. It must:
+
+- declare the supported Core spec version;
+- consume the shared conformance vectors;
+- use idiomatic language APIs rather than mechanically mirroring Go syntax;
+- publish through the normal ecosystem package manager when distribution is needed;
+- keep implementation-specific dependencies out of the language-neutral spec.
+
+Contract/model generation from schemas is encouraged where appropriate. Nontrivial algorithms should normally be implemented idiomatically per language and proven by conformance/property tests rather than generated into unreadable source.
+
+## 19. Go implementation quality gates
+
+Current Go development uses:
 
 ```text
 make setup
@@ -217,224 +285,45 @@ make format-check
 make vet
 make lint
 make test
+make conformance
 make test-race
 make fuzz-smoke
 make vuln
 make security
-make build
 make check
 ```
 
-`make check` runs all mandatory local PR checks.
-
-Principles:
-
-- simple, discoverable targets;
-- fail fast;
-- no hidden network side effects in ordinary tests;
-- exact tool versions;
-- README documents prerequisites and commands;
-- race and fuzz smoke targets stay bounded for developer use.
-
-## 11. Tool management
-
-`tools.go` uses a tools build tag only for Go tools that are appropriate to pin through the module.
-
-Expected tools when implementation confirms compatibility:
-
-- staticcheck;
-- govulncheck;
-- any additional Go-native generator or analyzer actually used by CI.
-
-Do not add unused tools or a dependency merely to populate `go.sum`.
-
-## 12. CI workflows
-
-### `ci.yml`
-
-- exact Go version;
-- dependency cache;
-- `gofmt` check;
-- `go vet ./...`;
-- `staticcheck ./...`;
-- `go test ./...`;
-- module/build verification.
-
-Race runs on main, release, scheduled/manual runs, and concurrency-relevant changes rather than every trivial PR when cost is unjustified.
-
-### `security.yml`
-
-- govulncheck;
-- OSV scan;
-- dependency review on PRs;
-- secret scan according to the approved tool;
-- GitHub Actions pinned by commit SHA.
-
-### `release.yml`
-
-Manual release only:
-
-1. validate clean main and version;
-2. validate CHANGELOG;
-3. run full checks;
-4. create release commit if required;
-5. create annotated tag;
-6. create GitHub Release;
-7. verify the module can be consumed by Gymkhana Database.
-
-No release on every merge.
-
-## 13. Testing strategy
-
-### M0
-
-- module builds;
-- package documentation and examples compile when present;
-- CI and security commands execute;
-- clean consumer import is verified.
-
-### M1
-
-- unit tests for Unicode, identifiers, dates, and year-month;
-- fuzzing for malformed Unicode, identifiers, dates, and serialization;
-- stable test vectors;
-- deterministic round trips.
-
-### Later milestones
-
-- Query AST/property tests;
-- plan serialization/fingerprint stability;
-- matching determinism and contradiction tests;
-- malformed Assistant/OCR schema fuzzing;
-- exhaustive small-domain character/solver tests;
-- algorithm benchmarks and budget boundaries.
+`make check` is the required local gate before marking a public-contract PR ready for review.
 
 Core tests do not spin up PostgreSQL, HTTP servers, provider APIs, or browser environments.
 
-## 14. Documentation files
+## 20. Pull request requirements
 
-- README: mission, boundaries, setup, commands, consumption, and status;
-- CONTRIBUTING: language, branch/commit policy, public API review, tests, fuzz, benchmark, and changelog;
-- SECURITY: private vulnerability reporting without inventing contact details;
-- CHANGELOG: Unreleased, Added, Changed, Fixed, Security;
-- proprietary/all-rights-reserved license while private;
-- `.editorconfig` with UTF-8/LF/final newline;
-- `.gitignore` for actual artifacts only.
+Core PRs describe:
 
-Documentation must not describe nonexistent APIs as available.
+- objective and reusable scope;
+- originating consumer requirement when applicable;
+- specification impact;
+- public API impact per implementation;
+- determinism and budgets;
+- conformance/test/fuzz/benchmark coverage;
+- security/privacy implications;
+- consumer migration notes for breaking behavior;
+- release/version impact.
 
-## 15. Branches and first PRs
+A consumer link is context, not architectural authority.
 
-Branches:
+## 21. Definition of Done for a portable Core capability
 
-```text
-chore/bootstrap-core
-feat/core-normalization
-```
+A capability is complete when:
 
-Initial PR sequence:
-
-1. module bootstrap, root files, Makefile, and documentation;
-2. CI and security workflows;
-3. normalization and civiltime foundations;
-4. release workflow and v0.1.0 preparation;
-5. v0.2.0 preparation when M1 APIs are stable and Gymkhana Database is ready to consume them.
-
-A smaller number of PRs is acceptable when grouping improves review and keeps `main` coherent.
-
-## 16. Initial issues
-
-M0 issues:
-
-- bootstrap Go module and repository root;
-- add local quality commands;
-- add CI workflow;
-- add security workflow;
-- add documentation and contribution policy;
-- add release workflow;
-- verify clean consumer import;
-- publish and validate v0.1.0.
-
-M1 issues:
-
-- implement text normalization;
-- implement CPF/document normalization;
-- implement phone/email normalization;
-- implement CivilDate;
-- implement YearMonth;
-- add fuzz and deterministic test vectors;
-- prepare foundation release.
-
-Each issue defines scope, exclusions, dependencies, acceptance criteria, tests, public API impact, and consumer impact.
-
-## 17. Release roadmap
-
-Conceptual sequence:
-
-```text
-v0.1.0 module and release foundation
-v0.2.0 normalization, civil dates, and canonical foundations
-v0.3.0 Query catalog, AST, and QueryPlan
-v0.4.0 matching and duplicate assessment
-v0.5.0 Assistant/provider/tool contracts
-v0.6.0 OCR contracts
-v0.7.0 ExecutionPlan, character engine, and solver
-```
-
-Exact version numbers follow actual SemVer impact. Releases occur only at real Gymkhana Database consumption points.
-
-## 18. Pull request requirements
-
-Core PRs include:
-
-- objective and scope;
-- public API changes;
-- deterministic behavior;
-- tests and fuzzing;
-- benchmarks for algorithms;
-- structured errors;
-- dependency impact;
-- infrastructure-independence review;
-- CHANGELOG entry when public behavior changes;
-- Gymkhana Database consumer impact.
-
-## 19. Definition of Done for Core algorithms
-
-- stable and intentionally small contract;
-- deterministic output;
-- unit tests;
-- fuzz/property tests when appropriate;
-- benchmark for nontrivial algorithms;
-- explicit complexity/budget behavior;
-- structured neutral errors;
-- documentation and examples;
-- no infrastructure or provider leakage;
-- release consumed by Gymkhana Database when required.
-
-## 20. Definition of Done for M0
-
-M0 is complete when:
-
-- clean clone and module download work;
-- build and tests pass;
-- formatting, vet, staticcheck, vulnerability, and security workflows pass;
-- README, CONTRIBUTING, SECURITY, CHANGELOG, and license exist;
-- release workflow is validated;
-- no artificial public package exists;
-- v0.1.0 is tagged and importable by Gymkhana Database;
-- no PostgreSQL, HTTP, provider, UI, or product concern leaked into the module.
-
-## 21. Implementation authorization
-
-Stage 10 is complete. Implementation starts here:
-
-```text
-repository: Pherlsz/Gymkhana-Core
-branch: chore/bootstrap-core
-milestone: M0 Bootstrap
-first scope: module, root files, Makefile, CI/security, and release foundation
-```
-
-After Core and UI publish verified minimum releases, Gymkhana Database integrates exact versions and continues the M0 bootstrap.
-
-The orchestration document is updated again when a milestone closes or an approved architectural decision changes.
+- responsibility is coherent and reusable;
+- normative semantics are documented;
+- observable portable behavior has conformance vectors when applicable;
+- current implementation tests pass;
+- fuzz/property tests exist for untrusted/structural inputs when appropriate;
+- nontrivial algorithms have benchmarks and explicit budgets;
+- errors are stable and non-localized;
+- no infrastructure/provider/product leakage exists;
+- compatibility/version impact is documented;
+- a consumer can use it without importing another product repository.
