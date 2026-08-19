@@ -10,19 +10,12 @@ import (
 
 func FuzzValue(f *testing.F) {
 	for _, seed := range []string{
-		`{}`,
-		`{"a":1}`,
-		`{"nested":{"x":[1,2,3]}}`,
-		`{"a":1,"a":2}`,
-		`[]`,
+		"{}",
+		"{\"a\":1}",
+		"{\"nested\":{\"x\":[1,2,3]}}",
+		"{\"a\":1,\"a\":2}",
+		"[]",
 	} {
-		// Convert the readable escaped seed notation to the exact JSON bytes used
-		// by the fuzzer without changing the semantic cases.
-		var decoded string
-		wrapped, err := json.Marshal(seed)
-		if err == nil && json.Unmarshal(wrapped, &decoded) == nil {
-			seed = decoded
-		}
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, value string) {
@@ -44,16 +37,11 @@ func FuzzValue(f *testing.F) {
 
 func FuzzSchema(f *testing.F) {
 	for _, seed := range []string{
-		`{}`,
-		`{"type":"string"}`,
-		`{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}`,
-		`{"type":"string","pattern":".*"}`,
+		"{}",
+		"{\"type\":\"string\"}",
+		"{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"}},\"required\":[\"name\"],\"additionalProperties\":false}",
+		"{\"type\":\"string\",\"pattern\":\".*\"}",
 	} {
-		var decoded string
-		wrapped, err := json.Marshal(seed)
-		if err == nil && json.Unmarshal(wrapped, &decoded) == nil {
-			seed = decoded
-		}
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, value string) {
