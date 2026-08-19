@@ -60,8 +60,8 @@ type MediaRef struct {
 	Name      string `json:"name,omitempty"`
 }
 
-// ToolDefinition describes one callable tool. InputSchema must encode a JSON
-// object; Core deliberately does not require a JSON Schema dialect in Spec 0.3.
+// ToolDefinition describes one callable tool. InputSchema uses the conservative
+// portable schema profile defined by ValidatePortableJSONSchema.
 type ToolDefinition struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
@@ -83,13 +83,16 @@ type ToolResult struct {
 	IsError bool          `json:"is_error,omitempty"`
 }
 
-// FinishReason is a portable completion reason.
+// FinishReason is a portable completion reason. Refusal is distinct from a
+// transport/provider error, and Paused represents a resumable provider turn.
 type FinishReason string
 
 const (
 	FinishStop          FinishReason = "stop"
 	FinishLength        FinishReason = "length"
 	FinishToolCalls     FinishReason = "tool_calls"
+	FinishRefusal       FinishReason = "refusal"
+	FinishPaused        FinishReason = "paused"
 	FinishContentFilter FinishReason = "content_filter"
 	FinishError         FinishReason = "error"
 	FinishOther         FinishReason = "other"
@@ -97,7 +100,7 @@ const (
 
 func (r FinishReason) Valid() bool {
 	switch r {
-	case FinishStop, FinishLength, FinishToolCalls, FinishContentFilter, FinishError, FinishOther:
+	case FinishStop, FinishLength, FinishToolCalls, FinishRefusal, FinishPaused, FinishContentFilter, FinishError, FinishOther:
 		return true
 	default:
 		return false
@@ -123,7 +126,9 @@ const (
 	CapabilityAudioInput       Capability = "audio_input"
 	CapabilityAudioOutput      Capability = "audio_output"
 	CapabilityVideoInput       Capability = "video_input"
+	CapabilityVideoOutput      Capability = "video_output"
 	CapabilityFileInput        Capability = "file_input"
+	CapabilityFileOutput       Capability = "file_output"
 	CapabilityToolCalling      Capability = "tool_calling"
 	CapabilityStructuredOutput Capability = "structured_output"
 	CapabilityStreaming        Capability = "streaming"
@@ -131,7 +136,7 @@ const (
 
 func (c Capability) Valid() bool {
 	switch c {
-	case CapabilityText, CapabilityImageInput, CapabilityImageOutput, CapabilityAudioInput, CapabilityAudioOutput, CapabilityVideoInput, CapabilityFileInput, CapabilityToolCalling, CapabilityStructuredOutput, CapabilityStreaming:
+	case CapabilityText, CapabilityImageInput, CapabilityImageOutput, CapabilityAudioInput, CapabilityAudioOutput, CapabilityVideoInput, CapabilityVideoOutput, CapabilityFileInput, CapabilityFileOutput, CapabilityToolCalling, CapabilityStructuredOutput, CapabilityStreaming:
 		return true
 	default:
 		return false
