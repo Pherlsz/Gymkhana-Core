@@ -18,11 +18,7 @@ func TestToolPolicySafetyDefaults(t *testing.T) {
 		t.Fatalf("unsafe default policy: %#v", policy)
 	}
 
-	unsafe := assistant.ToolPolicy{
-		Name:         "delete_account",
-		Effect:       assistant.ToolEffectDestructive,
-		Confirmation: assistant.ToolConfirmNever,
-	}
+	unsafe := assistant.ToolPolicy{Name: "delete_account", Effect: assistant.ToolEffectDestructive, Confirmation: assistant.ToolConfirmNever}
 	assertAssistantCode(t, assistant.ValidateToolPolicy(unsafe), assistant.CodeInvalidToolPolicy)
 }
 
@@ -45,15 +41,45 @@ func TestMemoryPolicyRequiresControlledPersistentWrites(t *testing.T) {
 	assertAssistantCode(t, assistant.ValidateMemoryPolicy(policy), assistant.CodeInvalidMemory)
 }
 
+func TestNextModelCandidateDistinguishesModelAndProviderFallback(t *testing.T) {
+	t.Parallel()
+
+	candidates := []assistant.ModelRef{
+		{Provider: "openai", Model: "model/a"},
+		{Provider: "openai", Model: "model/b"},
+		{Provider: "google", Model: "model/c"},
+	}
+	policy := assistant.RoutingFallbackPolicy{
+		ModelOn:     []assistant.FailureClass{assistant.FailureContextLimit},
+		ProviderOn:  []assistant.FailureClass{assistant.FailureRateLimit},
+		MaxAttempts: 4,
+	}
+	first, index, err := assistant.NextModelCandidate(candidates, -1, 0, assistant.FailureUnknown, policy)
+	if err != nil || index != 0 || first != candidates[0] {
+		t.Fatalf("first = %#v index=%d err=%v", first, index, err)
+	}
+	next, index, err := assistant.NextModelCandidate(candidates, 0, 1, assistant.FailureContextLimit, policy)
+	if err != nil || index != 1 || next != candidates[1] {
+		t.Fatalf("model fallback = %#v index=%d err=%v", next, index, err)
+	}
+	next, index, err = assistant.NextModelCandidate(candidates, 1, 2, assistant.FailureRateLimit, policy)
+	if err != nil || index != 2 || next != candidates[2] {
+		t.Fatalf("provider fallback = %#v index=%d err=%v", next, index, err)
+	}
+	if _, _, err := assistant.NextModelCandidate(candidates, 0, 1, assistant.FailureSafety, policy); !assistant.IsCode(err, assistant.CodeModelUnavailable) {
+		t.Fatalf("safety failure must not fallback, got %v", err)
+	}
+}
+
 func TestRunTraceTotalUsage(t *testing.T) {
 	t.Parallel()
 
 	credential := assistant.CredentialIdentity{ID: "key_01", Provider: "openai", Mode: assistant.CredentialBYOK, QuotaScope: "project:primary"}
 	trace := assistant.RunTrace{
-		RunID:            "run-001",
-		AssistantID:      "coding_assistant",
+		RunID:             "run-001",
+		AssistantID:       "coding_assistant",
 		AssistantRevision: 3,
-		EffectiveModules: []assistant.ModuleID{assistant.ModuleText, assistant.ModuleTools},
+		EffectiveModules:  []assistant.ModuleID{assistant.ModuleText, assistant.ModuleTools},
 		Attempts: []assistant.AttemptTrace{
 			{Index: 0, Model: assistant.ModelRef{Provider: "openai", Model: "model/a"}, Credential: &credential, Failure: assistant.FailureRateLimit, Usage: assistant.Usage{InputTokens: 10}},
 			{Index: 1, Model: assistant.ModelRef{Provider: "openai", Model: "model/b"}, Credential: &credential, Usage: assistant.Usage{InputTokens: 20, OutputTokens: 5}},
