@@ -1,5 +1,7 @@
 package assistant
 
+import "strings"
+
 // CredentialMode describes how a provider adapter obtains authorization.
 type CredentialMode string
 
@@ -28,7 +30,9 @@ type CredentialPolicy struct {
 //
 // ID is a stable non-secret logical identity used for usage attribution and
 // deduplication. Reference points to an application-owned secret store or
-// ephemeral binding and must never contain raw API-key/secret material.
+// ephemeral binding and must never contain raw API-key/secret material. To
+// reduce accidental raw-key use, Reference must be a namespaced handle such as
+// `session:key_01`, `vault:path/to/key`, or `arn:...` rather than a bare token.
 // QuotaScope is an optional opaque application-owned label identifying the
 // provider quota/account/project scope shared by credentials. Two credentials
 // with the same non-empty QuotaScope may consume the same provider limits.
@@ -83,7 +87,7 @@ func ValidateCredentialRef(ref CredentialRef) error {
 	if ref.Mode == CredentialNone {
 		return validationError(CodeInvalidCredential, "credential.mode")
 	}
-	if !validPortableID(ref.ID, 128) || !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validOpaqueModelID(ref.Reference, 256) {
+	if !validPortableID(ref.ID, 128) || !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validCredentialHandle(ref.Reference) {
 		return validationError(CodeInvalidCredential, "credential")
 	}
 	if ref.QuotaScope != "" && !validOpaqueModelID(ref.QuotaScope, 256) {
@@ -114,4 +118,28 @@ func (policy CredentialPolicy) Allows(mode CredentialMode) bool {
 		}
 	}
 	return false
+}
+
+func validCredentialHandle(value string) bool {
+	if !validOpaqueModelID(value, 256) {
+		return false
+	}
+	separator := strings.IndexByte(value, ':')
+	if separator < 1 || separator > 64 || separator == len(value)-1 {
+		return false
+	}
+	scheme := value[:separator]
+	for i := 0; i < len(scheme); i++ {
+		b := scheme[i]
+		if i == 0 {
+			if b < 'a' || b > 'z' {
+				return false
+			}
+			continue
+		}
+		if (b < 'a' || b > 'z') && (b < '0' || b > '9') && b != '_' && b != '-' && b != '.' {
+			return false
+		}
+	}
+	return true
 }
