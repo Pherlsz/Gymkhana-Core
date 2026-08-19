@@ -4,13 +4,14 @@ package assistant
 type CredentialMode string
 
 const (
+	CredentialNone    CredentialMode = "none"
 	CredentialManaged CredentialMode = "managed"
 	CredentialBYOK    CredentialMode = "byok"
 )
 
 func (mode CredentialMode) Valid() bool {
 	switch mode {
-	case CredentialManaged, CredentialBYOK:
+	case CredentialNone, CredentialManaged, CredentialBYOK:
 		return true
 	default:
 		return false
@@ -31,6 +32,7 @@ type CredentialPolicy struct {
 // QuotaScope is an optional opaque application-owned label identifying the
 // provider quota/account/project scope shared by credentials. Two credentials
 // with the same non-empty QuotaScope may consume the same provider limits.
+// CredentialNone is represented by the absence of a CredentialRef at runtime.
 type CredentialRef struct {
 	ID         string         `json:"id"`
 	Provider   ProviderID     `json:"provider"`
@@ -78,6 +80,9 @@ func ValidateCredentialPolicy(policy CredentialPolicy) error {
 
 // ValidateCredentialRef validates an opaque runtime credential binding.
 func ValidateCredentialRef(ref CredentialRef) error {
+	if ref.Mode == CredentialNone {
+		return validationError(CodeInvalidCredential, "credential.mode")
+	}
 	if !validPortableID(ref.ID, 128) || !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validOpaqueModelID(ref.Reference, 256) {
 		return validationError(CodeInvalidCredential, "credential")
 	}
@@ -89,6 +94,9 @@ func ValidateCredentialRef(ref CredentialRef) error {
 
 // ValidateCredentialIdentity validates persistable credential metadata.
 func ValidateCredentialIdentity(identity CredentialIdentity) error {
+	if identity.Mode == CredentialNone {
+		return validationError(CodeInvalidCredential, "credential_identity.mode")
+	}
 	if !validPortableID(identity.ID, 128) || !validPortableID(string(identity.Provider), 128) || !identity.Mode.Valid() {
 		return validationError(CodeInvalidCredential, "credential_identity")
 	}
