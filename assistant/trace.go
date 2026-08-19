@@ -14,16 +14,16 @@ type AttemptTrace struct {
 // RunTrace is a content-free portable execution summary suitable for metrics,
 // evaluation, routing analysis, and learning evidence references.
 type RunTrace struct {
-	RunID              string         `json:"run_id"`
-	AssistantID        string         `json:"assistant_id"`
-	AssistantRevision  int64          `json:"assistant_revision,omitempty"`
-	EffectiveModules   []ModuleID     `json:"effective_modules"`
-	Attempts           []AttemptTrace `json:"attempts,omitempty"`
-	RetrievalRounds    int64          `json:"retrieval_rounds,omitempty"`
-	ToolCalls          int64          `json:"tool_calls,omitempty"`
-	StartedAtUnix      int64          `json:"started_at_unix,omitempty"`
-	DurationMillis     int64          `json:"duration_millis,omitempty"`
-	FinishReason       FinishReason   `json:"finish_reason,omitempty"`
+	RunID             string         `json:"run_id"`
+	AssistantID       string         `json:"assistant_id"`
+	AssistantRevision int64          `json:"assistant_revision,omitempty"`
+	EffectiveModules  []ModuleID     `json:"effective_modules"`
+	Attempts          []AttemptTrace `json:"attempts,omitempty"`
+	RetrievalRounds   int64          `json:"retrieval_rounds,omitempty"`
+	ToolCalls         int64          `json:"tool_calls,omitempty"`
+	StartedAtUnix     int64          `json:"started_at_unix,omitempty"`
+	DurationMillis    int64          `json:"duration_millis,omitempty"`
+	FinishReason      FinishReason   `json:"finish_reason,omitempty"`
 }
 
 func ValidateRunTrace(trace RunTrace) error {
