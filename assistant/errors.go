@@ -33,6 +33,8 @@ const (
 	CodeModelUnavailable    ErrorCode = "model_unavailable"
 	CodeInvalidCredential   ErrorCode = "invalid_credential"
 	CodeInvalidRetrieval    ErrorCode = "invalid_retrieval"
+	CodeInvalidProvider     ErrorCode = "invalid_provider"
+	CodeDuplicateProvider   ErrorCode = "duplicate_provider"
 )
 
 // ValidationError intentionally contains no original prompt, arguments, URI,
