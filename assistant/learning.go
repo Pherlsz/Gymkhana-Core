@@ -65,9 +65,9 @@ func ValidateTaskSignature(signature TaskSignature) error {
 type LearningOutcome string
 
 const (
-	LearningSuccess  LearningOutcome = "success"
-	LearningFailure  LearningOutcome = "failure"
-	LearningImproved LearningOutcome = "improved"
+	LearningSuccess   LearningOutcome = "success"
+	LearningFailure   LearningOutcome = "failure"
+	LearningImproved  LearningOutcome = "improved"
 	LearningRegressed LearningOutcome = "regressed"
 )
 
@@ -110,7 +110,8 @@ type LearningEvidence struct {
 }
 
 // SkillLearningProposal is a reviewable, versioned proposal derived from prior
-// executions. It is not automatically applied to AssistantDefinition.
+// executions. Summary is untrusted advisory data and never becomes system or
+// developer authority merely because the proposal is eligible for promotion.
 type SkillLearningProposal struct {
 	ID          string             `json:"id"`
 	AssistantID string             `json:"assistant_id"`
@@ -122,7 +123,7 @@ type SkillLearningProposal struct {
 }
 
 // LearningMode controls whether observations are ignored, turned into proposals,
-// or may be automatically promoted by an application after policy checks. Core
+// or may become eligible for application-owned automatic policy updates. Core
 // never mutates an AssistantDefinition by itself.
 type LearningMode string
 
@@ -144,9 +145,9 @@ func (mode LearningMode) Valid() bool {
 // LearningPolicy bounds proposal creation/promotion. MaxEvidence prevents an
 // ever-growing replay history from becoming part of Assistant configuration.
 type LearningPolicy struct {
-	Mode              LearningMode  `json:"mode"`
-	MinEvidence       int64         `json:"min_evidence"`
-	MaxEvidence       int64         `json:"max_evidence"`
+	Mode              LearningMode    `json:"mode"`
+	MinEvidence       int64           `json:"min_evidence,omitempty"`
+	MaxEvidence       int64           `json:"max_evidence,omitempty"`
 	AutoPromoteScopes []LearningScope `json:"auto_promote_scopes,omitempty"`
 }
 
@@ -158,13 +159,28 @@ func DefaultLearningPolicy() LearningPolicy {
 	}
 }
 
+func DisabledLearningPolicy() LearningPolicy {
+	return LearningPolicy{Mode: LearningDisabled}
+}
+
 func ValidateLearningPolicy(policy LearningPolicy) error {
-	if !policy.Mode.Valid() || policy.MinEvidence < 1 || policy.MaxEvidence < policy.MinEvidence || policy.MaxEvidence > 256 {
+	if !policy.Mode.Valid() {
+		return validationError(CodeInvalidLearning, "learning_policy.mode")
+	}
+	if policy.Mode == LearningDisabled {
+		if policy.MinEvidence != 0 || policy.MaxEvidence != 0 || len(policy.AutoPromoteScopes) > 0 {
+			return validationError(CodeInvalidLearning, "learning_policy")
+		}
+		return nil
+	}
+	if policy.MinEvidence < 1 || policy.MaxEvidence < policy.MinEvidence || policy.MaxEvidence > 256 {
 		return validationError(CodeInvalidLearning, "learning_policy")
 	}
 	seen := make(map[LearningScope]struct{}, len(policy.AutoPromoteScopes))
 	for _, scope := range policy.AutoPromoteScopes {
-		if !scope.Valid() {
+		if !scope.Valid() || scope == LearningSkillHint {
+			// Free-form learned skill hints can influence instructions/behavior and
+			// therefore always require an application-owned review boundary.
 			return validationError(CodeInvalidLearning, "learning_policy.auto_promote_scopes")
 		}
 		if _, duplicate := seen[scope]; duplicate {
@@ -172,12 +188,11 @@ func ValidateLearningPolicy(policy LearningPolicy) error {
 		}
 		seen[scope] = struct{}{}
 	}
-	if policy.Mode != LearningAutoPromote && len(policy.AutoPromoteScopes) > 0 {
+	if policy.Mode == LearningPropose && len(policy.AutoPromoteScopes) > 0 {
 		return validationError(CodeInvalidLearning, "learning_policy.auto_promote_scopes")
 	}
-	if policy.Mode == LearningDisabled && (policy.MinEvidence != 1 || policy.MaxEvidence != 1) {
-		// Disabled still carries bounded canonical values rather than ambiguous zero.
-		return validationError(CodeInvalidLearning, "learning_policy")
+	if policy.Mode == LearningAutoPromote && len(policy.AutoPromoteScopes) == 0 {
+		return validationError(CodeInvalidLearning, "learning_policy.auto_promote_scopes")
 	}
 	return nil
 }
@@ -213,7 +228,8 @@ func ValidateSkillLearningProposal(proposal SkillLearningProposal) error {
 }
 
 // LearningEligible reports whether a valid proposal satisfies a policy's
-// minimum evidence and scope requirements. It does not apply the proposal.
+// minimum evidence and scope requirements. It does not apply the proposal and
+// does not confer instruction authority on proposal.Summary.
 func LearningEligible(policy LearningPolicy, proposal SkillLearningProposal) (bool, error) {
 	if err := ValidateLearningPolicy(policy); err != nil {
 		return false, err
