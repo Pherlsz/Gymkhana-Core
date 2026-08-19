@@ -1,8 +1,7 @@
 package assistant
 
 // QuotaDimension identifies a normalized provider limit dimension. Providers
-// may expose only a subset. The set is intentionally small and extensible by a
-// future specification revision rather than passing provider-specific strings.
+// may expose only a subset.
 type QuotaDimension string
 
 const (
@@ -23,8 +22,6 @@ func (dimension QuotaDimension) Valid() bool {
 
 // QuotaWindow is one normalized provider quota/rate-limit observation. Rolling
 // and fixed windows are both represented by optional WindowSeconds/ResetAtUnix.
-// Values are observations, not promises: providers may reserve capacity or
-// update counters asynchronously.
 type QuotaWindow struct {
 	Dimension     QuotaDimension `json:"dimension"`
 	Limit         int64          `json:"limit,omitempty"`
@@ -34,37 +31,46 @@ type QuotaWindow struct {
 	ResetAtUnix   int64          `json:"reset_at_unix,omitempty"`
 }
 
-// QuotaState is normalized runtime quota metadata for the actual provider
-// quota scope. It deliberately does not claim quotas are per API key or per
-// Assistant: UsageLedgerEntry handles local Assistant/key attribution.
+// QuotaState is normalized runtime quota metadata for the actual provider quota
+// scope. Credential is optional because managed/local adapters may not expose a
+// runtime CredentialRef. It does not claim quotas are per Assistant.
 type QuotaState struct {
-	Credential CredentialIdentity `json:"credential"`
-	Model      *ModelRef          `json:"model,omitempty"`
-	Known      bool               `json:"known"`
-	Limits     []QuotaWindow      `json:"limits,omitempty"`
+	Provider   ProviderID          `json:"provider"`
+	Credential *CredentialIdentity `json:"credential,omitempty"`
+	Model      *ModelRef           `json:"model,omitempty"`
+	Known      bool                `json:"known"`
+	Limits     []QuotaWindow       `json:"limits,omitempty"`
 }
 
 // UsageLedgerEntry attributes one provider usage observation to a run,
-// Assistant, logical credential identity and model without persisting the
-// secret-store Reference handle. RunID+Attempt gives consumers an idempotency
-// key for avoiding double counting on retries/replays.
+// Assistant, optional logical credential identity and model without persisting
+// the secret-store Reference handle. RunID+Attempt is an idempotency key for
+// avoiding double counting on retries/replays.
 type UsageLedgerEntry struct {
-	RunID          string             `json:"run_id"`
-	Attempt        int64              `json:"attempt"`
-	AssistantID    string             `json:"assistant_id"`
-	Credential     CredentialIdentity `json:"credential"`
-	Model          ModelRef           `json:"model"`
-	Usage          Usage              `json:"usage"`
-	ObservedAtUnix int64              `json:"observed_at_unix,omitempty"`
+	RunID          string              `json:"run_id"`
+	Attempt        int64               `json:"attempt"`
+	AssistantID    string              `json:"assistant_id"`
+	Credential     *CredentialIdentity `json:"credential,omitempty"`
+	Model          ModelRef            `json:"model"`
+	Usage          Usage               `json:"usage"`
+	ObservedAtUnix int64               `json:"observed_at_unix,omitempty"`
 }
 
 // ValidateQuotaState validates provider-normalized quota metadata.
 func ValidateQuotaState(state QuotaState) error {
-	if err := ValidateCredentialIdentity(state.Credential); err != nil {
-		return err
+	if !validPortableID(string(state.Provider), 128) {
+		return validationError(CodeInvalidQuota, "quota.provider")
+	}
+	if state.Credential != nil {
+		if err := ValidateCredentialIdentity(*state.Credential); err != nil {
+			return err
+		}
+		if state.Credential.Provider != state.Provider {
+			return validationError(CodeInvalidQuota, "quota.credential.provider")
+		}
 	}
 	if state.Model != nil {
-		if !validModelRef(*state.Model) || state.Model.Provider != state.Credential.Provider {
+		if !validModelRef(*state.Model) || state.Model.Provider != state.Provider {
 			return validationError(CodeInvalidQuota, "quota.model")
 		}
 	}
@@ -101,11 +107,13 @@ func ValidateUsageLedgerEntry(entry UsageLedgerEntry) error {
 	if entry.Attempt < 0 || entry.Attempt > maxPortableJSONInteger || entry.ObservedAtUnix < 0 || entry.ObservedAtUnix > maxPortableJSONInteger {
 		return validationError(CodeInvalidQuota, "usage_ledger.attempt")
 	}
-	if err := ValidateCredentialIdentity(entry.Credential); err != nil {
-		return err
-	}
-	if entry.Credential.Provider != entry.Model.Provider {
-		return validationError(CodeInvalidCredential, "usage_ledger.credential.provider")
+	if entry.Credential != nil {
+		if err := ValidateCredentialIdentity(*entry.Credential); err != nil {
+			return err
+		}
+		if entry.Credential.Provider != entry.Model.Provider {
+			return validationError(CodeInvalidCredential, "usage_ledger.credential.provider")
+		}
 	}
 	return ValidateUsage(entry.Usage)
 }
