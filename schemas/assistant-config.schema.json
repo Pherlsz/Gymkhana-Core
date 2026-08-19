@@ -13,12 +13,8 @@
       "maxLength": 256,
       "pattern": "^[!-~]+$"
     },
-    "ProviderID": {
-      "$ref": "#/$defs/PortableID"
-    },
-    "ModelID": {
-      "$ref": "#/$defs/OpaqueRef"
-    },
+    "ProviderID": {"$ref": "#/$defs/PortableID"},
+    "ModelID": {"$ref": "#/$defs/OpaqueRef"},
     "ModelRef": {
       "type": "object",
       "additionalProperties": false,
@@ -28,14 +24,8 @@
         "model": {"$ref": "#/$defs/ModelID"}
       }
     },
-    "AccessTier": {
-      "type": "string",
-      "enum": ["free", "paid", "local", "unknown"]
-    },
-    "ModelRole": {
-      "type": "string",
-      "enum": ["generation", "embedding", "reranking"]
-    },
+    "AccessTier": {"type": "string", "enum": ["free", "paid", "local", "unknown"]},
+    "ModelRole": {"type": "string", "enum": ["generation", "embedding", "reranking"]},
     "ModelDescriptor": {
       "type": "object",
       "additionalProperties": false,
@@ -44,17 +34,8 @@
         "ref": {"$ref": "#/$defs/ModelRef"},
         "display_name": {"type": "string"},
         "access": {"$ref": "#/$defs/AccessTier"},
-        "roles": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/ModelRole"}
-        },
-        "capabilities": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "assistant.schema.json#/$defs/Capability"}
-        },
+        "roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ModelRole"}},
+        "capabilities": {"type": "array", "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/Capability"}},
         "context_window": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
         "max_output_tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
       }
@@ -66,64 +47,24 @@
       "properties": {
         "mode": {"enum": ["manual", "ordered_fallback", "dynamic"]},
         "manual": {"$ref": "#/$defs/ModelRef"},
-        "candidates": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/ModelRef"}
-        },
-        "allowed_providers": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/ProviderID"}
-        },
-        "allowed_access": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/AccessTier"}
-        },
-        "preferred_access": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/AccessTier"}
-        },
-        "required_capabilities": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "assistant.schema.json#/$defs/Capability"}
-        }
+        "candidates": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ModelRef"}},
+        "allowed_providers": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ProviderID"}},
+        "allowed_access": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/AccessTier"}},
+        "preferred_access": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/AccessTier"}},
+        "required_capabilities": {"type": "array", "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/Capability"}}
       },
       "allOf": [
-        {
-          "if": {"properties": {"mode": {"const": "manual"}}, "required": ["mode"]},
-          "then": {"required": ["manual"], "not": {"required": ["candidates"]}}
-        },
-        {
-          "if": {"properties": {"mode": {"const": "ordered_fallback"}}, "required": ["mode"]},
-          "then": {"required": ["candidates"], "not": {"required": ["manual"]}}
-        },
-        {
-          "if": {"properties": {"mode": {"const": "dynamic"}}, "required": ["mode"]},
-          "then": {"not": {"anyOf": [{"required": ["manual"]}, {"required": ["candidates"]}]}}
-        }
+        {"if": {"properties": {"mode": {"const": "manual"}}, "required": ["mode"]}, "then": {"required": ["manual"], "not": {"required": ["candidates"]}}},
+        {"if": {"properties": {"mode": {"const": "ordered_fallback"}}, "required": ["mode"]}, "then": {"required": ["candidates"], "not": {"required": ["manual"]}}},
+        {"if": {"properties": {"mode": {"const": "dynamic"}}, "required": ["mode"]}, "then": {"not": {"anyOf": [{"required": ["manual"]}, {"required": ["candidates"]}]}}}
       ]
     },
-    "CredentialMode": {
-      "type": "string",
-      "enum": ["managed", "byok"]
-    },
+    "CredentialMode": {"type": "string", "enum": ["managed", "byok"]},
     "CredentialPolicy": {
       "type": "object",
       "additionalProperties": false,
       "required": ["allowed_modes"],
-      "properties": {
-        "allowed_modes": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/CredentialMode"}
-        }
-      }
+      "properties": {"allowed_modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/CredentialMode"}}}
     },
     "CredentialRef": {
       "type": "object",
@@ -135,28 +76,12 @@
         "reference": {"$ref": "#/$defs/OpaqueRef"}
       }
     },
-    "ModuleID": {
-      "type": "string",
-      "enum": [
-        "text",
-        "vision",
-        "audio_input",
-        "video_input",
-        "file_input",
-        "tools",
-        "retrieval",
-        "memory",
-        "structured_output"
-      ]
-    },
+    "ModuleID": {"type": "string", "enum": ["text", "vision", "audio_input", "video_input", "file_input", "tools", "retrieval", "memory", "structured_output"]},
     "InstructionBlock": {
       "type": "object",
       "additionalProperties": false,
       "required": ["role", "text"],
-      "properties": {
-        "role": {"enum": ["system", "developer"]},
-        "text": {"type": "string", "minLength": 1}
-      }
+      "properties": {"role": {"enum": ["system", "developer"]}, "text": {"type": "string", "minLength": 1}}
     },
     "RetrievalPolicy": {
       "type": "object",
@@ -193,30 +118,11 @@
         "id": {"$ref": "#/$defs/PortableID"},
         "name": {"type": "string", "minLength": 1},
         "description": {"type": "string"},
-        "instructions": {
-          "type": "array",
-          "items": {"$ref": "#/$defs/InstructionBlock"}
-        },
-        "modules": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/ModuleID"}
-        },
-        "optional_modules": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "#/$defs/ModuleID"}
-        },
-        "skills": {
-          "type": "array",
-          "items": {"$ref": "assistant.schema.json#/$defs/Skill"}
-        },
-        "tools": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "assistant.schema.json#/$defs/ToolName"}
-        },
+        "instructions": {"type": "array", "items": {"$ref": "#/$defs/InstructionBlock"}},
+        "modules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ModuleID"}},
+        "optional_modules": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ModuleID"}, "description": "Must be disjoint from modules; enforced by Core semantic validation."},
+        "skills": {"type": "array", "items": {"$ref": "assistant.schema.json#/$defs/Skill"}},
+        "tools": {"type": "array", "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/ToolName"}},
         "model_policy": {"$ref": "#/$defs/ModelPolicy"},
         "credentials": {"$ref": "#/$defs/CredentialPolicy"},
         "retrieval": {"$ref": "#/$defs/RetrievalPolicy"},
@@ -227,13 +133,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["assistants"],
-      "properties": {
-        "assistants": {
-          "type": "array",
-          "minItems": 1,
-          "items": {"$ref": "#/$defs/AssistantDefinition"}
-        }
-      }
+      "properties": {"assistants": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/AssistantDefinition"}}}
     }
   }
 }
