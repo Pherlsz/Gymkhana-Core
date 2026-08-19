@@ -14,7 +14,6 @@
         "model_policy":{"mode":"dynamic","allowed_access":["free","paid"],"preferred_access":["free","paid"]},
         "credentials":{"allowed_modes":["managed","byok"]},
         "retrieval":{"mode":"on_demand","search":"hybrid","query_transform":"rewrite","candidate_limit":20,"context_limit":6,"rerank":true,"grounding":"required","require_citations":true},
-        "learning":{"mode":"propose","min_evidence":2,"max_evidence":32},
         "budget":{"max_turns":8,"max_tool_calls":12,"max_retrieval_rounds":3,"max_output_tokens":4096}
       },"output":true
     },

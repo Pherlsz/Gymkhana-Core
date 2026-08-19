@@ -32,7 +32,6 @@ const (
 	CodeDuplicateAssistant    ErrorCode = "duplicate_assistant"
 	CodeInvalidModule         ErrorCode = "invalid_module"
 	CodeDuplicateModule       ErrorCode = "duplicate_module"
-	CodeInvalidMemory         ErrorCode = "invalid_memory"
 	CodeInvalidModel          ErrorCode = "invalid_model"
 	CodeInvalidModelPolicy    ErrorCode = "invalid_model_policy"
 	CodeModelUnavailable      ErrorCode = "model_unavailable"
@@ -42,7 +41,6 @@ const (
 	CodeInvalidProvider       ErrorCode = "invalid_provider"
 	CodeDuplicateProvider     ErrorCode = "duplicate_provider"
 	CodeInvalidQuota          ErrorCode = "invalid_quota"
-	CodeInvalidLearning       ErrorCode = "invalid_learning"
 	CodeInvalidTrace          ErrorCode = "invalid_trace"
 )
 

@@ -19,12 +19,6 @@
     },
     {"name":"reject destructive tool without explicit confirmation","operation":"assistant.tool_policy.validate","input":{"name":"delete_account","effect":"destructive","confirmation":"never"},"error":"invalid_tool_policy"},
     {"name":"validate read only tool policy","operation":"assistant.tool_policy.validate","input":{"name":"search_docs","effect":"read_only","confirmation":"never","parallel_safe":true,"idempotent":true},"output":true},
-    {"name":"validate bounded confirmed memory","operation":"assistant.memory.validate","input":{"read_scopes":["session","user"],"write_mode":"confirmed","write_scope":"user","sensitive":"exclude","max_items":100,"max_item_bytes":4096},"output":true},
-    {"name":"reject automatic promotion of free form skill hints","operation":"assistant.learning_policy.validate","input":{"mode":"auto_promote","min_evidence":2,"max_evidence":32,"auto_promote_scopes":["skill_hint"]},"error":"invalid_learning"},
-    {
-      "name":"validate task scoped learning proposal","operation":"assistant.learning.validate",
-      "input":{"id":"learn/retrieval_01","assistant_id":"research_assistant","task":{"family":"document_research","version":1,"traits":["legal","pt_br"]},"scope":"retrieval_hint","summary":"Prefer hybrid retrieval before reranking for this task family.","revision":1,"evidence":[{"run_id":"run-001","outcome":"improved","origin":"evaluation"},{"run_id":"run-002","outcome":"success","origin":"runtime"}]},"output":true
-    },
     {
       "name":"validate provider quota observation","operation":"assistant.quota.validate",
       "input":{"provider":"openai","credential":{"id":"key_01","provider":"openai","mode":"byok","quota_scope":"project:primary"},"known":true,"limits":[{"dimension":"total_tokens","limit":1000,"used":250,"remaining":750,"window_seconds":60}]},"output":true

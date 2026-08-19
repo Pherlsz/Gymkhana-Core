@@ -22,38 +22,11 @@ func TestToolPolicySafetyDefaults(t *testing.T) {
 	assertAssistantCode(t, assistant.ValidateToolPolicy(unsafe), assistant.CodeInvalidToolPolicy)
 }
 
-func TestMemoryPolicyRequiresControlledPersistentWrites(t *testing.T) {
-	t.Parallel()
-
-	policy := assistant.MemoryPolicy{
-		ReadScopes:   []assistant.MemoryScope{assistant.MemorySession, assistant.MemoryUser},
-		WriteMode:    assistant.MemoryWriteConfirmed,
-		WriteScope:   assistant.MemoryUser,
-		Sensitive:    assistant.MemorySensitiveExclude,
-		MaxItems:     100,
-		MaxItemBytes: 4096,
-	}
-	if err := assistant.ValidateMemoryPolicy(policy); err != nil {
-		t.Fatalf("ValidateMemoryPolicy(valid) = %v", err)
-	}
-
-	policy.WriteMode = assistant.MemoryWriteDisabled
-	assertAssistantCode(t, assistant.ValidateMemoryPolicy(policy), assistant.CodeInvalidMemory)
-}
-
 func TestNextModelCandidateDistinguishesModelAndProviderFallback(t *testing.T) {
 	t.Parallel()
 
-	candidates := []assistant.ModelRef{
-		{Provider: "openai", Model: "model/a"},
-		{Provider: "openai", Model: "model/b"},
-		{Provider: "google", Model: "model/c"},
-	}
-	policy := assistant.RoutingFallbackPolicy{
-		ModelOn:     []assistant.FailureClass{assistant.FailureContextLimit},
-		ProviderOn:  []assistant.FailureClass{assistant.FailureRateLimit},
-		MaxAttempts: 4,
-	}
+	candidates := []assistant.ModelRef{{Provider: "openai", Model: "model/a"}, {Provider: "openai", Model: "model/b"}, {Provider: "google", Model: "model/c"}}
+	policy := assistant.RoutingFallbackPolicy{ModelOn: []assistant.FailureClass{assistant.FailureContextLimit}, ProviderOn: []assistant.FailureClass{assistant.FailureRateLimit}, MaxAttempts: 4}
 	first, index, err := assistant.NextModelCandidate(candidates, -1, 0, assistant.FailureUnknown, policy)
 	if err != nil || index != 0 || first != candidates[0] {
 		t.Fatalf("first = %#v index=%d err=%v", first, index, err)
@@ -76,10 +49,8 @@ func TestRunTraceTotalUsage(t *testing.T) {
 
 	credential := assistant.CredentialIdentity{ID: "key_01", Provider: "openai", Mode: assistant.CredentialBYOK, QuotaScope: "project:primary"}
 	trace := assistant.RunTrace{
-		RunID:             "run-001",
-		AssistantID:       "coding_assistant",
-		AssistantRevision: 3,
-		EffectiveModules:  []assistant.ModuleID{assistant.ModuleText, assistant.ModuleTools},
+		RunID: "run-001", AssistantID: "coding_assistant", AssistantRevision: 3,
+		EffectiveModules: []assistant.ModuleID{assistant.ModuleText, assistant.ModuleTools},
 		Attempts: []assistant.AttemptTrace{
 			{Index: 0, Model: assistant.ModelRef{Provider: "openai", Model: "model/a"}, Credential: &credential, Failure: assistant.FailureRateLimit, Usage: assistant.Usage{InputTokens: 10}},
 			{Index: 1, Model: assistant.ModelRef{Provider: "openai", Model: "model/b"}, Credential: &credential, Usage: assistant.Usage{InputTokens: 20, OutputTokens: 5}},
@@ -101,15 +72,7 @@ func TestRunTraceTotalUsage(t *testing.T) {
 func TestRetrievalEvidenceValidation(t *testing.T) {
 	t.Parallel()
 
-	evidence := assistant.RetrievalEvidence{
-		ID:      "ev-001",
-		Content: "bounded evidence",
-		Source:  "document:42",
-		Score:   0.9,
-		Metadata: map[string]string{
-			"tenant": "example",
-		},
-	}
+	evidence := assistant.RetrievalEvidence{ID: "ev-001", Content: "bounded evidence", Source: "document:42", Score: 0.9, Metadata: map[string]string{"tenant": "example"}}
 	if err := assistant.ValidateRetrievalEvidence(evidence); err != nil {
 		t.Fatalf("ValidateRetrievalEvidence(valid) = %v", err)
 	}

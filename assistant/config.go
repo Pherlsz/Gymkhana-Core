@@ -4,7 +4,6 @@ import "unicode/utf8"
 
 const maxAssistantInstructionBytes = 1 << 20
 
-// ModuleID identifies one independently configurable Assistant capability.
 type ModuleID string
 
 const (
@@ -19,28 +18,23 @@ const (
 	ModuleFileOutput       ModuleID = "file_output"
 	ModuleTools            ModuleID = "tools"
 	ModuleRetrieval        ModuleID = "retrieval"
-	ModuleMemory           ModuleID = "memory"
 	ModuleStructuredOutput ModuleID = "structured_output"
 )
 
 func (id ModuleID) Valid() bool {
 	switch id {
-	case ModuleText, ModuleVision, ModuleAudioInput, ModuleVideoInput, ModuleFileInput, ModuleImageOutput, ModuleAudioOutput, ModuleVideoOutput, ModuleFileOutput, ModuleTools, ModuleRetrieval, ModuleMemory, ModuleStructuredOutput:
+	case ModuleText, ModuleVision, ModuleAudioInput, ModuleVideoInput, ModuleFileInput, ModuleImageOutput, ModuleAudioOutput, ModuleVideoOutput, ModuleFileOutput, ModuleTools, ModuleRetrieval, ModuleStructuredOutput:
 		return true
 	default:
 		return false
 	}
 }
 
-// InstructionBlock is application-owned instruction content carried by the
-// portable Assistant definition. Only system/developer authority is valid.
 type InstructionBlock struct {
 	Role Role   `json:"role"`
 	Text string `json:"text"`
 }
 
-// AssistantDefinition describes one reusable Assistant profile. Modules are
-// enabled by default; OptionalModules are available for explicit per-run enablement.
 type AssistantDefinition struct {
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`
@@ -55,13 +49,9 @@ type AssistantDefinition struct {
 	Credentials     CredentialPolicy       `json:"credentials"`
 	RoutingFallback *RoutingFallbackPolicy `json:"routing_fallback,omitempty"`
 	Retrieval       *RetrievalPolicy       `json:"retrieval,omitempty"`
-	Memory          *MemoryPolicy          `json:"memory,omitempty"`
-	Learning        *LearningPolicy        `json:"learning,omitempty"`
 	Budget          ExecutionBudget        `json:"budget,omitempty"`
 }
 
-// ExecutionBudget bounds potentially expensive multi-step behavior. Zero means
-// the consumer/runtime default; Core never interprets zero as unbounded.
 type ExecutionBudget struct {
 	MaxTurns           int64 `json:"max_turns,omitempty"`
 	MaxToolCalls       int64 `json:"max_tool_calls,omitempty"`
@@ -69,13 +59,10 @@ type ExecutionBudget struct {
 	MaxOutputTokens    int64 `json:"max_output_tokens,omitempty"`
 }
 
-// AssistantCatalog is a portable collection of independently configured
-// assistants for different application functions.
 type AssistantCatalog struct {
 	Assistants []AssistantDefinition `json:"assistants"`
 }
 
-// ValidateAssistantDefinition validates one reusable Assistant profile.
 func ValidateAssistantDefinition(def AssistantDefinition) error {
 	if !validPortableID(def.ID, 128) || def.Name == "" || !utf8.ValidString(def.Name) || utf8.RuneCountInString(def.Name) > 256 || !utf8.ValidString(def.Description) || utf8.RuneCountInString(def.Description) > 4096 {
 		return validationError(CodeInvalidAssistant, "assistant")
@@ -139,21 +126,6 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 	} else if moduleEnabled(allModules, ModuleRetrieval) {
 		return validationError(CodeInvalidAssistant, "retrieval")
 	}
-	if def.Memory != nil {
-		if !moduleEnabled(allModules, ModuleMemory) {
-			return validationError(CodeInvalidAssistant, "memory")
-		}
-		if err := ValidateMemoryPolicy(*def.Memory); err != nil {
-			return err
-		}
-	} else if moduleEnabled(allModules, ModuleMemory) {
-		return validationError(CodeInvalidAssistant, "memory")
-	}
-	if def.Learning != nil {
-		if err := ValidateLearningPolicy(*def.Learning); err != nil {
-			return err
-		}
-	}
 	if err := ValidateModelPolicy(def.ModelPolicy); err != nil {
 		return err
 	}
@@ -174,7 +146,6 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 	return nil
 }
 
-// ValidateAssistantCatalog validates multiple independently addressable profiles.
 func ValidateAssistantCatalog(catalog AssistantCatalog) error {
 	if len(catalog.Assistants) == 0 || len(catalog.Assistants) > 1024 {
 		return validationError(CodeEmpty, "assistants")
