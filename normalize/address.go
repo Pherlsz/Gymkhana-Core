@@ -101,6 +101,18 @@ func formatPrefixedSlot(value, prefix string, labels []string) string {
 		return ""
 	}
 
+	// Preserve an already canonical prefix before label peeling. The payload may
+	// itself equal a valid label (for example "bl. BL" or "apt. AP"), and
+	// treating both tokens as labels would otherwise erase a valid canonical
+	// value on the second pass.
+	if len(value) >= len(prefix) && strings.EqualFold(value[:len(prefix)], prefix) {
+		canonical := Alphanumeric(strings.TrimSpace(value[len(prefix):]))
+		if canonical == "" {
+			return ""
+		}
+		return prefix + canonical
+	}
+
 	labelSet := make(map[string]bool, len(labels))
 	for _, label := range labels {
 		labelSet[label] = true

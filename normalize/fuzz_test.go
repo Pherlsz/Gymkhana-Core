@@ -161,7 +161,9 @@ func FuzzFormatAddressSlots(f *testing.F) {
 	for _, seed := range []string{
 		"rua primavera",
 		"bl. A",
+		"bl. BL",
 		"apt. 202",
+		"apt. AP",
 		"123-A",
 		"",
 	} {
