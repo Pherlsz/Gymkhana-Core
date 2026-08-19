@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Pherlsz/Gymkhana-Core/schemas/assistant-runtime.schema.json",
+  "title": "Gymkhana Core Assistant runtime contracts",
+  "$defs": {
+    "RunOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enable_modules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}
+        },
+        "disable_modules": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}
+        },
+        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"}
+      }
+    },
+    "ProviderDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "credential_modes"],
+      "properties": {
+        "id": {"$ref": "assistant-config.schema.json#/$defs/ProviderID"},
+        "display_name": {"type": "string"},
+        "credential_modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "assistant-config.schema.json#/$defs/CredentialMode"}
+        }
+      }
+    },
+    "GenerationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "messages"],
+      "properties": {
+        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "messages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "assistant.schema.json#/$defs/Message"}
+        },
+        "tools": {
+          "type": "array",
+          "items": {"$ref": "assistant.schema.json#/$defs/ToolDefinition"}
+        },
+        "response_schema": {"type": "object"},
+        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"}
+      }
+    },
+    "GenerationResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "message", "finish_reason"],
+      "properties": {
+        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "message": {"$ref": "assistant.schema.json#/$defs/Message"},
+        "finish_reason": {"$ref": "assistant.schema.json#/$defs/FinishReason"},
+        "usage": {"$ref": "assistant.schema.json#/$defs/Usage"}
+      }
+    }
+  }
+}
