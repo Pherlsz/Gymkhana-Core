@@ -52,7 +52,9 @@ Gymkhana-Core/
 ├── normalize/     current Go implementation
 ├── civiltime/     current Go implementation
 ├── fingerprint/   current Go implementation
-├── assistant/     current Go implementation
+├── portablejson/  current generic structured-data implementation
+├── assistant/     current provider-neutral Assistant implementation
+├── ocr/           current provider-neutral extraction implementation
 └── future language/package implementations as justified
 ```
 
@@ -137,9 +139,13 @@ Generic typed identifier concepts with explicit jurisdiction keys. The current G
 
 Exact SHA-256 identity plus versioned domain-separated framing for deterministic multipart fingerprints. Fingerprinting does not perform implicit application canonicalization.
 
+### Portable JSON
+
+Strict portable JSON and the deliberately bounded `portable_json_schema/v1` profile provide reusable structured-data semantics for Assistant, OCR, and future Core domains without making JSON behavior belong to any one AI package.
+
 ### Assistant
 
-Core Spec `0.3`/Go `0.5.0` defines a modular multimodal Assistant foundation:
+The Assistant foundation originated in Core Spec `0.3` / Go `0.5.0`. Active Spec `0.4` keeps the reusable provider-neutral boundary:
 
 - semantic roles and ordered text/image/audio/video/file/tool content;
 - built-in versioned skills such as `token_economy/v1`;
@@ -152,11 +158,22 @@ Core Spec `0.3`/Go `0.5.0` defines a modular multimodal Assistant foundation:
 - automatic model-capability filtering from active modules;
 - managed/BYOK credential policies using opaque per-provider references rather than raw secrets;
 - lexical/vector/hybrid RAG, query transformation, candidate/context limits, optional reranking, grounding, citations, and retrieval evidence;
+- quota/usage attribution and content-free run traces;
 - Go provider-adapter/registry substitution boundaries with extensible provider IDs.
+
+Product-owned persistent memory and learning/promotion workflows are intentionally host concerns in Spec `0.4`. Hosts may project selected prior context through messages or RAG without requiring Core to own identity, persistence, retention, evaluation, or self-modification semantics.
 
 Concrete provider network adapters may use SDKs/HTTP internally and may be delivered independently; their SDK types must never leak into portable Core contracts.
 
 Streaming remains a capability only; a shared stream-event/delta contract is deliberately deferred until multiple concrete provider adapters exercise the semantics.
+
+### OCR / extraction
+
+Core Spec `0.4` / Go `0.6.0` defines provider-neutral schema-guided and discovery extraction across text, image, document, audio, and video sources. The boundary owns logical sources, evidence, observations, field candidates, confidence, ambiguity, validation/review state, and bounded structured results.
+
+Discovery correctness is encoded directly as extraction invariants. Core does not expose a separate OCR discovery skill or provider prompt profile. OCR depends on generic `portablejson`, not Assistant; an AI-backed host may compose Assistant infrastructure without creating a normative package dependency.
+
+Provider invocation, uploads/storage, document rendering, permissions, persistence, review UI, billing, and product-specific document models remain consumer/adapter concerns.
 
 ### Errors
 
@@ -169,16 +186,16 @@ The Foundation roadmap is currently:
 1. Foundation specification/conformance infrastructure — **implemented**;
 2. global/jurisdiction separation for existing normalization — **established architecturally; incremental cleanup continues**;
 3. canonical `fingerprint` package/specification — **implemented in Core Spec 0.2 / Go 0.4.0**;
-4. modular provider-neutral `assistant` contracts, model routing, BYOK references, RAG policy, and adapter boundary — **Core Spec 0.3 / Go 0.5.0 workstream**;
-5. concrete provider-adapter validation against several materially different provider families/gateways/local runtimes — **next integration stress test; may ship independently from Core semantics**;
-6. provider-neutral OCR/multimodal extraction contracts with conditional `data_identification/v1` — **next new Foundation capability**;
+4. modular provider-neutral `assistant` contracts, model routing, BYOK references, RAG policy, and adapter boundary — **implemented in Core Spec 0.3 / Go 0.5.0; narrowed in Spec 0.4**;
+5. provider-neutral OCR/multimodal extraction contracts — **implemented in Core Spec 0.4 / Go 0.6.0; discovery invariants are direct contract semantics**;
+6. concrete provider-adapter validation against several materially different provider families/gateways/local runtimes — **next integration stress test; may ship independently from Core semantics**;
 7. generic matching/evidence primitives;
 8. generic solver/constraint/composition algorithms;
 9. first non-Go implementation, preferably TypeScript as the first portability stress test;
 10. Java, .NET/C#, Python, Rust, and PHP ports as real consumers justify them;
 11. package ecosystem publication and implementation/spec compatibility matrix.
 
-Concrete adapter work and OCR may proceed in parallel when it does not destabilize the portable Assistant contract.
+Concrete adapter work may proceed without destabilizing the portable Assistant or OCR contracts.
 
 ## 12. Assistant boundary
 
@@ -191,7 +208,7 @@ The Assistant specification may own:
 - managed/BYOK credential modes and opaque credential references;
 - RAG/retrieval/evidence/citation policy;
 - provider adapter substitution boundaries;
-- capabilities, finish reasons, usage, and stable errors.
+- capabilities, finish reasons, usage/quota, content-free traces, and stable errors.
 
 It does not own:
 
@@ -201,6 +218,8 @@ It does not own:
 - volatile provider pricing/free-tier/model availability tables;
 - consumer-specific prompt policy embedded as Core behavior;
 - product persistence/session authorization;
+- persistent user/tenant memory or memory storage policy;
+- task signatures, learning proposals, evaluation evidence, or promotion workflows;
 - autonomous unbounded agent loops.
 
 Provider/model references are not provider coupling: they are opaque portable identifiers resolved by adapters. Concrete model availability and access tier are runtime data.
@@ -215,11 +234,13 @@ Retrieval/query/reranking changes should be evaluated against representative que
 
 ## 14. OCR/multimodal extraction boundary
 
-The future OCR specification may own provider-neutral suggestions, candidate field identification, evidence, bounded regions/text spans, confidence/ambiguity, review states, and structured extraction results.
+Core Spec `0.4` owns provider-neutral extraction requests/results, candidate field identification, evidence, bounded regions/text spans/time ranges, confidence/ambiguity, review/validation states, and schema-guided structured extraction results.
 
-When a target schema is already known, schema-guided extraction should skip generic discovery. `data_identification/v1` is intended only for unknown/unstructured discovery paths.
+When a target schema is already known, schema-guided extraction uses that exact schema and does not silently switch to generic discovery. When fields are unknown, discovery must preserve raw observations when available, require evidence, preserve ambiguity, avoid inventing missing values, avoid assuming jurisdiction, and normalize only through an explicit canonicalizer.
 
-Provider invocation, file storage, document rendering, permissions, persistence, and mutation/application remain consumer-owned.
+Those discovery rules are direct OCR contract invariants, not a built-in Core skill. Provider-specific prompt text and request shaping remain adapter concerns.
+
+Provider invocation, file storage, document rendering, permissions, persistence, billing, review workflow, and mutation/application remain consumer-owned.
 
 ## 15. Matching boundary
 
@@ -257,6 +278,7 @@ For every public capability:
 - River, R2, signed URLs, Cloud Run, Vercel, deployment topology;
 - React, routes, browser state, product forms, Data Grid components;
 - provider SDK types/HTTP payloads/raw credentials/volatile pricing tables in portable contracts;
+- product-owned persistent memory, learning/evaluation state, and promotion workflows;
 - complete application domain/persistence models;
 - arbitrary SQL/code/expression execution;
 - autonomous unbounded agent loops;
