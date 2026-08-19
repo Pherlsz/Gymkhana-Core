@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"unicode/utf8"
 )
 
 // Well-known provider IDs are conveniences, not a closed provider enum.
@@ -31,19 +32,19 @@ type ProviderDescriptor struct {
 // adapter. The adapter instance resolves Credential references through an
 // application-owned secure credential resolver configured outside Core.
 type GenerationRequest struct {
-	Model          ModelRef          `json:"model"`
-	Messages       []Message         `json:"messages"`
-	Tools          []ToolDefinition  `json:"tools,omitempty"`
-	ResponseSchema json.RawMessage   `json:"response_schema,omitempty"`
-	Credential     *CredentialRef    `json:"credential,omitempty"`
+	Model          ModelRef         `json:"model"`
+	Messages       []Message        `json:"messages"`
+	Tools          []ToolDefinition `json:"tools,omitempty"`
+	ResponseSchema json.RawMessage  `json:"response_schema,omitempty"`
+	Credential     *CredentialRef   `json:"credential,omitempty"`
 }
 
 // GenerationResponse is the normalized non-streaming provider result.
 type GenerationResponse struct {
-	Model        ModelRef      `json:"model"`
-	Message      Message       `json:"message"`
-	FinishReason FinishReason  `json:"finish_reason"`
-	Usage        Usage         `json:"usage,omitempty"`
+	Model        ModelRef     `json:"model"`
+	Message      Message      `json:"message"`
+	FinishReason FinishReason `json:"finish_reason"`
+	Usage        Usage        `json:"usage,omitempty"`
 }
 
 // ProviderAdapter is the current Go substitution boundary for concrete AI
@@ -107,8 +108,8 @@ func (registry *AdapterRegistry) Providers() []ProviderID {
 
 // ValidateProviderDescriptor validates stable adapter metadata.
 func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
-	if !validPortableID(string(descriptor.ID), 128) {
-		return validationError(CodeInvalidProvider, "provider.id")
+	if !validPortableID(string(descriptor.ID), 128) || !utf8.ValidString(descriptor.DisplayName) {
+		return validationError(CodeInvalidProvider, "provider")
 	}
 	if len(descriptor.CredentialModes) == 0 {
 		return validationError(CodeEmpty, "provider.credential_modes")
@@ -122,6 +123,58 @@ func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
 			return validationError(CodeInvalidProvider, "provider.credential_modes")
 		}
 		seen[mode] = struct{}{}
+	}
+	return nil
+}
+
+// ValidateGenerationRequest validates normalized adapter input without invoking
+// a provider or resolving credential secrets.
+func ValidateGenerationRequest(request GenerationRequest) error {
+	if !validModelRef(request.Model) || len(request.Messages) == 0 {
+		return validationError(CodeInvalidProvider, "generation_request")
+	}
+	for _, message := range request.Messages {
+		if err := ValidateMessage(message); err != nil {
+			return err
+		}
+	}
+	seenTools := make(map[string]struct{}, len(request.Tools))
+	for _, tool := range request.Tools {
+		if err := ValidateToolDefinition(tool); err != nil {
+			return err
+		}
+		if _, exists := seenTools[tool.Name]; exists {
+			return validationError(CodeInvalidProvider, "generation_request.tools")
+		}
+		seenTools[tool.Name] = struct{}{}
+	}
+	if len(request.ResponseSchema) > 0 && !validJSONObject(request.ResponseSchema) {
+		return validationError(CodeInvalidJSON, "response_schema")
+	}
+	if request.Credential != nil {
+		if err := ValidateCredentialRef(*request.Credential); err != nil {
+			return err
+		}
+		if request.Credential.Provider != request.Model.Provider {
+			return validationError(CodeInvalidCredential, "credential.provider")
+		}
+	}
+	return nil
+}
+
+// ValidateGenerationResponse validates normalized adapter output.
+func ValidateGenerationResponse(response GenerationResponse) error {
+	if !validModelRef(response.Model) {
+		return validationError(CodeInvalidModel, "generation_response.model")
+	}
+	if err := ValidateMessage(response.Message); err != nil {
+		return err
+	}
+	if err := ValidateFinishReason(response.FinishReason); err != nil {
+		return err
+	}
+	if err := ValidateUsage(response.Usage); err != nil {
+		return err
 	}
 	return nil
 }
