@@ -4,25 +4,28 @@ This document is normative for Core Spec `0.3`.
 
 ## Assistant definitions
 
-An `AssistantDefinition` is a reusable profile for one application function. Applications may create any number of profiles, for example a research assistant, coding assistant, support assistant, OCR assistant, or domain specialist.
+`AssistantDefinition` is one reusable profile for one application function. Applications may keep multiple definitions such as research, coding, support, OCR, or domain-specific Assistants.
 
-A profile owns portable configuration only:
+Portable configuration may include:
 
-- stable assistant ID/name/description;
-- application-owned `system`/`developer` instruction blocks;
+- stable ID/name/description;
+- system/developer instruction blocks;
 - default and optional modules;
-- built-in Core skills;
-- allowed tool names;
-- model-selection policy;
+- built-in skills;
+- tool allowlist and `ToolPolicy` values;
+- generation-model selection policy;
 - credential policy;
-- optional retrieval/RAG policy;
+- model/provider fallback policy;
+- optional RAG policy;
+- optional memory policy;
+- optional learning policy;
 - bounded execution budgets.
 
-Profiles do not own provider SDK objects, database rows, HTTP sessions, or raw API secrets.
+Provider SDK objects, HTTP sessions, raw API secrets, persistence rows, and product authorization are not part of the definition.
 
-## Modular functionality
+## Modules
 
-Default modules are listed in `modules`. Modules available but disabled by default are listed in `optional_modules`.
+Default modules are listed in `modules`. Disabled-by-default capabilities available to a run are listed in `optional_modules`.
 
 Portable modules in Spec `0.3` are:
 
@@ -31,94 +34,109 @@ Portable modules in Spec `0.3` are:
 - `audio_input`;
 - `video_input`;
 - `file_input`;
+- `image_output`;
+- `audio_output`;
+- `video_output`;
+- `file_output`;
 - `tools`;
 - `retrieval`;
 - `memory`;
 - `structured_output`.
 
-A run may disable a default module or explicitly enable an optional module. It may not enable a module that the Assistant definition did not declare.
+Default and optional module sets are disjoint. A run may enable only declared optional modules and disable only declared defaults. The effective set may not be empty.
 
-This separates capability authorization/configuration from model capability. Enabling `vision`, for example, does not guarantee that every registered model supports images; model routing must filter for the corresponding model capability.
+Generation-model requirements are derived from active modules:
 
-The runtime derives these minimum generation-model capabilities automatically:
-
-| Module | Required model capability |
+| Module | Required capability |
 | --- | --- |
 | `text` | `text` |
 | `vision` | `image_input` |
 | `audio_input` | `audio_input` |
 | `video_input` | `video_input` |
 | `file_input` | `file_input` |
+| `image_output` | `image_output` |
+| `audio_output` | `audio_output` |
+| `video_output` | `video_output` |
+| `file_output` | `file_output` |
 | `tools` | `tool_calling` |
 | `structured_output` | `structured_output` |
 
-`retrieval` and `memory` may be implemented outside the generation model and therefore do not imply a model capability by themselves.
+`retrieval` and `memory` may execute outside the generation model and therefore do not directly imply a model capability.
+
+Declaring the retrieval or memory module requires the corresponding policy even when the module is optional, so enabling it at runtime cannot activate undefined semantics.
 
 ## Provider adapters
 
-Concrete providers are represented by adapters. The language-neutral contract does not depend on a provider SDK or HTTP shape.
+Concrete providers are represented by adapters. The language-neutral contract does not depend on vendor SDK/HTTP types.
 
-The current Go implementation exposes a `ProviderAdapter` substitution boundary that normalizes:
+The current Go boundary normalizes:
 
-- provider metadata;
+- provider descriptor;
 - live model-catalog discovery;
-- non-streaming generation requests/responses.
+- non-streaming generation request/response;
+- optional failure classification;
+- optional quota observation.
 
-Provider adapters may internally use vendor SDKs, HTTP, local inference runtimes, gateways, or other mechanisms. Provider-specific types must not cross the Core boundary.
+Provider-specific models, headers, request IDs, raw errors, retry-after fields, credentials, and pricing metadata remain adapter/runtime concerns unless mapped into an explicit portable contract.
 
-Core defines convenience provider IDs for common adapter targets (`openai`, `anthropic`, `google`, `openrouter`, `groq`, `ollama`, `mistral`, `xai`) but this is not a closed enum. Any valid provider ID may be registered.
-
-The Core package defines the adapter contract and routing behavior; concrete network adapters may be delivered independently so provider release cadence does not force Core semantic releases.
+Convenience provider IDs include `openai`, `anthropic`, `google`, `openrouter`, `groq`, `ollama`, `mistral`, and `xai`. The namespace is extensible.
 
 ## Model catalogs
 
-Model names, availability, free tiers, pricing, context limits, and capabilities change independently from Core releases. Core therefore does not hardcode a permanent model list or price table.
+Core does not freeze provider model names, prices, free tiers, or availability. Adapters provide current `ModelDescriptor` values containing:
 
-Adapters return current `ModelDescriptor` values containing:
-
-- provider/model reference;
-- current access tier (`free`, `paid`, `local`, `unknown`);
-- model roles (`generation`, `embedding`, `reranking`);
+- `(provider, model)` identity;
+- display name;
+- current access tier: `free`, `paid`, `local`, `unknown`;
+- semantic roles: `generation`, `embedding`, `reranking`;
 - portable capabilities;
-- reported context/output limits when known.
+- optional context/output limits.
 
-Access tier is runtime catalog metadata, not a timeless property of a model. A model that is free today may be paid tomorrow without requiring a Core specification change.
+Model identity is the tuple `(provider, model)`, not a concatenated string. This prevents collisions when either component itself contains separators.
+
+Catalog and candidate sizes are bounded so dynamic routing remains predictable.
 
 ## Model selection
 
-Three portable modes exist.
+Portable modes:
 
-### Manual
+### `manual`
 
-`manual` selects exactly one provider/model pair. This is used for explicit user selection and per-run model overrides.
+Select exactly one provider/model pair. Manual selection still has to satisfy provider/access/capability restrictions and the active module set.
 
-The selected model still has to satisfy Assistant module/capability and policy constraints.
+### `ordered_fallback`
 
-### Ordered fallback
+Carry an explicit ordered list of candidates. This is appropriate when the application has benchmark/evaluation evidence for the desired order.
 
-`ordered_fallback` carries an explicit ordered candidate list. The runtime skips unavailable/ineligible candidates and retains caller order for the remaining models.
+### `dynamic`
 
-This is appropriate when the application has deliberately benchmarked a preferred sequence.
+Filter the current catalog by allowed providers, access tiers, and required capabilities. `preferred_access` defines deterministic access-tier priority, for example free/local before paid. Within an equal preference class, ordering is deterministic by provider then model.
 
-### Dynamic
+`preferred_access` must be a subset of `allowed_access` when an allowed set is supplied.
 
-`dynamic` resolves against the current adapter-supplied catalog.
+Core deliberately does not guess relative model quality from price or provider name.
 
-The policy can filter by:
+## Routing fallback
 
-- allowed providers;
-- allowed access tiers;
-- required capabilities.
+Selecting candidate order and deciding whether to advance after a failure are separate operations.
 
-`preferred_access` supplies deterministic tier ordering, for example `free` before `paid`. It does not fabricate quality/pricing information and does not override capability requirements.
+`RoutingFallbackPolicy` declares:
 
-Within the same preference class, ordering is deterministic by provider/model reference. Applications that need quality/latency ranking should supply an explicit ordered fallback or an application-owned router based on measured telemetry.
+- failure classes that allow another model in the same provider;
+- failure classes that allow switching provider;
+- maximum provider invocation attempts.
 
-## Free, paid, and local models
+The default policy permits bounded fallback for operational conditions such as quota/rate-limit, timeout, unavailability, network failure, context-limit, or unsupported capability as appropriate.
 
-A profile may be free-only, paid-only, local-only, or any combination by configuring `allowed_access`.
+Authentication, safety/refusal policy, invalid-request, and caller-cancellation failures cannot be configured as automatic failover triggers in Spec `0.3`. Switching providers to bypass these failures would change authorization/safety semantics rather than provide operational resilience.
 
-A common cost-aware configuration is:
+`NextModelCandidate`/equivalent consumes an already-resolved candidate list and distinguishes same-provider model fallback from cross-provider fallback.
+
+## Access tiers
+
+An Assistant may restrict generation to free, paid, local, or mixed catalogs.
+
+Example cost preference:
 
 ```json
 {
@@ -128,41 +146,71 @@ A common cost-aware configuration is:
 }
 ```
 
-Paid fallback is never silently enabled when the policy excludes `paid`.
+This is a cost/access ordering only. It is not a quality ranking. Paid fallback cannot occur when `paid` is excluded.
 
-## BYOK
+## Credentials and BYOK
 
-Core supports `managed` and `byok` credential modes.
+Portable credential modes:
 
-Raw API keys never belong in an `AssistantDefinition`, `CredentialRef`, log field, validation error, fingerprint, or model catalog.
+- `none` — no runtime credential reference;
+- `managed` — host/provider-managed authorization;
+- `byok` — host resolves a user/application-owned credential.
 
-A `CredentialRef` contains only:
+A runtime `CredentialRef` carries:
 
-- provider ID;
-- credential mode;
-- opaque application-owned reference/handle.
+- stable non-secret logical `id`;
+- provider;
+- mode (`managed` or `byok`);
+- namespaced opaque secret-store `reference` such as `session:key_01` or `vault:path`;
+- optional `quota_scope`.
 
-For BYOK, the host application stores the supplied key in an appropriate secure or ephemeral credential store and gives the adapter an opaque reference. The adapter resolves that reference through application-owned infrastructure configured outside Core.
+`none` is represented by absence of a `CredentialRef`, not by constructing a fake empty credential.
 
-This allows one Assistant definition to run with application credentials, user-owned keys, or local models without changing the portable profile.
+The namespaced-handle rule is a defense against accidentally placing a bare API key in portable configuration. It is not a secret detector; the host remains responsible for never passing raw key material.
+
+`CredentialIdentity` removes `reference` and is the only credential representation intended for portable usage/trace persistence.
+
+## Multiple credentials and quota-aware fallback
+
+A run may provide multiple credentials for the same provider. Their order is significant.
+
+Logical credential IDs and secret-store references must be unique within a provider chain so the runtime does not retry the same binding under another alias.
+
+The default `CredentialFallbackPolicy` advances only for normalized `quota` or `rate_limit` failures. It does not advance after auth, safety, invalid-request, or unrelated failures.
+
+`quota_scope` identifies credentials known by the host/adapter to consume the same provider quota scope. After quota/rate-limit exhaustion, the default policy skips later credentials with the same non-empty scope. This prevents pointless retries when several API keys share one project/account limit.
+
+An empty quota scope means the relationship is unknown; Core does not infer sharing.
+
+See [`OBSERVABILITY.md`](OBSERVABILITY.md) for quota and usage attribution semantics.
 
 ## Per-run overrides
 
-`RunOverrides` permits temporary changes without mutating the persisted Assistant profile:
+`RunOverrides` may temporarily:
 
 - enable declared optional modules;
 - disable default modules;
-- select one concrete model manually;
-- bind zero or more credential references, with at most one binding per provider.
+- select one concrete model;
+- supply ordered credentials;
+- override credential-fallback policy;
+- override routing-fallback policy.
 
-Multiple credential bindings are necessary for dynamic or ordered fallback across providers. Once a model is selected, only the credential binding for that provider is passed to its adapter.
+Overrides do not mutate the persisted definition and do not bypass model capabilities, credential modes, tool policies, or product authorization.
 
-A model override does not bypass allowed provider/access/capability constraints. Credential modes must be permitted by the Assistant definition.
+## Tool, RAG, memory, and learning policy
+
+Tools require a declared tool module and are governed by [`TOOLS.md`](TOOLS.md).
+
+Retrieval requires a declared retrieval module and a `RetrievalPolicy`; see [`RAG.md`](RAG.md).
+
+Memory requires a declared memory module and a `MemoryPolicy`. Persistent writes are disabled, explicit, or confirmation-gated; there is no unrestricted automatic persistent-write mode in Spec `0.3`.
+
+`LearningPolicy` controls disabled/proposal/low-authority auto-promotion eligibility. See [`LEARNING.md`](LEARNING.md).
 
 ## Execution budgets
 
-Assistants with tools/retrieval/agent-like workflows must remain bounded. `ExecutionBudget` provides portable limits for turns, tool calls, retrieval rounds, and output tokens.
+`ExecutionBudget` bounds turns, tool calls, retrieval rounds, and requested output tokens.
 
-A zero budget field means "use the runtime/application default"; it never means infinite execution.
+Zero means use a bounded host/runtime default. Zero never means infinite execution.
 
-Core Spec `0.3` does not define an autonomous unbounded agent loop.
+Spec `0.3` does not define an autonomous unbounded agent loop.
