@@ -54,7 +54,7 @@ This conservative subset is intended to travel across providers without provider
 
 Core requires `input_schema` to be a JSON object but does not enforce a particular JSON Schema dialect in Spec `0.3`, because provider schema support differs. Consumers may impose a stricter dialect.
 
-A `ToolCall` contains an opaque non-empty UTF-8 `id` of at most 256 bytes, a valid tool `name`, and `arguments` as a JSON object. Argument property ordering is not semantic.
+A `ToolCall` contains an opaque non-empty Unicode `id` of at most 256 Unicode scalar values, a valid tool `name`, and `arguments` as a JSON object. Argument property ordering is not semantic.
 
 A `ToolResult` references the original call through `call_id`, contains one or more result content parts, and may set `is_error`. Tool-result content may contain `text`, `image`, or `file`; nested `tool_call` and `tool_result` parts are invalid.
 
