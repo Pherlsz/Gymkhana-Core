@@ -5,12 +5,12 @@ package assistant
 // disabled, one concrete model may be selected, and ordered provider credential
 // handles may be supplied for dynamic/fallback routing.
 type RunOverrides struct {
-	EnableModules      []ModuleID                 `json:"enable_modules,omitempty"`
-	DisableModules     []ModuleID                 `json:"disable_modules,omitempty"`
-	Model              *ModelRef                  `json:"model,omitempty"`
-	Credentials        []CredentialRef            `json:"credentials,omitempty"`
-	CredentialFallback *CredentialFallbackPolicy  `json:"credential_fallback,omitempty"`
-	RoutingFallback    *RoutingFallbackPolicy     `json:"routing_fallback,omitempty"`
+	EnableModules      []ModuleID                `json:"enable_modules,omitempty"`
+	DisableModules     []ModuleID                `json:"disable_modules,omitempty"`
+	Model              *ModelRef                 `json:"model,omitempty"`
+	Credentials        []CredentialRef           `json:"credentials,omitempty"`
+	CredentialFallback *CredentialFallbackPolicy `json:"credential_fallback,omitempty"`
+	RoutingFallback    *RoutingFallbackPolicy    `json:"routing_fallback,omitempty"`
 }
 
 // EffectiveModules returns deterministic effective modules for one run.
@@ -85,8 +85,20 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 	if overrides.Model != nil && !validModelRef(*overrides.Model) {
 		return validationError(CodeInvalidModel, "run.model")
 	}
+	if len(overrides.Credentials) > 256 {
+		return validationError(CodeInvalidCredential, "run.credentials")
+	}
 
-	seenCredentials := make(map[CredentialIdentity]struct{}, len(overrides.Credentials))
+	type credentialIDKey struct {
+		Provider ProviderID
+		ID       string
+	}
+	type credentialRefKey struct {
+		Provider  ProviderID
+		Reference string
+	}
+	seenIDs := make(map[credentialIDKey]struct{}, len(overrides.Credentials))
+	seenReferences := make(map[credentialRefKey]struct{}, len(overrides.Credentials))
 	for _, credential := range overrides.Credentials {
 		if err := ValidateCredentialRef(credential); err != nil {
 			return err
@@ -94,11 +106,16 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 		if !def.Credentials.Allows(credential.Mode) {
 			return validationError(CodeInvalidCredential, "run.credentials")
 		}
-		identity := credential.Identity()
-		if _, duplicate := seenCredentials[identity]; duplicate {
-			return validationError(CodeInvalidCredential, "run.credentials")
+		idKey := credentialIDKey{Provider: credential.Provider, ID: credential.ID}
+		if _, duplicate := seenIDs[idKey]; duplicate {
+			return validationError(CodeInvalidCredential, "run.credentials.id")
 		}
-		seenCredentials[identity] = struct{}{}
+		seenIDs[idKey] = struct{}{}
+		referenceKey := credentialRefKey{Provider: credential.Provider, Reference: credential.Reference}
+		if _, duplicate := seenReferences[referenceKey]; duplicate {
+			return validationError(CodeInvalidCredential, "run.credentials.reference")
+		}
+		seenReferences[referenceKey] = struct{}{}
 	}
 	if overrides.CredentialFallback != nil {
 		if err := ValidateCredentialFallbackPolicy(*overrides.CredentialFallback); err != nil {
@@ -114,7 +131,8 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 }
 
 // CredentialsForProvider returns the ordered credential chain configured for a
-// provider. Caller order is semantically significant.
+// provider. Caller order is semantically significant. The returned slice is a
+// copy and may be modified by the caller.
 func CredentialsForProvider(overrides RunOverrides, provider ProviderID) []CredentialRef {
 	result := make([]CredentialRef, 0)
 	for _, credential := range overrides.Credentials {
@@ -130,13 +148,34 @@ func CredentialsForProvider(overrides RunOverrides, provider ProviderID) []Crede
 // failures, credentials known to share the current quota scope are skipped when
 // the policy requests it.
 func NextCredential(overrides RunOverrides, provider ProviderID, current int, failure FailureClass) (CredentialRef, int, error) {
-	chain := CredentialsForProvider(overrides, provider)
-	if len(chain) == 0 || current < -1 || current >= len(chain) {
-		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+	if !validPortableID(string(provider), 128) {
+		return CredentialRef{}, -1, validationError(CodeInvalidProvider, "provider")
 	}
 	policy := DefaultCredentialFallbackPolicy()
 	if overrides.CredentialFallback != nil {
 		policy = *overrides.CredentialFallback
+	}
+	if err := ValidateCredentialFallbackPolicy(policy); err != nil {
+		return CredentialRef{}, -1, err
+	}
+	chain := CredentialsForProvider(overrides, provider)
+	if len(chain) == 0 || current < -1 || current >= len(chain) {
+		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+	}
+	seenIDs := make(map[string]struct{}, len(chain))
+	seenReferences := make(map[string]struct{}, len(chain))
+	for _, credential := range chain {
+		if err := ValidateCredentialRef(credential); err != nil {
+			return CredentialRef{}, -1, err
+		}
+		if _, duplicate := seenIDs[credential.ID]; duplicate {
+			return CredentialRef{}, -1, validationError(CodeInvalidCredential, "run.credentials.id")
+		}
+		seenIDs[credential.ID] = struct{}{}
+		if _, duplicate := seenReferences[credential.Reference]; duplicate {
+			return CredentialRef{}, -1, validationError(CodeInvalidCredential, "run.credentials.reference")
+		}
+		seenReferences[credential.Reference] = struct{}{}
 	}
 	if current >= 0 {
 		if !failure.Valid() || !policy.Allows(failure) {
