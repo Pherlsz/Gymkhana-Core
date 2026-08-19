@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/civiltime"
@@ -36,6 +37,12 @@ func TestTemporalConformance(t *testing.T) {
 func runSuite(t *testing.T, path string, execute func(vector) (string, string)) {
 	t.Helper()
 
+	expectedVersionData, err := os.ReadFile(filepath.Join("..", "spec", "VERSION"))
+	if err != nil {
+		t.Fatalf("read specification version: %v", err)
+	}
+	expectedVersion := strings.TrimSpace(string(expectedVersionData))
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read conformance suite %s: %v", path, err)
@@ -45,7 +52,10 @@ func runSuite(t *testing.T, path string, execute func(vector) (string, string)) 
 	if err := json.Unmarshal(data, &vectors); err != nil {
 		t.Fatalf("decode conformance suite %s: %v", path, err)
 	}
-	if vectors.SpecVersion == "" || vectors.Suite == "" || len(vectors.Cases) == 0 {
+	if vectors.SpecVersion != expectedVersion {
+		t.Fatalf("conformance suite %s targets spec %q, current spec is %q", path, vectors.SpecVersion, expectedVersion)
+	}
+	if vectors.Suite == "" || len(vectors.Cases) == 0 {
 		t.Fatalf("conformance suite %s is incomplete", path)
 	}
 
