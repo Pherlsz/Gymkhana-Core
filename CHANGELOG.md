@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.7.0] - 2026-08-19
+
+### Added
+
+- Reusable Go `assistant/adaptertest` integration harness for exercising external `ProviderAdapter` implementations through the public `AdapterRegistry` boundary.
+- Low-cost text generation smoke coverage plus adapter-declared capability probes, optional quota checks, and representative failure-classification checks without embedding provider SDKs or credentials in Core.
+
+### Changed
+
+- Provider-adapter validation now has a shared Go harness while concrete OpenAI-compatible, Anthropic/Google-family, gateway, and local-runtime adapters remain independent integration work.
+- Core Spec remains `0.4`; this release adds implementation/testing infrastructure and does not change portable Assistant semantics.
+
 ## [0.6.0] - 2026-08-19
 
 ### Added
@@ -58,7 +70,7 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 
 ### Added
 
-- `fingerprint` Go package with exact SHA-256 byte/string fingerprints, canonical lowercase hexadecimal digests, strict digest parsing, and stable validation errors.
+- `fingerprint` Go package with exact SHA-256 fingerprints of bytes and UTF-8 strings, canonical lowercase hexadecimal digests, strict digest parsing, and stable validation errors.
 - Core FingerPrint frame v1 (`CFP\x01`) with explicit namespace, part count, and big-endian part lengths for portable domain separation and unambiguous ordered multipart fingerprints.
 - Language-neutral fingerprint specification and shared conformance vectors under Core Spec `0.2`, including exact digest, framing, namespace separation, boundary preservation, and parsing behavior.
 - Bounded fingerprint parse fuzzing integrated into `make fuzz-smoke`.
