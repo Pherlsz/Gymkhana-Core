@@ -3,71 +3,72 @@
   "$id": "https://github.com/Pherlsz/Gymkhana-Core/schemas/assistant-runtime.schema.json",
   "title": "Gymkhana Core Assistant runtime contracts",
   "$defs": {
+    "FailureClass": {"type":"string","enum":["auth","rate_limit","quota","timeout","unavailable","safety","invalid_request","unknown"]},
+    "CredentialFallbackPolicy": {
+      "type":"object","additionalProperties":false,"required":["on"],
+      "properties":{"on":{"type":"array","uniqueItems":true,"items":{"$ref":"#/$defs/FailureClass"}}}
+    },
     "RunOverrides": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enable_modules": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}
-        },
-        "disable_modules": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}
-        },
-        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "enable_modules": {"type":"array","uniqueItems":true,"items":{"$ref":"assistant-config.schema.json#/$defs/ModuleID"}},
+        "disable_modules": {"type":"array","uniqueItems":true,"items":{"$ref":"assistant-config.schema.json#/$defs/ModuleID"}},
+        "model": {"$ref":"assistant-config.schema.json#/$defs/ModelRef"},
         "credentials": {
-          "type": "array",
-          "items": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"},
-          "description": "At most one semantic credential binding per provider; enforced by Core validation."
-        }
+          "type":"array",
+          "items":{"$ref":"assistant-config.schema.json#/$defs/CredentialRef"},
+          "description":"Ordered credential bindings. Multiple distinct handles for the same provider form a fallback chain."
+        },
+        "credential_fallback": {"$ref":"#/$defs/CredentialFallbackPolicy"}
+      }
+    },
+    "QuotaState": {
+      "type":"object","additionalProperties":false,"required":["credential","known"],
+      "properties":{
+        "credential":{"$ref":"assistant-config.schema.json#/$defs/CredentialRef"},
+        "assistant_id":{"$ref":"assistant-config.schema.json#/$defs/PortableID"},
+        "known":{"type":"boolean"},
+        "token_limit":{"type":"integer","minimum":0,"maximum":9007199254740991},
+        "tokens_used":{"type":"integer","minimum":0,"maximum":9007199254740991},
+        "tokens_remaining":{"type":"integer","minimum":0,"maximum":9007199254740991},
+        "reset_at_unix":{"type":"integer","minimum":0}
+      }
+    },
+    "UsageLedgerEntry": {
+      "type":"object","additionalProperties":false,"required":["assistant_id","credential","model","usage"],
+      "properties":{
+        "assistant_id":{"$ref":"assistant-config.schema.json#/$defs/PortableID"},
+        "credential":{"$ref":"assistant-config.schema.json#/$defs/CredentialRef"},
+        "model":{"$ref":"assistant-config.schema.json#/$defs/ModelRef"},
+        "usage":{"$ref":"assistant.schema.json#/$defs/Usage"}
       }
     },
     "ProviderDescriptor": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "credential_modes"],
-      "properties": {
-        "id": {"$ref": "assistant-config.schema.json#/$defs/ProviderID"},
-        "display_name": {"type": "string"},
-        "credential_modes": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": {"$ref": "assistant-config.schema.json#/$defs/CredentialMode"}
-        }
+      "type":"object","additionalProperties":false,"required":["id","credential_modes"],
+      "properties":{
+        "id":{"$ref":"assistant-config.schema.json#/$defs/ProviderID"},
+        "display_name":{"type":"string"},
+        "credential_modes":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"assistant-config.schema.json#/$defs/CredentialMode"}}
       }
     },
     "GenerationRequest": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["model", "messages"],
-      "properties": {
-        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
-        "messages": {
-          "type": "array",
-          "minItems": 1,
-          "items": {"$ref": "assistant.schema.json#/$defs/Message"}
-        },
-        "tools": {
-          "type": "array",
-          "items": {"$ref": "assistant.schema.json#/$defs/ToolDefinition"}
-        },
-        "response_schema": {"type": "object"},
-        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"}
+      "type":"object","additionalProperties":false,"required":["model","messages"],
+      "properties":{
+        "model":{"$ref":"assistant-config.schema.json#/$defs/ModelRef"},
+        "messages":{"type":"array","minItems":1,"items":{"$ref":"assistant.schema.json#/$defs/Message"}},
+        "tools":{"type":"array","items":{"$ref":"assistant.schema.json#/$defs/ToolDefinition"}},
+        "response_schema":{"type":"object"},
+        "credential":{"$ref":"assistant-config.schema.json#/$defs/CredentialRef"}
       }
     },
     "GenerationResponse": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["model", "message", "finish_reason"],
-      "properties": {
-        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
-        "message": {"$ref": "assistant.schema.json#/$defs/Message"},
-        "finish_reason": {"$ref": "assistant.schema.json#/$defs/FinishReason"},
-        "usage": {"$ref": "assistant.schema.json#/$defs/Usage"}
+      "type":"object","additionalProperties":false,"required":["model","message","finish_reason"],
+      "properties":{
+        "model":{"$ref":"assistant-config.schema.json#/$defs/ModelRef"},
+        "message":{"$ref":"assistant.schema.json#/$defs/Message"},
+        "finish_reason":{"$ref":"assistant.schema.json#/$defs/FinishReason"},
+        "usage":{"$ref":"assistant.schema.json#/$defs/Usage"}
       }
     }
   }
