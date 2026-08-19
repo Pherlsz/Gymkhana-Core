@@ -27,12 +27,13 @@ Current specification areas:
 - `identity/` — generic typed identifier concepts;
 - `postal/` — explicitly jurisdiction-aware postal identifiers;
 - `fingerprint/` — exact SHA-256 digest semantics and versioned domain-separated framing;
-- `assistant/` — provider-neutral modular/multimodal Assistant messages, tools, structured output, model/credential routing, RAG, memory, learning, usage/quota, and observability semantics;
+- `json/` — strict portable JSON plus `portable_json_schema/v1` schema/instance semantics reusable across Core domains;
+- `assistant/` — provider-neutral modular/multimodal Assistant messages, tools, model/credential routing, RAG, memory, learning, usage/quota, and observability semantics; Assistant consumes the generic JSON contract for structured data;
 - `jurisdictions/` — country/jurisdiction-specific semantics, beginning with Brazil because those capabilities already exist in the Go implementation;
 - `standards/` — international/cross-jurisdiction standards when a reusable contract is justified;
 - `errors/` — stable, non-localized error semantics.
 
-Assistant Spec `0.3` companion documents cover configuration/model/BYOK routing, `portable_json_schema/v1`, tool safety, RAG, task-scoped Skill Build, and content-free quota/usage/tracing. Provider-neutral streaming event semantics, concrete provider adapters, Context Planner/cache hints/evals, and normative OCR extraction remain later workstreams.
+Assistant Spec `0.3` companion documents cover configuration/model/BYOK routing, Assistant-specific structured-output restrictions, tool safety, RAG, task-scoped Skill Build, and content-free quota/usage/tracing. Generic `portable_json_schema/v1` semantics live under `json/`. Provider-neutral streaming event semantics, concrete provider adapters, Context Planner/cache hints/evals, and normative OCR extraction remain later workstreams.
 
 Future top-level areas may include `ocr/`, `matching/`, and `solver/`.
 
