@@ -68,6 +68,8 @@ Provider adapters may internally use vendor SDKs, HTTP, local inference runtimes
 
 Core defines convenience provider IDs for common adapter targets (`openai`, `anthropic`, `google`, `openrouter`, `groq`, `ollama`, `mistral`, `xai`) but this is not a closed enum. Any valid provider ID may be registered.
 
+The Core package defines the adapter contract and routing behavior; concrete network adapters may be delivered independently so provider release cadence does not force Core semantic releases.
+
 ## Model catalogs
 
 Model names, availability, free tiers, pricing, context limits, and capabilities change independently from Core releases. Core therefore does not hardcode a permanent model list or price table.
@@ -142,7 +144,7 @@ A `CredentialRef` contains only:
 
 For BYOK, the host application stores the supplied key in an appropriate secure or ephemeral credential store and gives the adapter an opaque reference. The adapter resolves that reference through application-owned infrastructure configured outside Core.
 
-This allows one Assistant definition to run with application credentials, a user's own key, or a local model without changing the portable profile.
+This allows one Assistant definition to run with application credentials, user-owned keys, or local models without changing the portable profile.
 
 ## Per-run overrides
 
@@ -151,9 +153,11 @@ This allows one Assistant definition to run with application credentials, a user
 - enable declared optional modules;
 - disable default modules;
 - select one concrete model manually;
-- bind one credential reference.
+- bind zero or more credential references, with at most one binding per provider.
 
-A model override does not bypass allowed provider/access/capability constraints. A BYOK credential bound to a manually selected model must target the same provider.
+Multiple credential bindings are necessary for dynamic or ordered fallback across providers. Once a model is selected, only the credential binding for that provider is passed to its adapter.
+
+A model override does not bypass allowed provider/access/capability constraints. Credential modes must be permitted by the Assistant definition.
 
 ## Execution budgets
 
