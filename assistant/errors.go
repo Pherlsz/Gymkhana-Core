@@ -22,6 +22,8 @@ const (
 	CodeInvalidUsage        ErrorCode = "invalid_usage"
 	CodeInvalidCapability   ErrorCode = "invalid_capability"
 	CodeDuplicateCapability ErrorCode = "duplicate_capability"
+	CodeInvalidSkill        ErrorCode = "invalid_skill"
+	CodeDuplicateSkill      ErrorCode = "duplicate_skill"
 )
 
 // ValidationError intentionally contains no original prompt, arguments, URI,
