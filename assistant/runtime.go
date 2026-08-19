@@ -2,13 +2,14 @@ package assistant
 
 // RunOverrides applies temporary choices without mutating the persisted
 // AssistantDefinition. Optional modules may be enabled, default modules may be
-// disabled, one concrete model may be selected, and provider credential handles
-// may be supplied for dynamic/fallback routing.
+// disabled, one concrete model may be selected, and ordered provider credential
+// handles may be supplied for dynamic/fallback routing.
 type RunOverrides struct {
-	EnableModules  []ModuleID      `json:"enable_modules,omitempty"`
-	DisableModules []ModuleID      `json:"disable_modules,omitempty"`
-	Model          *ModelRef       `json:"model,omitempty"`
-	Credentials    []CredentialRef `json:"credentials,omitempty"`
+	EnableModules      []ModuleID                `json:"enable_modules,omitempty"`
+	DisableModules     []ModuleID                `json:"disable_modules,omitempty"`
+	Model              *ModelRef                 `json:"model,omitempty"`
+	Credentials        []CredentialRef           `json:"credentials,omitempty"`
+	CredentialFallback *CredentialFallbackPolicy `json:"credential_fallback,omitempty"`
 }
 
 // EffectiveModules returns deterministic effective modules for one run.
@@ -81,7 +82,7 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 		return validationError(CodeInvalidModel, "run.model")
 	}
 
-	seenProviders := make(map[ProviderID]struct{}, len(overrides.Credentials))
+	seenRefs := make(map[string]struct{}, len(overrides.Credentials))
 	for _, credential := range overrides.Credentials {
 		if err := ValidateCredentialRef(credential); err != nil {
 			return err
@@ -89,22 +90,51 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 		if !def.Credentials.Allows(credential.Mode) {
 			return validationError(CodeInvalidCredential, "run.credentials")
 		}
-		if _, duplicate := seenProviders[credential.Provider]; duplicate {
+		key := string(credential.Provider) + "|" + string(credential.Mode) + "|" + credential.Reference
+		if _, duplicate := seenRefs[key]; duplicate {
 			return validationError(CodeInvalidCredential, "run.credentials")
 		}
-		seenProviders[credential.Provider] = struct{}{}
+		seenRefs[key] = struct{}{}
+	}
+	if overrides.CredentialFallback != nil {
+		if err := ValidateCredentialFallbackPolicy(*overrides.CredentialFallback); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// CredentialForProvider resolves a run-local credential binding for a provider.
-func CredentialForProvider(overrides RunOverrides, provider ProviderID) (*CredentialRef, bool) {
-	for i := range overrides.Credentials {
-		if overrides.Credentials[i].Provider == provider {
-			return &overrides.Credentials[i], true
+// CredentialsForProvider returns the ordered credential chain configured for a
+// provider. Caller order is semantically significant.
+func CredentialsForProvider(overrides RunOverrides, provider ProviderID) []CredentialRef {
+	result := make([]CredentialRef, 0)
+	for _, credential := range overrides.Credentials {
+		if credential.Provider == provider {
+			result = append(result, credential)
 		}
 	}
-	return nil, false
+	return result
+}
+
+// NextCredential returns the next credential in provider order when policy
+// permits fallback for the normalized failure class.
+func NextCredential(overrides RunOverrides, provider ProviderID, current int, failure FailureClass) (CredentialRef, int, error) {
+	chain := CredentialsForProvider(overrides, provider)
+	if len(chain) == 0 || current < -1 || current >= len(chain) {
+		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+	}
+	policy := DefaultCredentialFallbackPolicy()
+	if overrides.CredentialFallback != nil {
+		policy = *overrides.CredentialFallback
+	}
+	if current >= 0 && !policy.Allows(failure) {
+		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+	}
+	next := current + 1
+	if next >= len(chain) {
+		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+	}
+	return chain[next], next, nil
 }
 
 // ResolveAssistantModelsForRun applies module and manual model overrides before
