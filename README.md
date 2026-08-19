@@ -29,6 +29,7 @@ Gymkhana-Core/
 ├── fingerprint/   # current Go implementation
 ├── portablejson/  # generic strict JSON/schema implementation
 ├── assistant/     # provider-neutral Assistant implementation
+├── ocr/           # provider-neutral OCR/extraction implementation
 └── ...            # future language implementations/packages as justified
 ```
 
@@ -93,7 +94,7 @@ Generic strict structured-data primitives reusable across Core domains:
 - exact rational comparison for portable decimal bounds/enums rather than runtime-dependent binary floating-point equality;
 - bounded numeric lexemes/exponents and JSON-safe portable integer semantics.
 
-`portablejson` is not an Assistant package. Assistant tools/structured outputs consume it today; future OCR/extraction, matching, solver, workflow, or other domains can consume the same contract without importing AI semantics.
+`portablejson` is not an Assistant or OCR package. Assistant tools/structured outputs and OCR/extraction consume the same generic contract without importing each other's domain semantics.
 
 The package deliberately does not implement full JSON Schema, canonical JSON serialization, persistence, transport, or provider-specific structured-output extensions.
 
@@ -121,13 +122,32 @@ Convenience provider IDs currently include OpenAI, Anthropic, Google, OpenRouter
 
 `assistant` contains no OpenAI, Google, Anthropic, or other provider SDK types. Media URIs and credential handles are opaque references owned by consumers/adapters, and tool calls are data rather than authorization to execute side effects. The Go `AdapterRegistry` is an implementation convenience, not a language-neutral requirement that other ports reproduce the same registry shape.
 
-Spec `0.3` deliberately defines streaming as a capability without freezing a provider-neutral stream-event/delta shape yet. Concrete provider adapters, Context Planner/cache semantics, eval-driven routing, MCP integration, and OCR extraction remain separate workstreams after the Foundation contract is validated.
+Streaming remains represented as a portable capability without freezing a provider-neutral stream-event/delta shape. Concrete provider adapters, Context Planner/cache semantics, eval-driven routing, and MCP integration remain separate workstreams.
+
+### `ocr`
+
+Provider-neutral OCR and structured-extraction contracts for:
+
+- schema-guided extraction against an exact caller-provided `portable_json_schema/v1` object schema;
+- discovery extraction when expected fields are unknown;
+- logical text/image/document/audio/video source references without storage or ACL material;
+- bounded page/region/text-span/time-range evidence references;
+- raw observations with optional portable JSON values and fixed-scale confidence;
+- evidence-backed field candidates with RFC 6901 paths, observed/derived/inferred basis, ambiguity, and explicit missing-vs-JSON-null state;
+- optional normalized values only when an explicit canonicalizer namespace is named;
+- result validation/review state and stable non-sensitive warnings;
+- candidate-to-structured-data consistency and exact portable-number equality;
+- conditional built-in `data_identification/v1` discovery semantics.
+
+`ocr` is broader than image OCR. Adapters may use classic OCR engines, document parsers, speech recognition, multimodal models, deterministic parsers, or compositions of those techniques. Provider SDK objects, upload/storage, persistence, queues, billing, and authorization stay outside Core.
+
+OCR does not depend on Assistant. An AI-backed host/adapter may compose Assistant infrastructure and `token_economy/v1`, but document/model output remains untrusted data and never becomes instruction or tool authority by extraction alone.
 
 ## Specification and conformance
 
 `spec/VERSION` identifies the language-neutral specification version independently from the Go module release.
 
-Core Spec `0.3` covers:
+Core Spec `0.4` covers:
 
 - global text semantics;
 - civil temporal semantics;
@@ -136,6 +156,7 @@ Core Spec `0.3` covers:
 - deterministic fingerprint digest/framing semantics;
 - generic strict JSON and `portable_json_schema/v1` schema/instance semantics;
 - provider-neutral Assistant messages, multimodal media, tools, skills, modular definitions, model routing/fallback, BYOK references, RAG, memory, learning, quota/usage, and observability contracts;
+- provider-neutral OCR/extraction requests, evidence, observations, candidates, confidence, schema-guided output, discovery, validation, and review semantics;
 - an international-standards extension point;
 - stable non-localized error semantics;
 - machine-readable conformance suites executed by the current Go implementation.
@@ -161,7 +182,7 @@ Core may contain coherent reusable packages/contracts such as:
 - provider-neutral Assistant messages/tools/configuration/model routing;
 - opaque managed/BYOK credential-reference semantics;
 - provider-neutral RAG/evidence, memory, learning, quota/usage, and trace policy/contracts;
-- OCR suggestion/evidence contracts;
+- provider-neutral OCR/extraction source/evidence/candidate/review contracts;
 - deterministic matching primitives;
 - generic constraint/composition solving algorithms.
 
@@ -228,7 +249,7 @@ export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 and pin an exact release:
 
 ```sh
-go get github.com/Pherlsz/Gymkhana-Core@v0.5.0
+go get github.com/Pherlsz/Gymkhana-Core@v0.6.0
 ```
 
 Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported as production dependency mechanisms.

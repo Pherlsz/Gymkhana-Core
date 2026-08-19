@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.6.0] - 2026-08-19
+
+### Added
+
+- Provider-neutral `ocr` Go package for bounded schema-guided and discovery extraction across document, image, text, audio, and video sources, with evidence references, raw observations, semantic field candidates, fixed-scale confidence, review/validation state, and stable non-sensitive errors.
+- Conditional built-in `data_identification/v1` discovery skill that preserves evidence and ambiguity, distinguishes missing values from JSON `null`, avoids assumed jurisdiction, and permits normalization only through an explicit canonicalizer.
+- Core Spec `0.4`, `spec/ocr/`, `schemas/ocr.schema.json`, and `conformance/v0.4/ocr.json`, with the complete Spec `0.3` conformance suite set carried forward unchanged in semantic meaning.
+- Candidate-to-structured-data consistency checks using RFC 6901 JSON Pointers and exact mathematical numeric equality, plus bounded aggregate result-data validation.
+- OCR request/result fuzz targets integrated into `make fuzz-smoke`.
+
+### Changed
+
+- OCR/extraction is now a first-class Core domain that depends directly on generic `portablejson`; Assistant infrastructure remains optional host/adapter composition rather than a required OCR dependency.
+- `docs/OCR-FOUNDATION.md` now records rationale and deferred adapter/infrastructure work while the normative contract lives in `spec/ocr/`.
+
 ## [0.5.0] - 2026-08-19
 
 ### Added

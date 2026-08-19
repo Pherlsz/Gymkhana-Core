@@ -70,6 +70,8 @@ fuzz-smoke:
 	@$(GO) test -run='^$$' -fuzz='^FuzzAssistantDefinitionJSON$$' -fuzztime=2s -timeout=30s -parallel=1 ./assistant
 	@$(GO) test -run='^$$' -fuzz='^FuzzValue$$' -fuzztime=2s -timeout=30s -parallel=1 ./portablejson
 	@$(GO) test -run='^$$' -fuzz='^FuzzSchema$$' -fuzztime=2s -timeout=30s -parallel=1 ./portablejson
+	@$(GO) test -run='^$$' -fuzz='^FuzzExtractionRequestJSON$$' -fuzztime=2s -timeout=30s -parallel=1 ./ocr
+	@$(GO) test -run='^$$' -fuzz='^FuzzExtractionResultJSON$$' -fuzztime=2s -timeout=30s -parallel=1 ./ocr
 
 vuln:
 	@"$(GOVULNCHECK)" ./...
