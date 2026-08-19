@@ -16,8 +16,11 @@ const (
 	CodeInvalidMedia        ErrorCode = "invalid_media"
 	CodeInvalidToolName     ErrorCode = "invalid_tool_name"
 	CodeInvalidJSON         ErrorCode = "invalid_json"
+	CodeInvalidSchema       ErrorCode = "invalid_schema"
 	CodeInvalidToolCall     ErrorCode = "invalid_tool_call"
 	CodeInvalidToolResult   ErrorCode = "invalid_tool_result"
+	CodeUnresolvedToolCall  ErrorCode = "unresolved_tool_call"
+	CodeInvalidToolPolicy   ErrorCode = "invalid_tool_policy"
 	CodeInvalidFinishReason ErrorCode = "invalid_finish_reason"
 	CodeInvalidUsage        ErrorCode = "invalid_usage"
 	CodeInvalidCapability   ErrorCode = "invalid_capability"
@@ -28,6 +31,7 @@ const (
 	CodeDuplicateAssistant  ErrorCode = "duplicate_assistant"
 	CodeInvalidModule       ErrorCode = "invalid_module"
 	CodeDuplicateModule     ErrorCode = "duplicate_module"
+	CodeInvalidMemory       ErrorCode = "invalid_memory"
 	CodeInvalidModel        ErrorCode = "invalid_model"
 	CodeInvalidModelPolicy  ErrorCode = "invalid_model_policy"
 	CodeModelUnavailable    ErrorCode = "model_unavailable"
@@ -38,6 +42,7 @@ const (
 	CodeDuplicateProvider   ErrorCode = "duplicate_provider"
 	CodeInvalidQuota        ErrorCode = "invalid_quota"
 	CodeInvalidLearning     ErrorCode = "invalid_learning"
+	CodeInvalidTrace        ErrorCode = "invalid_trace"
 )
 
 // ValidationError intentionally contains no original prompt, arguments, URI,
