@@ -156,6 +156,50 @@
       "type": "array",
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/Capability"}
+    },
+    "TokenEconomyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prefer_concise_responses",
+        "avoid_restatement",
+        "reuse_prior_context",
+        "compact_tool_results",
+        "preserve_instruction_hierarchy",
+        "preserve_unresolved_constraints"
+      ],
+      "properties": {
+        "prefer_concise_responses": {"type": "boolean"},
+        "avoid_restatement": {"type": "boolean"},
+        "reuse_prior_context": {"type": "boolean"},
+        "compact_tool_results": {"type": "boolean"},
+        "preserve_instruction_hierarchy": {"const": true},
+        "preserve_unresolved_constraints": {"const": true}
+      },
+      "anyOf": [
+        {"properties": {"prefer_concise_responses": {"const": true}}},
+        {"properties": {"avoid_restatement": {"const": true}}},
+        {"properties": {"reuse_prior_context": {"const": true}}},
+        {"properties": {"compact_tool_results": {"const": true}}}
+      ]
+    },
+    "TokenEconomySkill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "token_economy"],
+      "properties": {
+        "id": {"const": "token_economy/v1"},
+        "token_economy": {"$ref": "#/$defs/TokenEconomyPolicy"}
+      }
+    },
+    "Skill": {
+      "oneOf": [
+        {"$ref": "#/$defs/TokenEconomySkill"}
+      ]
+    },
+    "Skills": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/Skill"}
     }
   }
 }
