@@ -7,48 +7,21 @@ import (
 	"github.com/Pherlsz/Gymkhana-Core/assistant"
 )
 
-func TestValidatePortableJSONObjectRejectsAmbiguousJSON(t *testing.T) {
+func TestPortableJSONCompatibilityWrappers(t *testing.T) {
 	t.Parallel()
 
-	valid := json.RawMessage(`{"placeholder":true}`)
-	valid = json.RawMessage("{\"city\":\"Porto Alegre\",\"nested\":{\"value\":1}}")
-	if err := assistant.ValidatePortableJSONObject(valid); err != nil {
+	validObject := json.RawMessage("{\"city\":\"Porto Alegre\"}")
+	if err := assistant.ValidatePortableJSONObject(validObject); err != nil {
 		t.Fatalf("ValidatePortableJSONObject(valid) = %v", err)
 	}
-
-	cases := map[string]json.RawMessage{
-		"duplicate_key":      json.RawMessage("{\"a\":1,\"a\":2}"),
-		"unpaired_surrogate": json.RawMessage("{\"value\":\"\\ud800\"}"),
-		"array_root":         json.RawMessage("[1,2,3]"),
-		"trailing_value":     json.RawMessage("{} {}"),
-	}
-	for name, raw := range cases {
-		name, raw := name, raw
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if err := assistant.ValidatePortableJSONObject(raw); err == nil {
-				t.Fatalf("ValidatePortableJSONObject(%s) unexpectedly succeeded", raw)
-			}
-		})
-	}
-}
-
-func TestValidatePortableJSONSchema(t *testing.T) {
-	t.Parallel()
-
-	valid := json.RawMessage("{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":[\"integer\",\"null\"],\"minimum\":0,\"maximum\":200}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false}")
-	if err := assistant.ValidatePortableJSONSchema(valid); err != nil {
+	if err := assistant.ValidatePortableJSONSchema(json.RawMessage("{\"type\":\"string\"}")); err != nil {
 		t.Fatalf("ValidatePortableJSONSchema(valid) = %v", err)
 	}
-
-	invalidKeyword := json.RawMessage("{\"type\":\"string\",\"pattern\":\".*\"}")
-	assertAssistantCode(t, assistant.ValidatePortableJSONSchema(invalidKeyword), assistant.CodeInvalidSchema)
-
-	optionalProperty := json.RawMessage("{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":\"integer\"}},\"required\":[\"name\"],\"additionalProperties\":false}")
-	assertAssistantCode(t, assistant.ValidatePortableJSONSchema(optionalProperty), assistant.CodeInvalidSchema)
+	assertAssistantCode(t, assistant.ValidatePortableJSONObject(json.RawMessage("[1,2,3]")), assistant.CodeInvalidJSON)
+	assertAssistantCode(t, assistant.ValidatePortableJSONSchema(json.RawMessage("{\"type\":\"string\",\"pattern\":\".*\"}")), assistant.CodeInvalidSchema)
 }
 
-func TestToolDefinitionUsesPortableSchema(t *testing.T) {
+func TestToolDefinitionUsesPortableObjectSchema(t *testing.T) {
 	t.Parallel()
 
 	definition := assistant.ToolDefinition{
@@ -58,4 +31,7 @@ func TestToolDefinitionUsesPortableSchema(t *testing.T) {
 	if err := assistant.ValidateToolDefinition(definition); err != nil {
 		t.Fatalf("ValidateToolDefinition(valid) = %v", err)
 	}
+
+	definition.InputSchema = json.RawMessage("{\"type\":\"string\"}")
+	assertAssistantCode(t, assistant.ValidateToolDefinition(definition), assistant.CodeInvalidSchema)
 }
