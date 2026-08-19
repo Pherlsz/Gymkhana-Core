@@ -26,6 +26,7 @@ Gymkhana-Core/
 ├── schemas/       # portable serialized contracts
 ├── normalize/     # current Go implementation
 ├── civiltime/     # current Go implementation
+├── fingerprint/   # current Go implementation
 └── ...            # future language implementations/packages as justified
 ```
 
@@ -64,16 +65,31 @@ Timezone-free value types for:
 
 Zero values represent absence and serialize as empty text or JSON `null`.
 
+### `fingerprint`
+
+Portable deterministic fingerprint primitives for:
+
+- exact SHA-256 fingerprints of bytes and UTF-8 strings;
+- canonical 64-character lowercase hexadecimal digest representation;
+- strict digest parsing with stable errors;
+- versioned, domain-separated framing of ordered byte/string parts;
+- explicit part boundaries so concatenation ambiguity cannot change semantic identity.
+
+`fingerprint` does not normalize caller data and deliberately does not define canonical JSON yet. Consumers canonicalize semantic values before hashing when representation equivalence matters.
+
+Fingerprints are not encryption, anonymization, authentication, or password hashing. Hashing low-entropy sensitive identifiers does not make them private.
+
 ## Specification and conformance
 
 `spec/VERSION` identifies the language-neutral specification version independently from the Go module release.
 
-The initial Foundation establishes:
+Core Spec `0.2` covers:
 
 - global text semantics;
 - civil temporal semantics;
 - a generic identifier model;
 - explicit jurisdiction modules, beginning with Brazil because those capabilities already exist in Go;
+- deterministic fingerprint digest/framing semantics;
 - an international-standards extension point;
 - stable non-localized error semantics;
 - machine-readable conformance suites executed by the current Go implementation.
@@ -161,7 +177,7 @@ export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 and pin an exact release:
 
 ```sh
-go get github.com/Pherlsz/Gymkhana-Core@v0.3.0
+go get github.com/Pherlsz/Gymkhana-Core@v0.4.0
 ```
 
 Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported as production dependency mechanisms.
