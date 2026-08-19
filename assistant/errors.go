@@ -32,9 +32,12 @@ const (
 	CodeInvalidModelPolicy  ErrorCode = "invalid_model_policy"
 	CodeModelUnavailable    ErrorCode = "model_unavailable"
 	CodeInvalidCredential   ErrorCode = "invalid_credential"
+	CodeCredentialExhausted ErrorCode = "credential_exhausted"
 	CodeInvalidRetrieval    ErrorCode = "invalid_retrieval"
 	CodeInvalidProvider     ErrorCode = "invalid_provider"
 	CodeDuplicateProvider   ErrorCode = "duplicate_provider"
+	CodeInvalidQuota        ErrorCode = "invalid_quota"
+	CodeInvalidLearning     ErrorCode = "invalid_learning"
 )
 
 // ValidationError intentionally contains no original prompt, arguments, URI,
