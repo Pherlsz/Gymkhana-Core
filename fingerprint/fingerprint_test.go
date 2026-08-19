@@ -54,6 +54,28 @@ func TestFramedPreservesBoundariesAndNamespace(t *testing.T) {
 	}
 }
 
+func TestFramedDistinguishesZeroPartsFromEmptyPart(t *testing.T) {
+	t.Parallel()
+
+	zero, err := fingerprint.FramedStrings("empty/v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	empty, err := fingerprint.FramedStrings("empty/v1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if zero.String() != "5a57cd4806fb6e845a350d798fe9e1346bfe2f22c0cea0e540c7bd1e0c7b0e08" {
+		t.Fatalf("zero-part frame = %s", zero)
+	}
+	if empty.String() != "5d3c8cdd3b8bb65bb7b0192533816ff98df5ef007f3d9d385320ec12582d4e1f" {
+		t.Fatalf("empty-part frame = %s", empty)
+	}
+	if zero == empty {
+		t.Fatal("zero-part frame equals one-empty-part frame")
+	}
+}
+
 func TestFramedBytesMatchesStrings(t *testing.T) {
 	t.Parallel()
 
