@@ -10,21 +10,26 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 
 - Provider-neutral `assistant` Go package with portable message roles, ordered text/image/audio/video/file content parts, tool definitions/calls/results, finish reasons, usage counters, and capability identifiers.
 - Versioned Assistant skill contracts plus built-in `token_economy/v1`, covering concise responses, restatement avoidance, prior-context reuse, tool-result compaction, and mandatory preservation of instruction hierarchy and unresolved constraints.
-- Reusable `AssistantDefinition`/`AssistantCatalog` profiles with default and optional modules, application instruction blocks, tools, skills, bounded execution budgets, and per-run module/model/credential overrides.
-- Provider-neutral model catalogs and deterministic manual, ordered-fallback, and dynamic routing across current `free`, `paid`, `local`, and `unknown` access tiers, including automatic capability filtering from active Assistant modules.
-- Managed/BYOK credential policy and opaque per-provider `CredentialRef` bindings; raw provider secrets are never part of portable Core configuration.
+- Reusable `AssistantDefinition`/`AssistantCatalog` profiles with default and optional modules, application instruction blocks, tools, tool safety policies, skills, bounded memory/learning policies, bounded execution budgets, and per-run module/model/credential overrides.
+- Provider-neutral model catalogs and deterministic manual, ordered-fallback, and dynamic routing across current `free`, `paid`, `local`, and `unknown` access tiers, including automatic capability filtering from active Assistant modules and bounded model/provider failover.
+- Managed/BYOK credential policy, ordered credential fallback, non-secret credential identities, provider quota observations, and local usage attribution without placing raw provider secrets in portable Core contracts.
 - Runtime-local Go `ProviderAdapter`/`AdapterRegistry` boundaries with convenience IDs for common provider/gateway/local-runtime targets while keeping provider IDs extensible.
 - Portable RAG contracts for lexical/vector/hybrid retrieval, original/rewrite/multi-query search, bounded candidate/context selection, optional reranking, grounding, citations, embedding/reranking model references, and untrusted retrieval evidence.
-- Core Spec `0.3` Assistant semantics plus normative modular configuration/model-routing and RAG documents.
-- `schemas/assistant.schema.json`, `schemas/assistant-config.schema.json`, and `schemas/assistant-runtime.schema.json` for language-neutral Assistant message, configuration, model/BYOK/RAG, and runtime boundary shapes.
-- Complete `conformance/v0.3` suite set with Assistant core, multimodal, configuration/BYOK/RAG/model-routing vectors plus existing normalize, temporal, and fingerprint suites.
+- Task-scoped Skill Build contracts with `TaskSignature`, evidence-backed learning proposals, bounded promotion policy, and protection against silently promoting free-form learned text into higher instruction authority.
+- Content-free Assistant run traces for routing/fallback/tool/retrieval/usage diagnostics without persisting prompt, response, tool payload, evidence content, media URI, raw key, or secret-store reference data.
+- Generic `portablejson` Go package and normative `spec/json/` contract for strict duplicate-safe JSON, `portable_json_schema/v1`, exact bounded decimal semantics, object-schema restrictions, and schema-instance validation reusable outside Assistant.
+- Assistant structured-output/tool validation consumes the generic `portablejson` layer while retaining the initial `assistant.ValidatePortable*` APIs as compatibility wrappers.
+- Core Spec `0.3` semantics for generic portable JSON plus Assistant configuration/model/BYOK routing, tool safety, RAG, memory, learning, quota/usage, observability, and structured-output integration.
+- `schemas/assistant.schema.json`, `schemas/assistant-config.schema.json`, `schemas/assistant-runtime.schema.json`, and Assistant observability/configuration shapes for language-neutral serialized boundaries.
+- Complete `conformance/v0.3` suite set with generic portable JSON/schema vectors, Assistant core/multimodal/configuration/hardening/structured vectors, and carried-forward normalize, temporal, and fingerprint suites.
 - `docs/OCR-FOUNDATION.md` defining the next provider-neutral OCR/extraction boundary and conditional `data_identification/v1` discovery skill plan.
-- Bounded Assistant JSON round-trip fuzzing integrated into `make fuzz-smoke`.
+- Bounded Assistant and portable JSON/schema fuzzing integrated into `make fuzz-smoke`, plus local-only routing/JSON/schema performance benchmarks.
 
 ### Changed
 
-- Core specification advances from `0.2` to `0.3` for the new Assistant contract family.
-- Provider neutrality now distinguishes portable provider/model routing and opaque credential-reference contracts from excluded provider SDK types, raw credentials, volatile price/model availability tables, and HTTP transport.
+- Core specification advances from `0.2` to `0.3` for generic portable JSON and the new Assistant contract family.
+- Generic structured JSON/schema semantics are no longer conceptually owned by Assistant; future OCR/extraction, matching, solver, and other Core domains can reuse `portablejson` directly.
+- Provider neutrality now distinguishes portable provider/model routing and opaque credential-reference contracts from excluded provider SDK types, raw credentials, volatile price/model availability tables, HTTP transport, persistence, and product orchestration.
 - Streaming is represented as a portable capability but its event/delta wire contract is intentionally deferred until multiple provider adapters have exercised the semantics.
 - Token-economy behavior is defined as a portable semantic profile rather than provider prompt text; consumers/adapters remain responsible for provider tokenization, context caching, and any lossy context compaction.
 
