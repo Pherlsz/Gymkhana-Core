@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.4.0] - 2026-08-18
+
+### Added
+
+- `fingerprint` Go package with exact SHA-256 byte/string fingerprints, canonical lowercase hexadecimal digests, strict digest parsing, and stable validation errors.
+- Core FingerPrint frame v1 (`CFP\x01`) with explicit namespace, part count, and big-endian part lengths for portable domain separation and unambiguous ordered multipart fingerprints.
+- Language-neutral fingerprint specification and shared conformance vectors under Core Spec `0.2`, including exact digest, framing, namespace separation, boundary preservation, and parsing behavior.
+- Bounded fingerprint parse fuzzing integrated into `make fuzz-smoke`.
+
+### Changed
+
+- Core specification advances from `0.1` to `0.2` for the new fingerprint operation family; `conformance/v0.2` carries the complete applicable normalize, temporal, and fingerprint suite set.
+- Canonical JSON is explicitly deferred until a precise cross-language structured canonicalization contract is selected; fingerprinting never performs implicit Unicode, locale, JSON, or application normalization.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
