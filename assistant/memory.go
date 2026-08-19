@@ -60,12 +60,12 @@ func (policy SensitiveMemoryPolicy) Valid() bool {
 // MemoryPolicy configures portable read/write behavior. Zero limits mean use
 // application defaults, never unlimited storage.
 type MemoryPolicy struct {
-	ReadScopes       []MemoryScope          `json:"read_scopes,omitempty"`
-	WriteMode        MemoryWriteMode        `json:"write_mode"`
-	WriteScope       MemoryScope            `json:"write_scope,omitempty"`
-	Sensitive        SensitiveMemoryPolicy  `json:"sensitive"`
-	MaxItems         int64                  `json:"max_items,omitempty"`
-	MaxItemBytes     int64                  `json:"max_item_bytes,omitempty"`
+	ReadScopes   []MemoryScope         `json:"read_scopes,omitempty"`
+	WriteMode    MemoryWriteMode       `json:"write_mode"`
+	WriteScope   MemoryScope           `json:"write_scope,omitempty"`
+	Sensitive    SensitiveMemoryPolicy `json:"sensitive"`
+	MaxItems     int64                 `json:"max_items,omitempty"`
+	MaxItemBytes int64                 `json:"max_item_bytes,omitempty"`
 }
 
 // MemoryItemRef is persistable provenance metadata for a memory item without
