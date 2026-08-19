@@ -10,18 +10,18 @@ const MaxNamespaceBytes = 128
 
 var frameMagic = [...]byte{'C', 'F', 'P', FrameVersion}
 
-// Framed fingerprints an ordered sequence of exact byte parts using the
+// SumFramed fingerprints an ordered sequence of exact byte parts using the
 // portable Core FingerPrint frame. Part boundaries and namespaces are included
 // in the hash input, preventing ambiguous concatenation and cross-domain reuse.
-func Framed(namespace string, parts ...[]byte) (Digest, error) {
+func SumFramed(namespace string, parts ...[]byte) (Digest, error) {
 	return framed(namespace, len(parts), func(index int) []byte {
 		return parts[index]
 	})
 }
 
-// FramedStrings is Framed for exact UTF-8 string bytes. It performs no Unicode
-// or application-level canonicalization and rejects invalid UTF-8 strings.
-func FramedStrings(namespace string, parts ...string) (Digest, error) {
+// SumFramedText is SumFramed for exact UTF-8 string bytes. It performs no
+// Unicode or application-level canonicalization and rejects invalid UTF-8.
+func SumFramedText(namespace string, parts ...string) (Digest, error) {
 	for _, part := range parts {
 		if !utf8.ValidString(part) {
 			return Digest{}, validationError(CodeInvalidUTF8)
