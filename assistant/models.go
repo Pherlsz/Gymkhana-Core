@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"sort"
+	"unicode/utf8"
 )
 
 // ProviderID is a stable provider namespace supplied by a provider adapter.
@@ -106,10 +107,16 @@ func ValidateModelPolicy(policy ModelPolicy) error {
 	if policy.Manual != nil && !validModelRef(*policy.Manual) {
 		return validationError(CodeInvalidModel, "model_policy.manual")
 	}
+	seenCandidates := make(map[string]struct{}, len(policy.Candidates))
 	for _, ref := range policy.Candidates {
 		if !validModelRef(ref) {
 			return validationError(CodeInvalidModel, "model_policy.candidates")
 		}
+		key := modelRefKey(ref)
+		if _, exists := seenCandidates[key]; exists {
+			return validationError(CodeInvalidModelPolicy, "model_policy.candidates")
+		}
+		seenCandidates[key] = struct{}{}
 	}
 	if policy.Mode == ModelManual && policy.Manual == nil {
 		return validationError(CodeInvalidModelPolicy, "model_policy.manual")
@@ -118,6 +125,9 @@ func ValidateModelPolicy(policy ModelPolicy) error {
 		return validationError(CodeInvalidModelPolicy, "model_policy.manual")
 	}
 	if policy.Mode == ModelOrderedFallback && len(policy.Candidates) == 0 {
+		return validationError(CodeInvalidModelPolicy, "model_policy.candidates")
+	}
+	if policy.Mode != ModelOrderedFallback && len(policy.Candidates) > 0 {
 		return validationError(CodeInvalidModelPolicy, "model_policy.candidates")
 	}
 	if err := validateProviderIDs(policy.AllowedProviders); err != nil {
@@ -135,6 +145,60 @@ func ValidateModelPolicy(policy ModelPolicy) error {
 	return nil
 }
 
+// RequiredCapabilitiesForModules derives generation-model requirements from an
+// Assistant's enabled modules.
+func RequiredCapabilitiesForModules(modules []ModuleID) []Capability {
+	seen := make(map[Capability]struct{})
+	result := make([]Capability, 0, len(modules))
+	add := func(capability Capability) {
+		if _, exists := seen[capability]; exists {
+			return
+		}
+		seen[capability] = struct{}{}
+		result = append(result, capability)
+	}
+	for _, module := range modules {
+		switch module {
+		case ModuleText:
+			add(CapabilityText)
+		case ModuleVision:
+			add(CapabilityImageInput)
+		case ModuleAudioInput:
+			add(CapabilityAudioInput)
+		case ModuleVideoInput:
+			add(CapabilityVideoInput)
+		case ModuleFileInput:
+			add(CapabilityFileInput)
+		case ModuleTools:
+			add(CapabilityToolCalling)
+		case ModuleStructuredOutput:
+			add(CapabilityStructuredOutput)
+		}
+	}
+	return result
+}
+
+// ResolveAssistantModels resolves model candidates while automatically applying
+// capability requirements implied by the Assistant's enabled modules.
+func ResolveAssistantModels(def AssistantDefinition, catalog []ModelDescriptor) ([]ModelRef, error) {
+	if err := ValidateAssistantDefinition(def); err != nil {
+		return nil, err
+	}
+	policy := def.ModelPolicy
+	seen := make(map[Capability]struct{}, len(policy.RequiredCapabilities))
+	for _, capability := range policy.RequiredCapabilities {
+		seen[capability] = struct{}{}
+	}
+	for _, capability := range RequiredCapabilitiesForModules(def.Modules) {
+		if _, exists := seen[capability]; exists {
+			continue
+		}
+		policy.RequiredCapabilities = append(policy.RequiredCapabilities, capability)
+		seen[capability] = struct{}{}
+	}
+	return ResolveModelCandidates(policy, catalog)
+}
+
 // ResolveModelCandidates returns a deterministic ordered list of eligible
 // generation models. Adapters/runtime own health checks and actual invocation.
 func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]ModelRef, error) {
@@ -146,7 +210,11 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 		if err := ValidateModelDescriptor(model); err != nil {
 			return nil, err
 		}
-		byRef[modelRefKey(model.Ref)] = model
+		key := modelRefKey(model.Ref)
+		if _, exists := byRef[key]; exists {
+			return nil, validationError(CodeInvalidModel, "catalog")
+		}
+		byRef[key] = model
 	}
 
 	switch policy.Mode {
@@ -204,8 +272,11 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 
 // ValidateModelDescriptor validates adapter-supplied catalog metadata.
 func ValidateModelDescriptor(model ModelDescriptor) error {
-	if !validModelRef(model.Ref) || !model.Access.Valid() || model.ContextWindow < 0 || model.MaxOutputTokens < 0 {
+	if !validModelRef(model.Ref) || !model.Access.Valid() || !utf8.ValidString(model.DisplayName) {
 		return validationError(CodeInvalidModel, "model")
+	}
+	if model.ContextWindow < 0 || model.ContextWindow > maxPortableJSONInteger || model.MaxOutputTokens < 0 || model.MaxOutputTokens > maxPortableJSONInteger {
+		return validationError(CodeInvalidModel, "model.limits")
 	}
 	if len(model.Roles) == 0 {
 		return validationError(CodeInvalidModel, "model.roles")
@@ -245,35 +316,70 @@ func modelEligible(model ModelDescriptor, policy ModelPolicy) bool {
 }
 
 func validModelRef(ref ModelRef) bool {
-	return validPortableID(string(ref.Provider), 128) && validPortableID(string(ref.Model), 256)
+	return validPortableID(string(ref.Provider), 128) && validOpaqueModelID(string(ref.Model), 256)
 }
 
-func modelRefKey(ref ModelRef) string { return string(ref.Provider) + "/" + string(ref.Model) }
+func validOpaqueModelID(value string, max int) bool {
+	if value == "" || len(value) > max || !utf8.ValidString(value) {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if value[i] < 0x21 || value[i] > 0x7e {
+			return false
+		}
+	}
+	return true
+}
+
+func modelRefKey(ref ModelRef) string {
+	return string(ref.Provider) + "/" + string(ref.Model)
+}
 
 func containsRole(values []ModelRole, target ModelRole) bool {
 	for _, value := range values {
-		if value == target { return true }
+		if value == target {
+			return true
+		}
 	}
 	return false
 }
+
 func containsProvider(values []ProviderID, target ProviderID) bool {
-	for _, value := range values { if value == target { return true } }
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
 	return false
 }
+
 func containsAccess(values []AccessTier, target AccessTier) bool {
-	for _, value := range values { if value == target { return true } }
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
 	return false
 }
+
 func containsCapability(values []Capability, target Capability) bool {
-	for _, value := range values { if value == target { return true } }
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
 	return false
 }
 
 func validateProviderIDs(values []ProviderID) error {
 	seen := map[ProviderID]struct{}{}
 	for _, value := range values {
-		if !validPortableID(string(value), 128) { return validationError(CodeInvalidModelPolicy, "allowed_providers") }
-		if _, ok := seen[value]; ok { return validationError(CodeInvalidModelPolicy, "allowed_providers") }
+		if !validPortableID(string(value), 128) {
+			return validationError(CodeInvalidModelPolicy, "allowed_providers")
+		}
+		if _, ok := seen[value]; ok {
+			return validationError(CodeInvalidModelPolicy, "allowed_providers")
+		}
 		seen[value] = struct{}{}
 	}
 	return nil
@@ -282,8 +388,12 @@ func validateProviderIDs(values []ProviderID) error {
 func validateAccessTiers(values []AccessTier) error {
 	seen := map[AccessTier]struct{}{}
 	for _, value := range values {
-		if !value.Valid() { return validationError(CodeInvalidModelPolicy, "access") }
-		if _, ok := seen[value]; ok { return validationError(CodeInvalidModelPolicy, "access") }
+		if !value.Valid() {
+			return validationError(CodeInvalidModelPolicy, "access")
+		}
+		if _, ok := seen[value]; ok {
+			return validationError(CodeInvalidModelPolicy, "access")
+		}
 		seen[value] = struct{}{}
 	}
 	return nil
