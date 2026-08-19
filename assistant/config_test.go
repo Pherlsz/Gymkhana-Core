@@ -21,12 +21,16 @@ func TestValidateAssistantDefinition(t *testing.T) {
 	assertAssistantCode(t, assistant.ValidateAssistantDefinition(duplicateModule), assistant.CodeDuplicateModule)
 
 	missingRetrievalModule := definition
-	missingRetrievalModule.Modules = []assistant.ModuleID{assistant.ModuleText}
+	missingRetrievalModule.Modules = []assistant.ModuleID{assistant.ModuleText, assistant.ModuleTools}
 	assertAssistantCode(t, assistant.ValidateAssistantDefinition(missingRetrievalModule), assistant.CodeInvalidAssistant)
 
 	badInstruction := definition
 	badInstruction.Instructions = []assistant.InstructionBlock{{Role: assistant.RoleUser, Text: "not allowed"}}
 	assertAssistantCode(t, assistant.ValidateAssistantDefinition(badInstruction), assistant.CodeInvalidAssistant)
+
+	memoryWithoutPolicy := definition
+	memoryWithoutPolicy.OptionalModules = []assistant.ModuleID{assistant.ModuleMemory}
+	assertAssistantCode(t, assistant.ValidateAssistantDefinition(memoryWithoutPolicy), assistant.CodeInvalidAssistant)
 }
 
 func TestValidateAssistantCatalog(t *testing.T) {
@@ -91,6 +95,33 @@ func TestResolveAssistantModels(t *testing.T) {
 	}
 }
 
+func TestModelIdentityDoesNotCollideOnSlash(t *testing.T) {
+	t.Parallel()
+
+	policy := assistant.ModelPolicy{Mode: assistant.ModelDynamic}
+	catalog := []assistant.ModelDescriptor{
+		{
+			Ref:          assistant.ModelRef{Provider: "a", Model: "b/c"},
+			Access:       assistant.AccessFree,
+			Roles:        []assistant.ModelRole{assistant.ModelRoleGeneration},
+			Capabilities: []assistant.Capability{assistant.CapabilityText},
+		},
+		{
+			Ref:          assistant.ModelRef{Provider: "a/b", Model: "c"},
+			Access:       assistant.AccessFree,
+			Roles:        []assistant.ModelRole{assistant.ModelRoleGeneration},
+			Capabilities: []assistant.Capability{assistant.CapabilityText},
+		},
+	}
+	resolved, err := assistant.ResolveModelCandidates(policy, catalog)
+	if err != nil {
+		t.Fatalf("ResolveModelCandidates = %v", err)
+	}
+	if len(resolved) != 2 || resolved[0] == resolved[1] {
+		t.Fatalf("collision in resolved models: %#v", resolved)
+	}
+}
+
 func TestManualModelSelection(t *testing.T) {
 	t.Parallel()
 
@@ -120,9 +151,19 @@ func TestCredentialAndRetrievalValidation(t *testing.T) {
 	if err := assistant.ValidateCredentialPolicy(credentials); err != nil {
 		t.Fatalf("ValidateCredentialPolicy = %v", err)
 	}
-	if err := assistant.ValidateCredentialRef(assistant.CredentialRef{Provider: "openai", Mode: assistant.CredentialBYOK, Reference: "session/key_01"}); err != nil {
+	validCredential := assistant.CredentialRef{
+		ID:        "key_01",
+		Provider:  "openai",
+		Mode:      assistant.CredentialBYOK,
+		Reference: "session:key_01",
+	}
+	if err := assistant.ValidateCredentialRef(validCredential); err != nil {
 		t.Fatalf("ValidateCredentialRef = %v", err)
 	}
+
+	rawLooking := validCredential
+	rawLooking.Reference = "bare-secret-token"
+	assertAssistantCode(t, assistant.ValidateCredentialRef(rawLooking), assistant.CodeInvalidCredential)
 
 	retrieval := validRetrievalPolicy()
 	if err := assistant.ValidateRetrievalPolicy(retrieval); err != nil {
@@ -149,6 +190,13 @@ func validAssistantDefinition() assistant.AssistantDefinition {
 		},
 		Skills: []assistant.Skill{assistant.BuiltinTokenEconomySkill()},
 		Tools:  []string{"search_docs"},
+		ToolPolicies: []assistant.ToolPolicy{{
+			Name:         "search_docs",
+			Effect:       assistant.ToolEffectReadOnly,
+			Confirmation: assistant.ToolConfirmNever,
+			ParallelSafe: true,
+			Idempotent:   true,
+		}},
 		ModelPolicy: assistant.ModelPolicy{
 			Mode:             assistant.ModelDynamic,
 			AllowedProviders: []assistant.ProviderID{"gateway"},
@@ -157,6 +205,7 @@ func validAssistantDefinition() assistant.AssistantDefinition {
 		},
 		Credentials: assistant.CredentialPolicy{AllowedModes: []assistant.CredentialMode{assistant.CredentialManaged, assistant.CredentialBYOK}},
 		Retrieval:   retrievalPolicyPtr(validRetrievalPolicy()),
+		Learning:    learningPolicyPtr(assistant.DefaultLearningPolicy()),
 		Budget: assistant.ExecutionBudget{
 			MaxTurns:           8,
 			MaxToolCalls:       12,
@@ -180,6 +229,10 @@ func validRetrievalPolicy() assistant.RetrievalPolicy {
 }
 
 func retrievalPolicyPtr(value assistant.RetrievalPolicy) *assistant.RetrievalPolicy {
+	return &value
+}
+
+func learningPolicyPtr(value assistant.LearningPolicy) *assistant.LearningPolicy {
 	return &value
 }
 
