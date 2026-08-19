@@ -3,8 +3,8 @@ package normalize
 import "strings"
 
 type labeledRule struct {
-	label    string
-	needles  []string
+	label   string
+	needles []string
 }
 
 var teamPhrases = []labeledRule{
