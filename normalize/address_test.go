@@ -72,6 +72,8 @@ func TestFormatBlock(t *testing.T) {
 		{"bloco A", "bl. A"},
 		{"bl. A", "bl. A"},
 		{"blc 2", "bl. 2"},
+		{"b.l", "bl. BL"},
+		{"bl. BL", "bl. BL"},
 		{"bloco", ""},
 	}
 	for _, test := range tests {
@@ -99,6 +101,8 @@ func TestFormatApartment(t *testing.T) {
 		{"ap 7B", "apt. 7B"},
 		{"apt. 202", "apt. 202"},
 		{"aptº 101", "apt. 101"},
+		{"a.p", "apt. AP"},
+		{"apt. AP", "apt. AP"},
 		{"apartamento", ""},
 	}
 	for _, test := range tests {
