@@ -1,6 +1,7 @@
 package portablejson_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -26,7 +27,7 @@ func FuzzValue(f *testing.F) {
 			return
 		}
 		var decoded any
-		decoder := json.NewDecoder(bytesReader(raw))
+		decoder := json.NewDecoder(bytes.NewReader(raw))
 		decoder.UseNumber()
 		if err := decoder.Decode(&decoded); err != nil {
 			t.Fatalf("portable value failed standard JSON decode: %v", err)
@@ -55,24 +56,4 @@ func FuzzSchema(f *testing.F) {
 			t.Fatalf("valid portable schema is not a JSON object: %v", err)
 		}
 	})
-}
-
-// bytesReader keeps fuzz fixtures allocation-local without exporting any helper
-// from portablejson.
-func bytesReader(raw []byte) *reader {
-	return &reader{raw: raw}
-}
-
-type reader struct {
-	raw []byte
-	off int
-}
-
-func (r *reader) Read(dst []byte) (int, error) {
-	if r.off >= len(r.raw) {
-		return 0, io.EOF
-	}
-	n := copy(dst, r.raw[r.off:])
-	r.off += n
-	return n, nil
 }
