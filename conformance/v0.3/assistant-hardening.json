@@ -90,6 +90,7 @@
       "name": "validate provider quota observation",
       "operation": "assistant.quota.validate",
       "input": {
+        "provider": "openai",
         "credential": {"id": "key_01", "provider": "openai", "mode": "byok", "quota_scope": "project:primary"},
         "known": true,
         "limits": [{"dimension": "total_tokens", "limit": 1000, "used": 250, "remaining": 750, "window_seconds": 60}]
