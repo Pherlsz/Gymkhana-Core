@@ -82,7 +82,21 @@ func FormatHouseNumber(value string) string {
 		}
 		return "", false
 	})
-	return Alphanumeric(strings.Join(fields, ""))
+
+	canonical := Alphanumeric(strings.Join(fields, ""))
+	if canonical == "" {
+		return ""
+	}
+
+	// Never emit a value that a subsequent pass interprets as an empty marker
+	// or a standalone number label. Punctuation can otherwise bypass the label
+	// peeler (for example "n!" -> "N") and violate the formatter's idempotency
+	// contract on the next pass.
+	canonicalKey := SearchText(canonical)
+	if houseNumberEmpty[canonicalKey] || houseNumberLabels[canonicalKey] {
+		return ""
+	}
+	return canonical
 }
 
 // FormatBlock returns "bl. A" from bloco/bl/blc variants, or empty.
