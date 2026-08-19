@@ -51,7 +51,7 @@ func TestValidateConversationToolLifecycle(t *testing.T) {
 				ToolCall: &assistant.ToolCall{
 					ID:        "call_01",
 					Name:      "lookup_weather",
-					Arguments: json.RawMessage(`{"city":"Porto Alegre"}`),
+					Arguments: json.RawMessage(`{\"city\":\"Porto Alegre\"}`),
 				},
 			}},
 		},
@@ -116,7 +116,7 @@ func TestValidateGenerationExchangeToolAllowlist(t *testing.T) {
 	response := assistant.GenerationResponse{
 		Model: assistant.ModelRef{Provider: "openai", Model: "model/latest"},
 		Message: assistant.Message{Role: assistant.RoleAssistant, Content: []assistant.ContentPart{{
-			Type: assistant.PartToolCall,
+			Type:     assistant.PartToolCall,
 			ToolCall: &assistant.ToolCall{ID: "call_01", Name: "lookup_weather", Arguments: json.RawMessage("{}")},
 		}}},
 		FinishReason: assistant.FinishToolCalls,
