@@ -66,6 +66,8 @@ func TestValidateConversationToolLifecycle(t *testing.T) {
 			}},
 		},
 	}
+	// Construct the argument object without raw-string escaping ambiguity.
+	messages[1].Content[0].ToolCall.Arguments = json.RawMessage("{\"city\":\"Porto Alegre\"}")
 	if err := assistant.ValidateConversation(messages); err != nil {
 		t.Fatalf("ValidateConversation(valid) = %v", err)
 	}
