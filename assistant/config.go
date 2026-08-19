@@ -36,27 +36,31 @@ type InstructionBlock struct {
 // AssistantDefinition describes one reusable Assistant profile. Modules are
 // enabled by default; OptionalModules are available for explicit per-run enablement.
 type AssistantDefinition struct {
-	ID              string             `json:"id"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description,omitempty"`
-	Instructions    []InstructionBlock `json:"instructions,omitempty"`
-	Modules         []ModuleID         `json:"modules"`
-	OptionalModules []ModuleID         `json:"optional_modules,omitempty"`
-	Skills          []Skill            `json:"skills,omitempty"`
-	Tools           []string           `json:"tools,omitempty"`
-	ModelPolicy     ModelPolicy        `json:"model_policy"`
-	Credentials     CredentialPolicy   `json:"credentials"`
-	Retrieval       *RetrievalPolicy   `json:"retrieval,omitempty"`
-	Budget          ExecutionBudget    `json:"budget,omitempty"`
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description,omitempty"`
+	Instructions    []InstructionBlock     `json:"instructions,omitempty"`
+	Modules         []ModuleID             `json:"modules"`
+	OptionalModules []ModuleID             `json:"optional_modules,omitempty"`
+	Skills          []Skill                `json:"skills,omitempty"`
+	Tools           []string               `json:"tools,omitempty"`
+	ToolPolicies    []ToolPolicy           `json:"tool_policies,omitempty"`
+	ModelPolicy     ModelPolicy            `json:"model_policy"`
+	Credentials     CredentialPolicy       `json:"credentials"`
+	RoutingFallback *RoutingFallbackPolicy `json:"routing_fallback,omitempty"`
+	Retrieval       *RetrievalPolicy       `json:"retrieval,omitempty"`
+	Memory          *MemoryPolicy          `json:"memory,omitempty"`
+	Learning        *LearningPolicy        `json:"learning,omitempty"`
+	Budget          ExecutionBudget        `json:"budget,omitempty"`
 }
 
 // ExecutionBudget bounds potentially expensive multi-step behavior. Zero means
 // the consumer/runtime default; Core never interprets zero as unbounded.
 type ExecutionBudget struct {
-	MaxTurns           int `json:"max_turns,omitempty"`
-	MaxToolCalls       int `json:"max_tool_calls,omitempty"`
-	MaxRetrievalRounds int `json:"max_retrieval_rounds,omitempty"`
-	MaxOutputTokens    int `json:"max_output_tokens,omitempty"`
+	MaxTurns           int64 `json:"max_turns,omitempty"`
+	MaxToolCalls       int64 `json:"max_tool_calls,omitempty"`
+	MaxRetrievalRounds int64 `json:"max_retrieval_rounds,omitempty"`
+	MaxOutputTokens    int64 `json:"max_output_tokens,omitempty"`
 }
 
 // AssistantCatalog is a portable collection of independently configured
@@ -67,7 +71,7 @@ type AssistantCatalog struct {
 
 // ValidateAssistantDefinition validates one reusable Assistant profile.
 func ValidateAssistantDefinition(def AssistantDefinition) error {
-	if !validPortableID(def.ID, 128) || def.Name == "" || !utf8.ValidString(def.Name) || !utf8.ValidString(def.Description) {
+	if !validPortableID(def.ID, 128) || def.Name == "" || !utf8.ValidString(def.Name) || utf8.RuneCountInString(def.Name) > 256 || !utf8.ValidString(def.Description) || utf8.RuneCountInString(def.Description) > 4096 {
 		return validationError(CodeInvalidAssistant, "assistant")
 	}
 	if len(def.Modules) == 0 {
@@ -107,11 +111,31 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 	if len(def.Tools) > 0 && !moduleEnabled(allModules, ModuleTools) {
 		return validationError(CodeInvalidAssistant, "tools")
 	}
+	if err := ValidateToolPolicies(def.Tools, def.ToolPolicies); err != nil {
+		return err
+	}
 	if def.Retrieval != nil {
 		if !moduleEnabled(allModules, ModuleRetrieval) {
 			return validationError(CodeInvalidAssistant, "retrieval")
 		}
 		if err := ValidateRetrievalPolicy(*def.Retrieval); err != nil {
+			return err
+		}
+	} else if moduleEnabled(allModules, ModuleRetrieval) {
+		return validationError(CodeInvalidAssistant, "retrieval")
+	}
+	if def.Memory != nil {
+		if !moduleEnabled(allModules, ModuleMemory) {
+			return validationError(CodeInvalidAssistant, "memory")
+		}
+		if err := ValidateMemoryPolicy(*def.Memory); err != nil {
+			return err
+		}
+	} else if moduleEnabled(allModules, ModuleMemory) {
+		return validationError(CodeInvalidAssistant, "memory")
+	}
+	if def.Learning != nil {
+		if err := ValidateLearningPolicy(*def.Learning); err != nil {
 			return err
 		}
 	}
@@ -121,8 +145,16 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 	if err := ValidateCredentialPolicy(def.Credentials); err != nil {
 		return err
 	}
-	if def.Budget.MaxTurns < 0 || def.Budget.MaxToolCalls < 0 || def.Budget.MaxRetrievalRounds < 0 || def.Budget.MaxOutputTokens < 0 {
-		return validationError(CodeInvalidAssistant, "budget")
+	if def.RoutingFallback != nil {
+		if err := ValidateRoutingFallbackPolicy(*def.RoutingFallback); err != nil {
+			return err
+		}
+	}
+	budgetValues := [...]int64{def.Budget.MaxTurns, def.Budget.MaxToolCalls, def.Budget.MaxRetrievalRounds, def.Budget.MaxOutputTokens}
+	for _, value := range budgetValues {
+		if value < 0 || value > maxPortableJSONInteger {
+			return validationError(CodeInvalidAssistant, "budget")
+		}
 	}
 	return nil
 }
