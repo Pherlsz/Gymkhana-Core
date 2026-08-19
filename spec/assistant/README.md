@@ -95,6 +95,29 @@ Portable capability identifiers are:
 
 A capability set contains no duplicates. Capability discovery itself is adapter/application-owned; Core only defines portable names.
 
+## Built-in skills
+
+Assistant skills are versioned provider-neutral behavior profiles. They are not provider prompts, authorization rules, hidden chain-of-thought instructions, or model-specific configuration objects. A provider adapter may realize a skill through native settings, context construction, concise instructions, or a combination of those mechanisms, but the observable intent must remain portable.
+
+Spec `0.3` defines one built-in skill:
+
+### `token_economy/v1`
+
+The canonical token-economy profile enables these behaviors:
+
+- `prefer_concise_responses` — prefer the shortest complete answer that satisfies the request;
+- `avoid_restatement` — do not repeat user input, already-established decisions, or prior output unless repetition is needed for correctness;
+- `reuse_prior_context` — reference stable prior context instead of duplicating it when the consumer/provider can preserve the reference safely;
+- `compact_tool_results` — when the consumer controls tool-result projection, include only fields needed for the current task rather than forwarding irrelevant payload;
+- `preserve_instruction_hierarchy` — token reduction must never weaken or remove higher-authority instructions;
+- `preserve_unresolved_constraints` — compaction must retain unresolved requirements, decisions, identifiers, error conditions, and other state still needed to complete the task.
+
+The last two properties are mandatory for every valid `token_economy/v1` profile. At least one of the four optimization properties must be enabled.
+
+The skill does **not** define a universal tokenizer, exact input-token estimator, lossy summarizer, automatic message deletion policy, or guaranteed token-savings percentage. Tokenization differs by provider/model, and deleting/summarizing context without application knowledge can change semantics. Consumers that perform context compaction remain responsible for preserving instruction authority, tool-call/result linkage, required evidence, and unresolved constraints.
+
+`BuiltinTokenEconomySkill`/equivalent language APIs return the canonical profile with every defined behavior enabled. `BuiltinSkills`/equivalent language APIs include this skill by default. Consumers may explicitly select a narrower skill set, but a modified profile must still satisfy the safety-preservation invariants above.
+
 ## Stable errors
 
 Assistant validation uses stable, non-localized codes:
@@ -111,7 +134,9 @@ Assistant validation uses stable, non-localized codes:
 - `invalid_finish_reason`;
 - `invalid_usage`;
 - `invalid_capability`;
-- `duplicate_capability`.
+- `duplicate_capability`;
+- `invalid_skill`;
+- `duplicate_skill`.
 
 Errors must not embed prompt text, tool arguments, tool results, URIs, or other sensitive original values.
 
