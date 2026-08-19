@@ -1,8 +1,8 @@
 # Error semantics
 
-Core errors are stable, structured, and non-localized. Implementations may wrap them in idiomatic error types, exceptions, results, or discriminated unions, but must preserve the semantic code.
+Core errors are stable, structured, and non-localized. Implementations may wrap them in idiomatic error types, exceptions, result values, or discriminated unions, but must preserve the semantic code required by the specification.
 
-Initial validation codes:
+Common validation codes currently include:
 
 - `empty`
 - `invalid_format`
@@ -10,4 +10,8 @@ Initial validation codes:
 - `invalid_checksum`
 - `unknown_kind`
 
-Errors must not embed sensitive original input values. Human-facing localization belongs to consuming applications.
+Domain-specific specifications may define additional stable codes when a generic code would lose useful semantics. Current examples include temporal codes such as `invalid_year`, `invalid_month`, `invalid_day`, `zero_value`, and `out_of_range`, and normalization codes such as `invalid_area_code`, `invalid_number`, `missing_state`, `invalid_state`, and `ambiguous`.
+
+A code's meaning belongs to the specification area that defines it. New implementations must not compare localized message text to determine error behavior.
+
+Errors must not embed sensitive original input values. Human-facing localization, HTTP status mapping, logging policy, and product copy belong to consuming applications.
