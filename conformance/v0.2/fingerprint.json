@@ -15,6 +15,12 @@
       "output": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
+      "name": "sha256 UTF-8 text",
+      "operation": "fingerprint.sha256.text",
+      "input": "João",
+      "output": "9c48393460d7a004f5d12abed54f76afcb21c0a18a5c22e48f44b2b14acb2f9d"
+    },
+    {
       "name": "framed text portable vector",
       "operation": "fingerprint.sha256.framed_text",
       "input": {
@@ -22,6 +28,15 @@
         "parts": ["alpha", "beta"]
       },
       "output": "8f92cbf0d8c72b614311eadbf43c8842fc53e77f5a3943448db7a1f12ea470fd"
+    },
+    {
+      "name": "framed UTF-8 text",
+      "operation": "fingerprint.sha256.framed_text",
+      "input": {
+        "namespace": "unicode/v1",
+        "parts": ["João", "東京"]
+      },
+      "output": "c2d8a1218f73684c6d25558ceb90a5415514bc3c90edebcebee144402239a5e1"
     },
     {
       "name": "framing preserves first part boundary",
