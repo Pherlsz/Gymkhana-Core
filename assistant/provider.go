@@ -3,6 +3,7 @@ package assistant
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"sync"
 	"unicode/utf8"
@@ -54,12 +55,18 @@ type ProviderAdapter interface {
 	Generate(ctx context.Context, request GenerationRequest) (GenerationResponse, error)
 }
 
+// FailureClassifier is an optional adapter capability that maps vendor/transport
+// errors to portable fallback semantics. It must never classify an auth/safety/
+// invalid-request failure as a transient operational error merely to force retry.
+type FailureClassifier interface {
+	ClassifyFailure(err error) FailureClass
+}
+
 // QuotaProvider is an optional adapter capability. Provider quotas are queried
-// for a credential/quota scope and optional model; Assistant attribution is a
-// separate local UsageLedger concern because provider quotas are often applied
-// to projects/accounts rather than individual API keys or Assistant profiles.
+// for an optional credential/quota scope and optional model; Assistant usage
+// attribution is a separate local UsageLedger concern.
 type QuotaProvider interface {
-	Quota(ctx context.Context, credential CredentialRef, model *ModelRef) (QuotaState, error)
+	Quota(ctx context.Context, credential *CredentialRef, model *ModelRef) (QuotaState, error)
 }
 
 // AdapterRegistry stores provider adapters for one runtime.
@@ -107,6 +114,33 @@ func (registry *AdapterRegistry) Providers() []ProviderID {
 	return result
 }
 
+// ClassifyFailure maps an adapter error to portable fallback semantics. Context
+// cancellation/deadline are recognized centrally before consulting an adapter.
+func (registry *AdapterRegistry) ClassifyFailure(provider ProviderID, err error) FailureClass {
+	if err == nil {
+		return FailureUnknown
+	}
+	if errors.Is(err, context.Canceled) {
+		return FailureCancelled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return FailureTimeout
+	}
+	adapter, ok := registry.Get(provider)
+	if !ok {
+		return FailureUnknown
+	}
+	classifier, ok := adapter.(FailureClassifier)
+	if !ok {
+		return FailureUnknown
+	}
+	class := classifier.ClassifyFailure(err)
+	if !class.Valid() {
+		return FailureUnknown
+	}
+	return class
+}
+
 // ListModels calls one adapter through the validated Core boundary and rejects
 // catalog entries that claim a different provider or duplicate model identity.
 func (registry *AdapterRegistry) ListModels(ctx context.Context, provider ProviderID, credential *CredentialRef) ([]ModelDescriptor, error) {
@@ -130,6 +164,9 @@ func (registry *AdapterRegistry) ListModels(ctx context.Context, provider Provid
 	if err != nil {
 		return nil, err
 	}
+	if len(models) > maxModelCatalog {
+		return nil, validationError(CodeInvalidModel, "catalog")
+	}
 	seen := make(map[ModelRef]struct{}, len(models))
 	for _, model := range models {
 		if err := ValidateModelDescriptor(model); err != nil {
@@ -146,9 +183,7 @@ func (registry *AdapterRegistry) ListModels(ctx context.Context, provider Provid
 	return models, nil
 }
 
-// Generate invokes the selected provider through a validated boundary. Direct
-// adapter calls remain possible for low-level integrations, but consumers that
-// want Core invariants should prefer this method.
+// Generate invokes the selected provider through a validated boundary.
 func (registry *AdapterRegistry) Generate(ctx context.Context, request GenerationRequest) (GenerationResponse, error) {
 	if err := ValidateGenerationRequest(request); err != nil {
 		return GenerationResponse{}, err
@@ -178,11 +213,55 @@ func (registry *AdapterRegistry) Generate(ctx context.Context, request Generatio
 	return response, nil
 }
 
+// Quota invokes the optional normalized quota capability for a provider.
+func (registry *AdapterRegistry) Quota(ctx context.Context, provider ProviderID, credential *CredentialRef, model *ModelRef) (QuotaState, error) {
+	adapter, ok := registry.Get(provider)
+	if !ok {
+		return QuotaState{}, validationError(CodeInvalidProvider, "provider")
+	}
+	descriptor := adapter.Descriptor()
+	if err := ValidateProviderDescriptor(descriptor); err != nil || descriptor.ID != provider {
+		return QuotaState{}, validationError(CodeInvalidProvider, "provider")
+	}
+	if credential != nil {
+		if err := ValidateCredentialRef(*credential); err != nil {
+			return QuotaState{}, err
+		}
+		if credential.Provider != provider || !providerAllowsCredential(descriptor, credential.Mode) {
+			return QuotaState{}, validationError(CodeInvalidCredential, "credential")
+		}
+	}
+	if model != nil && (!validModelRef(*model) || model.Provider != provider) {
+		return QuotaState{}, validationError(CodeInvalidModel, "quota.model")
+	}
+	quotaAdapter, ok := adapter.(QuotaProvider)
+	if !ok {
+		return QuotaState{}, validationError(CodeUnsupportedCapability, "quota")
+	}
+	state, err := quotaAdapter.Quota(ctx, credential, model)
+	if err != nil {
+		return QuotaState{}, err
+	}
+	if err := ValidateQuotaState(state); err != nil {
+		return QuotaState{}, err
+	}
+	if state.Provider != provider {
+		return QuotaState{}, validationError(CodeInvalidQuota, "quota.provider")
+	}
+	if credential != nil && state.Credential != nil && *state.Credential != credential.Identity() {
+		return QuotaState{}, validationError(CodeInvalidQuota, "quota.credential")
+	}
+	if model != nil && state.Model != nil && *state.Model != *model {
+		return QuotaState{}, validationError(CodeInvalidQuota, "quota.model")
+	}
+	return state, nil
+}
+
 func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
 	if !validPortableID(string(descriptor.ID), 128) || !utf8.ValidString(descriptor.DisplayName) || utf8.RuneCountInString(descriptor.DisplayName) > 256 {
 		return validationError(CodeInvalidProvider, "provider")
 	}
-	if len(descriptor.CredentialModes) == 0 {
+	if len(descriptor.CredentialModes) == 0 || len(descriptor.CredentialModes) > 3 {
 		return validationError(CodeEmpty, "provider.credential_modes")
 	}
 	seen := make(map[CredentialMode]struct{}, len(descriptor.CredentialModes))
@@ -201,6 +280,9 @@ func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
 func ValidateGenerationRequest(request GenerationRequest) error {
 	if !validModelRef(request.Model) {
 		return validationError(CodeInvalidProvider, "generation_request.model")
+	}
+	if len(request.Messages) > 4096 || len(request.Tools) > 256 {
+		return validationError(CodeInvalidProvider, "generation_request")
 	}
 	if err := ValidateConversation(request.Messages); err != nil {
 		return err
