@@ -2,6 +2,8 @@
 // validation primitives shared by Core domains.
 package portablejson
 
+import "errors"
+
 // ErrorCode is a stable, non-localized portable JSON validation code.
 type ErrorCode string
 
@@ -27,10 +29,10 @@ func (err *ValidationError) Error() string {
 	return err.Field + ": " + string(err.Code)
 }
 
-// IsCode reports whether err is a portablejson ValidationError with code.
+// IsCode reports whether err contains a portablejson ValidationError with code.
 func IsCode(err error, code ErrorCode) bool {
-	validation, ok := err.(*ValidationError)
-	return ok && validation.Code == code
+	var validation *ValidationError
+	return errors.As(err, &validation) && validation.Code == code
 }
 
 func validationError(code ErrorCode, field string) error {
