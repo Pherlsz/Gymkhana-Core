@@ -22,8 +22,8 @@
       "required": ["uri"],
       "properties": {
         "uri": {"type": "string", "minLength": 1},
-        "media_type": {"type": "string", "minLength": 1},
-        "name": {"type": "string", "minLength": 1}
+        "media_type": {"type": "string"},
+        "name": {"type": "string"}
       }
     },
     "ToolDefinition": {
