@@ -6,18 +6,18 @@ package assistant
 type FailureClass string
 
 const (
-	FailureAuth          FailureClass = "auth"
-	FailureRateLimit     FailureClass = "rate_limit"
-	FailureQuota         FailureClass = "quota"
-	FailureTimeout       FailureClass = "timeout"
-	FailureUnavailable   FailureClass = "unavailable"
-	FailureNetwork       FailureClass = "network"
-	FailureContextLimit  FailureClass = "context_limit"
-	FailureUnsupported   FailureClass = "unsupported_capability"
-	FailureSafety        FailureClass = "safety"
-	FailureInvalid       FailureClass = "invalid_request"
-	FailureCancelled     FailureClass = "cancelled"
-	FailureUnknown       FailureClass = "unknown"
+	FailureAuth         FailureClass = "auth"
+	FailureRateLimit    FailureClass = "rate_limit"
+	FailureQuota        FailureClass = "quota"
+	FailureTimeout      FailureClass = "timeout"
+	FailureUnavailable  FailureClass = "unavailable"
+	FailureNetwork      FailureClass = "network"
+	FailureContextLimit FailureClass = "context_limit"
+	FailureUnsupported  FailureClass = "unsupported_capability"
+	FailureSafety       FailureClass = "safety"
+	FailureInvalid      FailureClass = "invalid_request"
+	FailureCancelled    FailureClass = "cancelled"
+	FailureUnknown      FailureClass = "unknown"
 )
 
 func (class FailureClass) Valid() bool {
@@ -36,10 +36,6 @@ type CredentialFallbackPolicy struct {
 	SkipSameQuotaScope bool           `json:"skip_same_quota_scope"`
 }
 
-// DefaultCredentialFallbackPolicy advances only for quota/rate-limit exhaustion
-// and skips credentials known to share the same provider quota scope. This is
-// important for providers whose limits apply to a project/account rather than
-// independently to every API key.
 func DefaultCredentialFallbackPolicy() CredentialFallbackPolicy {
 	return CredentialFallbackPolicy{
 		On:                 []FailureClass{FailureQuota, FailureRateLimit},
@@ -52,23 +48,17 @@ func ValidateCredentialFallbackPolicy(policy CredentialFallbackPolicy) error {
 }
 
 func (policy CredentialFallbackPolicy) Allows(class FailureClass) bool {
-	for _, allowed := range policy.On {
-		if allowed == class {
-			return true
-		}
-	}
-	return false
+	return failureSetContains(policy.On, class)
 }
 
 // RoutingFallbackPolicy bounds automatic model/provider failover. It does not
-// authorize bypassing safety/auth/invalid-request failures.
+// authorize bypassing safety/auth/invalid-request/cancelled failures.
 type RoutingFallbackPolicy struct {
 	ModelOn     []FailureClass `json:"model_on,omitempty"`
 	ProviderOn  []FailureClass `json:"provider_on,omitempty"`
 	MaxAttempts int64          `json:"max_attempts,omitempty"`
 }
 
-// DefaultRoutingFallbackPolicy allows failover only for operational failures.
 func DefaultRoutingFallbackPolicy() RoutingFallbackPolicy {
 	return RoutingFallbackPolicy{
 		ModelOn: []FailureClass{
@@ -101,6 +91,12 @@ func ValidateRoutingFallbackPolicy(policy RoutingFallbackPolicy) error {
 	if policy.MaxAttempts < 0 || policy.MaxAttempts > maxPortableJSONInteger {
 		return validationError(CodeInvalidModelPolicy, "routing_fallback.max_attempts")
 	}
+	for _, class := range append(append([]FailureClass{}, policy.ModelOn...), policy.ProviderOn...) {
+		switch class {
+		case FailureAuth, FailureSafety, FailureInvalid, FailureCancelled:
+			return validationError(CodeInvalidModelPolicy, "routing_fallback")
+		}
+	}
 	return nil
 }
 
@@ -110,6 +106,47 @@ func (policy RoutingFallbackPolicy) AllowsModel(class FailureClass) bool {
 
 func (policy RoutingFallbackPolicy) AllowsProvider(class FailureClass) bool {
 	return failureSetContains(policy.ProviderOn, class)
+}
+
+// NextModelCandidate advances an already-resolved deterministic candidate list.
+// `attempts` is the number of provider invocations already made for this run.
+// A zero MaxAttempts uses the Core default rather than meaning unlimited.
+func NextModelCandidate(candidates []ModelRef, current int, attempts int64, failure FailureClass, policy RoutingFallbackPolicy) (ModelRef, int, error) {
+	if len(candidates) == 0 || current < -1 || current >= len(candidates) || attempts < 0 {
+		return ModelRef{}, -1, validationError(CodeModelUnavailable, "routing")
+	}
+	if err := ValidateRoutingFallbackPolicy(policy); err != nil {
+		return ModelRef{}, -1, err
+	}
+	for _, candidate := range candidates {
+		if !validModelRef(candidate) {
+			return ModelRef{}, -1, validationError(CodeInvalidModel, "routing.candidates")
+		}
+	}
+	maxAttempts := policy.MaxAttempts
+	if maxAttempts == 0 {
+		maxAttempts = DefaultRoutingFallbackPolicy().MaxAttempts
+	}
+	if attempts >= maxAttempts {
+		return ModelRef{}, -1, validationError(CodeModelUnavailable, "routing.attempts")
+	}
+	if current == -1 {
+		return candidates[0], 0, nil
+	}
+	if !failure.Valid() {
+		return ModelRef{}, -1, validationError(CodeModelUnavailable, "routing.failure")
+	}
+	currentProvider := candidates[current].Provider
+	for next := current + 1; next < len(candidates); next++ {
+		sameProvider := candidates[next].Provider == currentProvider
+		if sameProvider && policy.AllowsModel(failure) {
+			return candidates[next], next, nil
+		}
+		if !sameProvider && policy.AllowsProvider(failure) {
+			return candidates[next], next, nil
+		}
+	}
+	return ModelRef{}, -1, validationError(CodeModelUnavailable, "routing")
 }
 
 func validateFailureSet(values []FailureClass, field string) error {
