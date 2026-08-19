@@ -66,6 +66,7 @@ fuzz-smoke:
 	@$(GO) test -run='^$$' -fuzz='^FuzzParseCivilDate$$' -fuzztime=2s -timeout=30s -parallel=1 ./civiltime
 	@$(GO) test -run='^$$' -fuzz='^FuzzParseYearMonth$$' -fuzztime=2s -timeout=30s -parallel=1 ./civiltime
 	@$(GO) test -run='^$$' -fuzz='^FuzzFingerprintParse$$' -fuzztime=2s -timeout=30s -parallel=1 ./fingerprint
+	@$(GO) test -run='^$$' -fuzz='^FuzzAssistantMessageJSON$$' -fuzztime=2s -timeout=30s -parallel=1 ./assistant
 
 vuln:
 	@"$(GOVULNCHECK)" ./...
