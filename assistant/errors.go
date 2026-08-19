@@ -24,10 +24,19 @@ const (
 	CodeDuplicateCapability ErrorCode = "duplicate_capability"
 	CodeInvalidSkill        ErrorCode = "invalid_skill"
 	CodeDuplicateSkill      ErrorCode = "duplicate_skill"
+	CodeInvalidAssistant    ErrorCode = "invalid_assistant"
+	CodeDuplicateAssistant  ErrorCode = "duplicate_assistant"
+	CodeInvalidModule       ErrorCode = "invalid_module"
+	CodeDuplicateModule     ErrorCode = "duplicate_module"
+	CodeInvalidModel        ErrorCode = "invalid_model"
+	CodeInvalidModelPolicy  ErrorCode = "invalid_model_policy"
+	CodeModelUnavailable    ErrorCode = "model_unavailable"
+	CodeInvalidCredential   ErrorCode = "invalid_credential"
+	CodeInvalidRetrieval    ErrorCode = "invalid_retrieval"
 )
 
 // ValidationError intentionally contains no original prompt, arguments, URI,
-// or other user/provider data.
+// credential material, or other user/provider data.
 type ValidationError struct {
 	Code  ErrorCode
 	Field string
