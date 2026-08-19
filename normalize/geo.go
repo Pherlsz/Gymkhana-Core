@@ -51,7 +51,7 @@ var neighborhoodAliases = map[string]string{
 	"bella vista": "Bela Vista", "bela vista": "Bela Vista",
 	"sao thomas": "São Thomas", "sao tomas": "São Tomás",
 	"sao jose": "São José", "sao francisco": "São Francisco",
-	"sa o miguel":              "São Miguel",
+	"sao miguel":              "São Miguel",
 	"nossa senhora aparecida": "Nossa Senhora Aparecida",
 	"passo d areia":           "Passo d'Areia", "passo da areia": "Passo d'Areia",
 	"cidade alta": "Cidade Alta", "cidade baixa": "Cidade Baixa",
