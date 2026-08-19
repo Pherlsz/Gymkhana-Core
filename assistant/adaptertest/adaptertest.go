@@ -173,26 +173,26 @@ func Run(t *testing.T, config Config) {
 
 func validateConfig(config Config) error {
 	if config.Adapter == nil {
-		return errors.New("Adapter is required")
+		return errors.New("adapter is required")
 	}
 	if config.Model.Provider == "" || config.Model.Model == "" {
-		return errors.New("Model is required")
+		return errors.New("model is required")
 	}
 	if config.Timeout < 0 {
-		return errors.New("Timeout must not be negative")
+		return errors.New("timeout must not be negative")
 	}
 	if config.Credential != nil {
 		if err := assistant.ValidateCredentialRef(*config.Credential); err != nil {
-			return fmt.Errorf("Credential: %w", err)
+			return fmt.Errorf("credential: %w", err)
 		}
 		if config.Credential.Provider != config.Model.Provider {
-			return errors.New("Credential provider must match Model provider")
+			return errors.New("credential provider must match model provider")
 		}
 	}
 	seenProbeNames := make(map[string]struct{}, len(config.Probes))
 	for _, probe := range config.Probes {
 		if probe.Name == "" {
-			return errors.New("Probe.Name is required")
+			return errors.New("probe.Name is required")
 		}
 		if _, duplicate := seenProbeNames[probe.Name]; duplicate {
 			return fmt.Errorf("duplicate Probe.Name %q", probe.Name)
@@ -200,34 +200,34 @@ func validateConfig(config Config) error {
 		seenProbeNames[probe.Name] = struct{}{}
 		for _, capability := range probe.RequiredCapabilities {
 			if !capability.Valid() {
-				return fmt.Errorf("Probe %q has invalid capability %q", probe.Name, capability)
+				return fmt.Errorf("probe %q has invalid capability %q", probe.Name, capability)
 			}
 		}
 	}
 	if config.ProbeQuota {
 		if _, ok := config.Adapter.(assistant.QuotaProvider); !ok {
-			return errors.New("ProbeQuota requires assistant.QuotaProvider")
+			return errors.New("probeQuota requires assistant.QuotaProvider")
 		}
 	}
 	if len(config.FailureProbes) > 0 {
 		if _, ok := config.Adapter.(assistant.FailureClassifier); !ok {
-			return errors.New("FailureProbes require assistant.FailureClassifier")
+			return errors.New("failureProbes require assistant.FailureClassifier")
 		}
 	}
 	seenFailureNames := make(map[string]struct{}, len(config.FailureProbes))
 	for _, probe := range config.FailureProbes {
 		if probe.Name == "" {
-			return errors.New("FailureProbe.Name is required")
+			return errors.New("failureProbe.Name is required")
 		}
 		if _, duplicate := seenFailureNames[probe.Name]; duplicate {
 			return fmt.Errorf("duplicate FailureProbe.Name %q", probe.Name)
 		}
 		seenFailureNames[probe.Name] = struct{}{}
 		if probe.Err == nil {
-			return fmt.Errorf("FailureProbe %q requires Err", probe.Name)
+			return fmt.Errorf("failureProbe %q requires Err", probe.Name)
 		}
 		if !probe.Want.Valid() {
-			return fmt.Errorf("FailureProbe %q has invalid Want %q", probe.Name, probe.Want)
+			return fmt.Errorf("failureProbe %q has invalid Want %q", probe.Name, probe.Want)
 		}
 	}
 	return nil
