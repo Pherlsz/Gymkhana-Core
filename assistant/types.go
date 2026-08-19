@@ -29,6 +29,8 @@ type PartType string
 const (
 	PartText       PartType = "text"
 	PartImage      PartType = "image"
+	PartAudio      PartType = "audio"
+	PartVideo      PartType = "video"
 	PartFile       PartType = "file"
 	PartToolCall   PartType = "tool_call"
 	PartToolResult PartType = "tool_result"
@@ -74,7 +76,7 @@ type ToolCall struct {
 }
 
 // ToolResult is the result of a prior tool call. Result content may contain
-// text/image/file parts but may not recursively contain tool calls/results.
+// text/image/audio/video/file parts but may not recursively contain tool calls/results.
 type ToolResult struct {
 	CallID  string        `json:"call_id"`
 	Content []ContentPart `json:"content"`
@@ -117,6 +119,10 @@ type Capability string
 const (
 	CapabilityText             Capability = "text"
 	CapabilityImageInput       Capability = "image_input"
+	CapabilityImageOutput      Capability = "image_output"
+	CapabilityAudioInput       Capability = "audio_input"
+	CapabilityAudioOutput      Capability = "audio_output"
+	CapabilityVideoInput       Capability = "video_input"
 	CapabilityFileInput        Capability = "file_input"
 	CapabilityToolCalling      Capability = "tool_calling"
 	CapabilityStructuredOutput Capability = "structured_output"
@@ -125,7 +131,7 @@ const (
 
 func (c Capability) Valid() bool {
 	switch c {
-	case CapabilityText, CapabilityImageInput, CapabilityFileInput, CapabilityToolCalling, CapabilityStructuredOutput, CapabilityStreaming:
+	case CapabilityText, CapabilityImageInput, CapabilityImageOutput, CapabilityAudioInput, CapabilityAudioOutput, CapabilityVideoInput, CapabilityFileInput, CapabilityToolCalling, CapabilityStructuredOutput, CapabilityStreaming:
 		return true
 	default:
 		return false
