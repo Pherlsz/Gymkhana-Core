@@ -73,14 +73,14 @@ Provider-specific raw reasons may be retained by adapters outside the Core contr
 
 ## Usage
 
-`Usage` exposes non-negative counters for:
+`Usage` exposes counters for:
 
 - `input_tokens`;
 - `output_tokens`;
 - `cached_input_tokens`;
 - `reasoning_tokens`.
 
-Token accounting and tokenization are provider/model-defined. Counts from different models are not assumed to be directly comparable. Zero means not reported or zero consumed; Core does not infer missing counts.
+Every counter is an integer in the inclusive range `0..9007199254740991` (`2^53-1`), the largest integer that remains exact in JSON-backed JavaScript/TypeScript runtimes. Token accounting and tokenization are provider/model-defined. Counts from different models are not assumed to be directly comparable. Zero means not reported or zero consumed; Core does not infer missing counts.
 
 ## Capabilities
 
