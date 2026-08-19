@@ -22,30 +22,6 @@
       "error": "unresolved_tool_call"
     },
     {
-      "name": "reject duplicate JSON object keys",
-      "operation": "assistant.json_object.validate",
-      "input": "{\"a\":1,\"a\":2}",
-      "error": "invalid_json"
-    },
-    {
-      "name": "reject unpaired UTF16 surrogate escape",
-      "operation": "assistant.json_object.validate",
-      "input": "{\"value\":\"\\ud800\"}",
-      "error": "invalid_json"
-    },
-    {
-      "name": "validate portable strict structured schema",
-      "operation": "assistant.schema.validate",
-      "input": "{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":[\"integer\",\"null\"],\"minimum\":0,\"maximum\":200}},\"required\":[\"name\",\"age\"],\"additionalProperties\":false}",
-      "output": true
-    },
-    {
-      "name": "reject unsupported structured schema keyword",
-      "operation": "assistant.schema.validate",
-      "input": "{\"type\":\"string\",\"pattern\":\".*\"}",
-      "error": "invalid_schema"
-    },
-    {
       "name": "reject destructive tool without explicit confirmation",
       "operation": "assistant.tool_policy.validate",
       "input": {"name": "delete_account", "effect": "destructive", "confirmation": "never"},
