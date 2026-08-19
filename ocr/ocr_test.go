@@ -205,6 +205,18 @@ func TestSchemaGuidedCandidateUsesMathematicalNumberEquality(t *testing.T) {
 	}
 }
 
+func TestSchemaGuidedCandidateRejectsUnboundedNumber(t *testing.T) {
+	t.Parallel()
+
+	request := validRequest()
+	request.TargetSchema = json.RawMessage(`{"type":"object","properties":{"score":{"type":"number"}},"required":["score"],"additionalProperties":false}`)
+	result := validResult()
+	result.Candidates[0].Path = "/score"
+	result.Candidates[0].Value = json.RawMessage(`1e1000000`)
+	result.StructuredData = json.RawMessage(`{"score":1}`)
+	assertCode(t, ocr.ValidateExtractionExchange(request, result), ocr.CodeInvalidCandidate)
+}
+
 func TestResultAggregateDataIsBounded(t *testing.T) {
 	t.Parallel()
 

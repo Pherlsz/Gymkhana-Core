@@ -364,8 +364,8 @@ func portableValueEqual(left, right any) bool {
 		if !ok {
 			return false
 		}
-		leftNumber, leftOK := new(big.Rat).SetString(l.String())
-		rightNumber, rightOK := new(big.Rat).SetString(r.String())
+		leftNumber, leftOK := parseComparableNumber(l)
+		rightNumber, rightOK := parseComparableNumber(r)
 		return leftOK && rightOK && leftNumber.Cmp(rightNumber) == 0
 	case []any:
 		r, ok := right.([]any)
@@ -393,6 +393,28 @@ func portableValueEqual(left, right any) bool {
 	default:
 		return false
 	}
+}
+
+func parseComparableNumber(number json.Number) (*big.Rat, bool) {
+	text := number.String()
+	if len(text) == 0 || len(text) > portablejson.MaxNumberLexemeBytes {
+		return nil, false
+	}
+	if exponentAt := strings.IndexAny(text, "eE"); exponentAt >= 0 {
+		exponent, err := strconv.ParseInt(text[exponentAt+1:], 10, 32)
+		if err != nil || exponent < -portablejson.MaxDecimalExponent || exponent > portablejson.MaxDecimalExponent {
+			return nil, false
+		}
+	}
+	value, ok := new(big.Rat).SetString(text)
+	if !ok {
+		return nil, false
+	}
+	limit := new(big.Rat).SetInt64(portablejson.MaxSafeInteger)
+	if new(big.Rat).Abs(value).Cmp(limit) > 0 {
+		return nil, false
+	}
+	return value, true
 }
 
 func validIdentifier(value string) bool {
