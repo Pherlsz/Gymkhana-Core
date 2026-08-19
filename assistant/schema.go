@@ -7,12 +7,9 @@ import (
 	"github.com/Pherlsz/Gymkhana-Core/portablejson"
 )
 
-const (
-	// PortableJSONSchemaV1 is retained as an Assistant compatibility alias. The
-	// language-neutral contract is owned by the generic portablejson package.
-	PortableJSONSchemaV1 = portablejson.SchemaV1
-	maxPortableJSONBytes = portablejson.MaxBytes
-)
+// PortableJSONSchemaV1 is retained as an Assistant compatibility alias. The
+// language-neutral contract is owned by the generic portablejson package.
+const PortableJSONSchemaV1 = portablejson.SchemaV1
 
 // ValidatePortableJSONObject is retained for compatibility. New generic Core
 // consumers should import portablejson directly.
