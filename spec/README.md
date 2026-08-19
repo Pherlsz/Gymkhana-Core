@@ -10,7 +10,7 @@ The active specification version is stored in `VERSION`; its compatibility rules
 
 1. **Language-neutral** — contracts and behavior must be portable to Go, TypeScript/Node.js, Java, .NET/C#, Python, Rust, PHP, and future implementations.
 2. **Product-neutral** — no application, including Gymkhana Database, owns or defines Core semantics.
-3. **Provider-neutral** — provider SDKs, model choices, credentials, pricing, and transport-specific behavior remain outside Core.
+3. **Provider-neutral** — portable provider/model references, routing policy, adapter boundaries, and opaque credential references may be standardized; provider SDK types, raw credentials, volatile pricing/model availability, and transport-specific payloads remain outside portable Core contracts.
 4. **Jurisdiction-neutral** — Brazil-specific rules are one jurisdictional module among others; international standards and other jurisdictions are first-class.
 5. **Deterministic where possible** — equivalent semantic input must produce equivalent canonical output across conforming implementations.
 6. **Infrastructure-independent** — persistence, HTTP, queues, cloud services, UI frameworks, and deployment concerns remain consumer-owned.
@@ -25,12 +25,12 @@ The current specification areas are:
 - `identity/` — generic typed identifier concepts;
 - `postal/` — explicitly jurisdiction-aware postal identifiers;
 - `fingerprint/` — exact SHA-256 digest semantics and versioned domain-separated framing;
-- `assistant/` — provider-neutral messages, multimodal references, tools, finish reasons, usage, capabilities, and versioned built-in behavior skills;
+- `assistant/` — provider-neutral multimodal messages, tools, built-in skills, reusable Assistant definitions/modules, live model routing, opaque managed/BYOK credential references, RAG/evidence policy, and provider-adapter boundaries;
 - `jurisdictions/` — country/jurisdiction-specific semantics, beginning with Brazil because those capabilities already exist in the Go implementation;
 - `standards/` — international/cross-jurisdiction standards when a reusable contract is justified;
 - `errors/` — stable, non-localized error semantics.
 
-Future areas may include `ocr/`, `matching/`, and `solver/`. Assistant streaming event semantics are intentionally deferred until multiple provider adapters have exercised the contract. The planned OCR boundary and conditional `data_identification/v1` discovery skill are recorded in `docs/OCR-FOUNDATION.md` and are not normative in the current specification.
+Future areas may include `ocr/`, `matching/`, and `solver/`. Assistant streaming event semantics are intentionally deferred until multiple concrete provider adapters have exercised the contract. The planned OCR boundary and conditional `data_identification/v1` discovery skill are recorded in `docs/OCR-FOUNDATION.md` and are not normative in the current specification.
 
 Jurisdiction-specific behavior must be namespaced explicitly, for example `identity.br.cpf` or `postal.br.cep`. A consumer must not be forced to assume a country, language, locale, currency, or timezone from another one of those concepts.
 
@@ -39,6 +39,8 @@ Jurisdiction-specific behavior must be namespaced explicitly, for example `ident
 `spec/` describes semantics. `conformance/` proves observable behavior. `schemas/` defines portable serialized shapes where machine-readable contracts are useful.
 
 Language implementations may expose idiomatic APIs; they do not have to reproduce Go package/function naming. The cross-language contract is semantic behavior and stable serialization, not syntax.
+
+Provider adapters may use idiomatic SDKs or HTTP clients internally; provider-specific types must not leak into language-neutral schemas/conformance or portable application contracts.
 
 ## Conformance
 
