@@ -27,6 +27,7 @@ Gymkhana-Core/
 ├── normalize/     # current Go implementation
 ├── civiltime/     # current Go implementation
 ├── fingerprint/   # current Go implementation
+├── assistant/     # current Go implementation
 └── ...            # future language implementations/packages as justified
 ```
 
@@ -79,17 +80,33 @@ Portable deterministic fingerprint primitives for:
 
 Fingerprints are not encryption, anonymization, authentication, or password hashing. Hashing low-entropy sensitive identifiers does not make them private.
 
+### `assistant`
+
+Provider-neutral AI Assistant contracts for:
+
+- semantic message roles (`system`, `developer`, `user`, `assistant`, `tool`);
+- ordered text, image-reference, file-reference, tool-call, and tool-result content parts;
+- portable tool definitions with structured JSON arguments;
+- stable finish reasons and usage counters;
+- portable capability names such as text, multimodal input, tool calling, structured output, and streaming;
+- stable validation errors without embedding prompt/tool payload data.
+
+`assistant` contains no OpenAI, Google, Anthropic, or other provider SDK types. Media URIs are opaque references owned by consumers/adapters, and tool calls are data rather than authorization to execute side effects.
+
+Spec `0.3` deliberately defines streaming as a capability without freezing a provider-neutral stream-event/delta shape yet. Streaming semantics should be standardized only after multiple real provider adapters exercise the contract.
+
 ## Specification and conformance
 
 `spec/VERSION` identifies the language-neutral specification version independently from the Go module release.
 
-Core Spec `0.2` covers:
+Core Spec `0.3` covers:
 
 - global text semantics;
 - civil temporal semantics;
 - a generic identifier model;
 - explicit jurisdiction modules, beginning with Brazil because those capabilities already exist in Go;
 - deterministic fingerprint digest/framing semantics;
+- provider-neutral Assistant messages, multimodal references, tools, finish reasons, usage, and capabilities;
 - an international-standards extension point;
 - stable non-localized error semantics;
 - machine-readable conformance suites executed by the current Go implementation.
@@ -177,7 +194,7 @@ export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 and pin an exact release:
 
 ```sh
-go get github.com/Pherlsz/Gymkhana-Core@v0.4.0
+go get github.com/Pherlsz/Gymkhana-Core@v0.5.0
 ```
 
 Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported as production dependency mechanisms.
