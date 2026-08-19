@@ -8,7 +8,6 @@ import (
 )
 
 // Well-known provider IDs are conveniences, not a closed provider enum.
-// Additional adapters may use any valid ProviderID without changing Core.
 const (
 	ProviderOpenAI     ProviderID = "openai"
 	ProviderAnthropic  ProviderID = "anthropic"
@@ -29,8 +28,7 @@ type ProviderDescriptor struct {
 }
 
 // GenerationRequest is the provider-neutral generation boundary used by a Go
-// adapter. The adapter instance resolves Credential references through an
-// application-owned secure credential resolver configured outside Core.
+// adapter. Credential contains only an opaque application-owned reference.
 type GenerationRequest struct {
 	Model          ModelRef         `json:"model"`
 	Messages       []Message        `json:"messages"`
@@ -48,27 +46,30 @@ type GenerationResponse struct {
 }
 
 // ProviderAdapter is the current Go substitution boundary for concrete AI
-// providers/gateways/local runtimes. Implementations may use SDKs internally;
-// those SDK types must not cross this interface.
+// providers/gateways/local runtimes.
 type ProviderAdapter interface {
 	Descriptor() ProviderDescriptor
 	ListModels(ctx context.Context, credential *CredentialRef) ([]ModelDescriptor, error)
 	Generate(ctx context.Context, request GenerationRequest) (GenerationResponse, error)
 }
 
-// AdapterRegistry stores provider adapters for one runtime. It is safe for
-// concurrent lookup/registration and deliberately contains no global singleton.
+// QuotaProvider is an optional adapter capability. Providers that can expose
+// normalized quota/limit information implement it; absence means quota is not
+// discoverable and usage must be tracked from GenerationResponse instead.
+type QuotaProvider interface {
+	Quota(ctx context.Context, assistantID string, credential CredentialRef) (QuotaState, error)
+}
+
+// AdapterRegistry stores provider adapters for one runtime.
 type AdapterRegistry struct {
 	mu       sync.RWMutex
 	adapters map[ProviderID]ProviderAdapter
 }
 
-// NewAdapterRegistry creates an empty runtime-local provider registry.
 func NewAdapterRegistry() *AdapterRegistry {
 	return &AdapterRegistry{adapters: make(map[ProviderID]ProviderAdapter)}
 }
 
-// Register adds one provider adapter and rejects duplicate provider IDs.
 func (registry *AdapterRegistry) Register(adapter ProviderAdapter) error {
 	if adapter == nil {
 		return validationError(CodeInvalidProvider, "provider")
@@ -86,7 +87,6 @@ func (registry *AdapterRegistry) Register(adapter ProviderAdapter) error {
 	return nil
 }
 
-// Get resolves an adapter by provider ID.
 func (registry *AdapterRegistry) Get(provider ProviderID) (ProviderAdapter, bool) {
 	registry.mu.RLock()
 	defer registry.mu.RUnlock()
@@ -94,7 +94,6 @@ func (registry *AdapterRegistry) Get(provider ProviderID) (ProviderAdapter, bool
 	return adapter, ok
 }
 
-// Providers returns deterministic registered provider IDs.
 func (registry *AdapterRegistry) Providers() []ProviderID {
 	registry.mu.RLock()
 	defer registry.mu.RUnlock()
@@ -106,7 +105,6 @@ func (registry *AdapterRegistry) Providers() []ProviderID {
 	return result
 }
 
-// ValidateProviderDescriptor validates stable adapter metadata.
 func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
 	if !validPortableID(string(descriptor.ID), 128) || !utf8.ValidString(descriptor.DisplayName) {
 		return validationError(CodeInvalidProvider, "provider")
@@ -127,8 +125,6 @@ func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
 	return nil
 }
 
-// ValidateGenerationRequest validates normalized adapter input without invoking
-// a provider or resolving credential secrets.
 func ValidateGenerationRequest(request GenerationRequest) error {
 	if !validModelRef(request.Model) || len(request.Messages) == 0 {
 		return validationError(CodeInvalidProvider, "generation_request")
@@ -162,9 +158,6 @@ func ValidateGenerationRequest(request GenerationRequest) error {
 	return nil
 }
 
-// ValidateGenerationResponse validates normalized adapter output. Provider
-// generation output must be represented as an assistant-role message; tool
-// results remain separate tool-role input messages.
 func ValidateGenerationResponse(response GenerationResponse) error {
 	if !validModelRef(response.Model) {
 		return validationError(CodeInvalidModel, "generation_response.model")
@@ -178,10 +171,7 @@ func ValidateGenerationResponse(response GenerationResponse) error {
 	if err := ValidateFinishReason(response.FinishReason); err != nil {
 		return err
 	}
-	if err := ValidateUsage(response.Usage); err != nil {
-		return err
-	}
-	return nil
+	return ValidateUsage(response.Usage)
 }
 
 func sortProviderIDs(values []ProviderID) {
