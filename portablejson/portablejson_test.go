@@ -11,13 +11,6 @@ import (
 func TestValidateObject(t *testing.T) {
 	t.Parallel()
 
-	if err := portablejson.ValidateObject(json.RawMessage(`{"city":"Porto Alegre","nested":{"value":1}}`)); err == nil {
-		// The fixture above intentionally exercises exact bytes below; escaped
-		// notation inside a raw string is invalid JSON and must be rejected.
-	} else if !portablejson.IsCode(err, portablejson.CodeInvalidJSON) {
-		t.Fatalf("ValidateObject invalid fixture = %v", err)
-	}
-
 	valid := json.RawMessage("{\"city\":\"Porto Alegre\",\"nested\":{\"value\":1}}")
 	if err := portablejson.ValidateObject(valid); err != nil {
 		t.Fatalf("ValidateObject(valid) = %v", err)
