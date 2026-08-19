@@ -18,11 +18,11 @@ type suite struct {
 }
 
 type vector struct {
-	Name      string `json:"name"`
-	Operation string `json:"operation"`
-	Input     string `json:"input"`
-	Output    string `json:"output,omitempty"`
-	Error     string `json:"error,omitempty"`
+	Name      string  `json:"name"`
+	Operation string  `json:"operation"`
+	Input     string  `json:"input"`
+	Output    *string `json:"output,omitempty"`
+	Error     *string `json:"error,omitempty"`
 }
 
 func TestNormalizeConformance(t *testing.T) {
@@ -50,16 +50,29 @@ func runSuite(t *testing.T, path string, execute func(vector) (string, string)) 
 	}
 
 	for _, testCase := range vectors.Cases {
-		testCase := testCase
+		if testCase.Name == "" || testCase.Operation == "" || (testCase.Output == nil) == (testCase.Error == nil) {
+			t.Fatalf("conformance case in %s has an invalid result shape: %#v", path, testCase)
+		}
+
 		t.Run(testCase.Name, func(t *testing.T) {
 			t.Parallel()
 
 			output, errorCode := execute(testCase)
-			if errorCode != testCase.Error {
-				t.Fatalf("%s error = %q, want %q", testCase.Operation, errorCode, testCase.Error)
+			if testCase.Error != nil {
+				if errorCode != *testCase.Error {
+					t.Fatalf("%s error = %q, want %q", testCase.Operation, errorCode, *testCase.Error)
+				}
+				if output != "" {
+					t.Fatalf("%s returned output %q with error %q", testCase.Operation, output, errorCode)
+				}
+				return
 			}
-			if output != testCase.Output {
-				t.Fatalf("%s output = %q, want %q", testCase.Operation, output, testCase.Output)
+
+			if errorCode != "" {
+				t.Fatalf("%s unexpected error = %q", testCase.Operation, errorCode)
+			}
+			if output != *testCase.Output {
+				t.Fatalf("%s output = %q, want %q", testCase.Operation, output, *testCase.Output)
 			}
 		})
 	}
