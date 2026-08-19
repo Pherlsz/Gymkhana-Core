@@ -11,6 +11,10 @@ const (
 	ModuleAudioInput       ModuleID = "audio_input"
 	ModuleVideoInput       ModuleID = "video_input"
 	ModuleFileInput        ModuleID = "file_input"
+	ModuleImageOutput      ModuleID = "image_output"
+	ModuleAudioOutput      ModuleID = "audio_output"
+	ModuleVideoOutput      ModuleID = "video_output"
+	ModuleFileOutput       ModuleID = "file_output"
 	ModuleTools            ModuleID = "tools"
 	ModuleRetrieval        ModuleID = "retrieval"
 	ModuleMemory           ModuleID = "memory"
@@ -19,7 +23,7 @@ const (
 
 func (id ModuleID) Valid() bool {
 	switch id {
-	case ModuleText, ModuleVision, ModuleAudioInput, ModuleVideoInput, ModuleFileInput, ModuleTools, ModuleRetrieval, ModuleMemory, ModuleStructuredOutput:
+	case ModuleText, ModuleVision, ModuleAudioInput, ModuleVideoInput, ModuleFileInput, ModuleImageOutput, ModuleAudioOutput, ModuleVideoOutput, ModuleFileOutput, ModuleTools, ModuleRetrieval, ModuleMemory, ModuleStructuredOutput:
 		return true
 	default:
 		return false
@@ -74,7 +78,7 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 	if !validPortableID(def.ID, 128) || def.Name == "" || !utf8.ValidString(def.Name) || utf8.RuneCountInString(def.Name) > 256 || !utf8.ValidString(def.Description) || utf8.RuneCountInString(def.Description) > 4096 {
 		return validationError(CodeInvalidAssistant, "assistant")
 	}
-	if len(def.Modules) == 0 {
+	if len(def.Modules) == 0 || len(def.Modules) > 32 || len(def.OptionalModules) > 32 {
 		return validationError(CodeEmpty, "modules")
 	}
 	allModules := make(map[ModuleID]struct{}, len(def.Modules)+len(def.OptionalModules))
@@ -87,16 +91,25 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 		}
 		allModules[module] = struct{}{}
 	}
+	if len(def.Instructions) > 64 {
+		return validationError(CodeInvalidAssistant, "instructions")
+	}
 	for _, instruction := range def.Instructions {
 		if instruction.Role != RoleSystem && instruction.Role != RoleDeveloper {
 			return validationError(CodeInvalidAssistant, "instructions.role")
 		}
-		if instruction.Text == "" || !utf8.ValidString(instruction.Text) {
+		if instruction.Text == "" || !utf8.ValidString(instruction.Text) || len(instruction.Text) > maxPortableJSONBytes {
 			return validationError(CodeInvalidAssistant, "instructions.text")
 		}
 	}
+	if len(def.Skills) > 32 {
+		return validationError(CodeInvalidAssistant, "skills")
+	}
 	if err := ValidateSkills(def.Skills); err != nil {
 		return err
+	}
+	if len(def.Tools) > 256 || len(def.ToolPolicies) > 256 {
+		return validationError(CodeInvalidAssistant, "tools")
 	}
 	seenTools := make(map[string]struct{}, len(def.Tools))
 	for _, tool := range def.Tools {
@@ -161,7 +174,7 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 
 // ValidateAssistantCatalog validates multiple independently addressable profiles.
 func ValidateAssistantCatalog(catalog AssistantCatalog) error {
-	if len(catalog.Assistants) == 0 {
+	if len(catalog.Assistants) == 0 || len(catalog.Assistants) > 1024 {
 		return validationError(CodeEmpty, "assistants")
 	}
 	seen := make(map[string]struct{}, len(catalog.Assistants))
