@@ -20,6 +20,8 @@ conformance/
 │   └── temporal.json
 └── v0.3/
     ├── assistant.json
+    ├── assistant-multimodal.json
+    ├── assistant-config.json
     ├── fingerprint.json
     ├── normalize.json
     └── temporal.json
@@ -34,11 +36,11 @@ Future implementations should consume the same JSON vectors rather than copying 
 Each case has:
 
 - a stable human-readable `name`;
-- an operation key such as `identity.br.cpf.canonicalize`, `fingerprint.sha256.framed_text`, or `assistant.message.validate`;
+- an operation key such as `identity.br.cpf.canonicalize`, `fingerprint.sha256.framed_text`, `assistant.message.validate`, or `assistant.model.resolve`;
 - JSON `input`, which may be a scalar, array, or structured object;
 - exactly one expected JSON `output` or stable `error` code.
 
-Structured inputs let conformance cover typed contracts without encoding multiple semantic arguments into an opaque string. Assistant vectors validate provider-neutral messages, tool definitions, finish reasons, usage, and capability sets.
+Structured inputs let conformance cover typed contracts without encoding multiple semantic arguments into an opaque string. Assistant vectors cover message/tool semantics, full multimodal references, built-in skills, reusable Assistant definitions, BYOK references, RAG policy, and deterministic model routing over adapter-supplied catalogs.
 
 ## Rules
 
@@ -46,7 +48,9 @@ Structured inputs let conformance cover typed contracts without encoding multipl
 - errors are asserted by stable semantic code, never localized message text;
 - sensitive original values must not appear in errors;
 - jurisdiction-specific operations use an explicit jurisdiction in their operation key;
-- provider-neutral Assistant vectors contain no provider SDK/model/transport fields;
+- provider-neutral Assistant vectors contain no provider SDK or provider HTTP payload types;
+- model-routing vectors use synthetic catalog data rather than freezing volatile provider model availability or pricing;
+- BYOK vectors contain opaque credential handles, never API-key material;
 - equivalent cases must keep the same meaning across all supported languages;
 - implementations may use idiomatic APIs but adapters/runners must map them to the same operation semantics;
 - changing an existing vector's semantics requires a specification version change.
