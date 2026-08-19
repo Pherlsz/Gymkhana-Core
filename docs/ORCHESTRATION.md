@@ -1,7 +1,7 @@
 # Gymkhana Core — Architecture and Orchestration
 
 > **Foundation architecture:** 1  
-> **Last synchronized:** 2026-08-18  
+> **Last synchronized:** 2026-08-19  
 > **Repository responsibility:** language-neutral reusable contracts and infrastructure-independent algorithms  
 > **Specification:** `spec/`  
 > **Behavioral source of truth:** `spec/` + versioned `conformance/` vectors
@@ -60,6 +60,8 @@ Gymkhana-Core/
 ├── schemas/       portable serialized contracts
 ├── normalize/     current Go implementation
 ├── civiltime/     current Go implementation
+├── fingerprint/   current Go implementation
+├── assistant/     current Go implementation
 └── future language/package implementations as justified
 ```
 
@@ -170,19 +172,29 @@ Timezone-free `CivilDate` and `YearMonth` semantics.
 
 Generic typed identifier concepts with explicit jurisdiction keys. The current Go implementation already includes Brazilian CPF/CNPJ and document behavior; the specification treats Brazil as one jurisdiction module.
 
+### Fingerprint
+
+Exact SHA-256 identity plus versioned domain-separated framing for deterministic multipart fingerprints. Fingerprinting does not perform implicit application canonicalization.
+
+### Assistant
+
+Provider-neutral messages, ordered content parts, external media references, tool definitions/calls/results, finish reasons, usage counters, capability names, portable schemas, and stable validation errors. Provider SDKs and transport remain outside Core.
+
+Streaming is currently a capability only; a shared stream-event/delta contract is deliberately deferred until multiple provider adapters have exercised the semantics.
+
 ### Errors
 
 Stable non-localized error codes without sensitive original-value leakage.
 
 ## 11. Planned capability order
 
-New areas should generally be added in this order, based on real reusable value rather than Database milestones:
+The Foundation roadmap is currently:
 
-1. Foundation specification/conformance infrastructure;
-2. global/jurisdiction separation for existing normalization;
-3. canonical `fingerprint` package/specification;
-4. provider-neutral `assistant` contracts;
-5. provider-neutral OCR/multimodal contracts;
+1. Foundation specification/conformance infrastructure — **implemented**;
+2. global/jurisdiction separation for existing normalization — **established architecturally; incremental cleanup continues**;
+3. canonical `fingerprint` package/specification — **implemented in Core Spec 0.2 / Go 0.4.0**;
+4. provider-neutral `assistant` contracts — **implemented by Core Spec 0.3 / Go 0.5.0 workstream**;
+5. provider-neutral OCR/multimodal extraction contracts — **next planned capability**;
 6. generic matching/evidence primitives;
 7. generic solver/constraint/composition algorithms;
 8. first non-Go implementation, preferably TypeScript as the first portability stress test;
@@ -193,18 +205,18 @@ This ordering is guidance, not a coupling to any product milestone.
 
 ## 12. Assistant boundary
 
-A future Assistant specification may own neutral concepts such as:
+The Assistant specification owns neutral concepts such as:
 
-- messages and roles;
+- messages and semantic roles;
 - typed content parts;
+- external image/file references;
 - tool definitions, calls, and results;
-- streaming event semantics;
 - capabilities;
 - finish reasons;
 - usage structures;
-- stable errors and bounded behavior.
+- stable validation errors.
 
-It must not own:
+It does not own:
 
 - OpenAI, Gemini, Anthropic, or other SDK types;
 - API keys/secrets;
@@ -212,7 +224,10 @@ It must not own:
 - provider pricing;
 - application prompts;
 - persistence/session authorization;
+- provider HTTP/retry behavior;
 - autonomous unbounded agent loops.
+
+Streaming event semantics remain deferred. Provider adapters may expose native streaming while Core defines only the `streaming` capability until a portable event contract is proven.
 
 ## 13. OCR/multimodal boundary
 
