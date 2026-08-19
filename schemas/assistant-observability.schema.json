@@ -4,10 +4,68 @@
   "title": "Gymkhana Core Assistant observability",
   "$defs": {
     "QuotaDimension": {"type": "string", "enum": ["requests", "input_tokens", "output_tokens", "total_tokens"]},
-    "QuotaWindow": {"type": "object", "additionalProperties": false, "required": ["dimension"], "properties": {"dimension": {"$ref": "#/$defs/QuotaDimension"}, "limit": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "used": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "remaining": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "window_seconds": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "reset_at_unix": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}}},
-    "QuotaState": {"type": "object", "additionalProperties": false, "required": ["provider", "known"], "properties": {"provider": {"$ref": "assistant-config.schema.json#/$defs/ProviderID"}, "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialIdentity"}, "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"}, "known": {"type": "boolean"}, "limits": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/QuotaWindow"}}}, "description": "Quota belongs to the provider/account/project scope actually reported. It is not implicitly per Assistant or per API key."},
-    "UsageLedgerEntry": {"type": "object", "additionalProperties": false, "required": ["run_id", "attempt", "assistant_id", "model", "usage"], "properties": {"run_id": {"$ref": "assistant-config.schema.json#/$defs/OpaqueRef"}, "attempt": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "assistant_id": {"$ref": "assistant-config.schema.json#/$defs/PortableID"}, "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialIdentity"}, "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"}, "usage": {"$ref": "assistant.schema.json#/$defs/Usage"}, "observed_at_unix": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}}},
-    "AttemptTrace": {"type": "object", "additionalProperties": false, "required": ["index", "model"], "properties": {"index": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"}, "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialIdentity"}, "failure": {"$ref": "assistant-config.schema.json#/$defs/FailureClass"}, "usage": {"$ref": "assistant.schema.json#/$defs/Usage"}, "duration_millis": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}}},
-    "RunTrace": {"type": "object", "additionalProperties": false, "required": ["run_id", "assistant_id", "effective_modules"], "properties": {"run_id": {"$ref": "assistant-config.schema.json#/$defs/OpaqueRef"}, "assistant_id": {"$ref": "assistant-config.schema.json#/$defs/PortableID"}, "assistant_revision": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "effective_modules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}}, "attempts": {"type": "array", "items": {"$ref": "#/$defs/AttemptTrace"}}, "retrieval_rounds": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "tool_calls": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "started_at_unix": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "duration_millis": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}, "finish_reason": {"$ref": "assistant.schema.json#/$defs/FinishReason"}}, "description": "Trace deliberately carries no prompt, tool payload, media URI, provider error body or secret-store reference."}
+    "QuotaWindow": {
+      "type": "object", "additionalProperties": false, "required": ["dimension"],
+      "properties": {
+        "dimension": {"$ref": "#/$defs/QuotaDimension"},
+        "limit": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "used": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "remaining": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "window_seconds": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "reset_at_unix": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}
+      }
+    },
+    "QuotaState": {
+      "type": "object", "additionalProperties": false, "required": ["provider", "known"],
+      "properties": {
+        "provider": {"$ref": "assistant-config.schema.json#/$defs/ProviderID"},
+        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialIdentity"},
+        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "known": {"type": "boolean"},
+        "limits": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/QuotaWindow"}}
+      },
+      "description": "Quota belongs to the provider/account/project scope actually reported. It is not implicitly per Assistant or per API key."
+    },
+    "UsageLedgerEntry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_id", "attempt", "assistant_id", "model", "usage"],
+      "properties": {
+        "run_id": {"$ref": "assistant-config.schema.json#/$defs/OpaqueRef"},
+        "attempt": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "assistant_id": {"$ref": "assistant-config.schema.json#/$defs/PortableID"},
+        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialIdentity"},
+        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "usage": {"$ref": "assistant.schema.json#/$defs/Usage"},
+        "observed_at_unix": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}
+      }
+    },
+    "AttemptTrace": {
+      "type": "object", "additionalProperties": false, "required": ["index", "model"],
+      "properties": {
+        "index": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
+        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialIdentity"},
+        "failure": {"$ref": "assistant-config.schema.json#/$defs/FailureClass"},
+        "usage": {"$ref": "assistant.schema.json#/$defs/Usage"},
+        "duration_millis": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"}
+      }
+    },
+    "RunTrace": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_id", "assistant_id", "effective_modules"],
+      "properties": {
+        "run_id": {"$ref": "assistant-config.schema.json#/$defs/OpaqueRef"},
+        "assistant_id": {"$ref": "assistant-config.schema.json#/$defs/PortableID"},
+        "assistant_revision": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "effective_modules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}},
+        "attempts": {"type": "array", "items": {"$ref": "#/$defs/AttemptTrace"}},
+        "retrieval_rounds": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "tool_calls": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "started_at_unix": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "duration_millis": {"$ref": "assistant-config.schema.json#/$defs/SafeInteger"},
+        "finish_reason": {"$ref": "assistant.schema.json#/$defs/FinishReason"}
+      },
+      "description": "Trace deliberately carries no prompt, tool payload, media URI, provider error body or secret-store reference."
+    }
   }
 }

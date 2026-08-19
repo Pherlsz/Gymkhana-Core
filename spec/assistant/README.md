@@ -29,7 +29,15 @@ Role/content invariants:
 
 ## Multimodal content
 
-Portable ordered content parts are `text`, `image`, `audio`, `video`, `file`, `tool_call`, and `tool_result`.
+Portable ordered content parts are:
+
+- `text`;
+- `image`;
+- `audio`;
+- `video`;
+- `file`;
+- `tool_call`;
+- `tool_result`.
 
 Media uses opaque URI references with optional media type/name. Core does not fetch, authorize, upload, transcode, render, or persist media.
 
@@ -47,15 +55,35 @@ Long-lived user/tenant memory and learning/promotion workflows are host concerns
 
 Concrete AI systems are adapters. Model catalogs are discovered at runtime rather than frozen into Core releases.
 
-Portable selection modes are `manual`, `ordered_fallback`, and `dynamic`. Active modules contribute required capabilities automatically. Model identity is the pair `(provider, model)`, never ambiguous string concatenation.
+Portable selection modes are:
+
+- `manual` — one exact provider/model;
+- `ordered_fallback` — explicit caller/benchmark-defined order;
+- `dynamic` — deterministic filtering/ranking of current catalog metadata.
+
+Active modules contribute required capabilities automatically. For example, an Assistant with `vision + tools` cannot route to a model lacking `image_input + tool_calling`.
+
+Model identity is the pair `(provider, model)`. It is never represented internally by ambiguous string concatenation.
 
 Convenience provider IDs such as OpenAI, Anthropic, Google, OpenRouter, Groq, Ollama, Mistral, and xAI are not a closed enum.
 
 ## Credentials and BYOK
 
-Portable credential modes are `none`, `managed`, and `byok`.
+Portable credential modes are:
 
-A runtime `CredentialRef` contains a logical non-secret credential ID, provider, mode, namespaced secret-store handle, and optional quota-scope label. Raw API keys are not portable Core configuration. The secret-store handle is excluded from usage ledgers and run traces; those carry `CredentialIdentity` only.
+- `none` — no credential reference, typically local/public runtime;
+- `managed` — application/provider-managed authorization;
+- `byok` — user/application-owned key resolved through an external secret store.
+
+A runtime `CredentialRef` contains:
+
+- logical non-secret credential ID;
+- provider;
+- mode;
+- namespaced secret-store handle;
+- optional quota-scope label.
+
+Raw API keys are not portable Core configuration. The secret-store handle is also excluded from usage ledgers and run traces; those carry `CredentialIdentity` only.
 
 Multiple credentials for a provider form an ordered chain. Default BYOK fallback occurs only after normalized quota/rate-limit exhaustion and skips later credentials known to share the same non-empty quota scope.
 
@@ -93,13 +121,29 @@ Evidence content/metadata, scores, counts, and model roles are validated/bounded
 
 ## Built-in token economy
 
-`token_economy/v1` requests concise-but-complete responses, avoidance of unnecessary restatement, safe reuse of stable prior context, compact projection of tool results, preservation of instruction hierarchy, and preservation of unresolved constraints/state.
+`token_economy/v1` requests:
+
+- concise-but-complete responses;
+- avoidance of unnecessary restatement;
+- safe reuse of stable prior context;
+- compact projection of tool results;
+- mandatory preservation of instruction hierarchy;
+- mandatory preservation of unresolved constraints/state.
 
 It is a semantic profile rather than provider prompt text. It does not define a universal tokenizer, lossy summarizer, message-deletion algorithm, cache ID, or guaranteed savings percentage.
 
 ## Finish reasons
 
-Portable finish reasons are `stop`, `length`, `tool_calls`, `refusal`, `paused`, `content_filter`, `error`, and `other`.
+Portable finish reasons are:
+
+- `stop`;
+- `length`;
+- `tool_calls`;
+- `refusal`;
+- `paused`;
+- `content_filter`;
+- `error`;
+- `other`.
 
 `refusal` is distinct from a provider/transport error. `paused` represents a resumable provider turn rather than normal completion.
 
@@ -111,7 +155,7 @@ Portable finish reasons are `stop`, `length`, `tool_calls`, `refusal`, `paused`,
 
 ## Streaming
 
-`streaming` remains a capability in Spec `0.4`; a provider-neutral stream-event wire shape is deliberately deferred until multiple concrete adapters prove the common event lifecycle.
+`streaming` remains a capability in Spec `0.4`; a provider-neutral stream-event wire shape is deliberately deferred until multiple concrete adapters prove the common event lifecycle. Providers differ in text deltas, partial tool arguments, pause/resume semantics, usage timing, and errors.
 
 ## Security and privacy
 

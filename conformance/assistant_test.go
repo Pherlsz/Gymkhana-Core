@@ -8,13 +8,18 @@ import (
 	"github.com/Pherlsz/Gymkhana-Core/assistant"
 )
 
-func TestAssistantConformance(t *testing.T) { runSuite(t, "assistant.json", executeAssistant) }
+func TestAssistantConformance(t *testing.T) {
+	runSuite(t, "assistant.json", executeAssistant)
+}
+
 func TestAssistantMultimodalConformance(t *testing.T) {
 	runSuite(t, "assistant-multimodal.json", executeAssistant)
 }
+
 func TestAssistantConfigConformance(t *testing.T) {
 	runSuite(t, "assistant-config.json", executeAssistantConfig)
 }
+
 func TestAssistantHardeningConformance(t *testing.T) {
 	runSuite(t, "assistant-hardening.json", executeAssistantHardening)
 }
@@ -166,16 +171,19 @@ type modelResolutionInput struct {
 	Policy  assistant.ModelPolicy       `json:"policy"`
 	Catalog []assistant.ModelDescriptor `json:"catalog"`
 }
+
 type assistantResolutionInput struct {
 	Assistant assistant.AssistantDefinition `json:"assistant"`
 	Catalog   []assistant.ModelDescriptor   `json:"catalog"`
 }
+
 type credentialFallbackInput struct {
 	Overrides assistant.RunOverrides `json:"overrides"`
 	Provider  assistant.ProviderID   `json:"provider"`
 	Current   int                    `json:"current"`
 	Failure   assistant.FailureClass `json:"failure"`
 }
+
 type credentialFallbackOutput struct {
 	Credential assistant.CredentialRef `json:"credential"`
 	Index      int                     `json:"index"`
