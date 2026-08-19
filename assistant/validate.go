@@ -13,8 +13,6 @@ const (
 	maxToolResultParts            = 1024
 )
 
-// ValidateMessage validates portable message semantics including the allowed
-// tool-content relationship for each semantic role.
 func ValidateMessage(message Message) error {
 	if !message.Role.Valid() {
 		return validationError(CodeInvalidRole, "role")
@@ -47,10 +45,6 @@ func ValidateMessage(message Message) error {
 	return nil
 }
 
-// ValidateConversation validates cross-message tool-call/result linkage. Tool
-// call IDs are unique within the request, every tool result resolves one prior
-// call exactly once, and no unresolved call remains when a new generation is
-// requested.
 func ValidateConversation(messages []Message) error {
 	if len(messages) == 0 {
 		return validationError(CodeEmpty, "messages")
@@ -88,7 +82,6 @@ func ValidateConversation(messages []Message) error {
 	return nil
 }
 
-// ValidateContentPart validates the ContentPart discriminated union.
 func ValidateContentPart(part ContentPart) error {
 	switch part.Type {
 	case PartText:
@@ -149,7 +142,6 @@ func validateMedia(partType PartType, media MediaRef) error {
 	return nil
 }
 
-// ValidateToolName validates the portable cross-provider tool-name subset.
 func ValidateToolName(name string) error {
 	if len(name) == 0 || len(name) > 64 || !utf8.ValidString(name) {
 		return validationError(CodeInvalidToolName, "name")
@@ -173,8 +165,6 @@ func asciiLetter(value byte) bool {
 	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z'
 }
 
-// ValidateToolDefinition validates portable tool metadata and the conservative
-// portable JSON-schema profile used across provider adapters.
 func ValidateToolDefinition(definition ToolDefinition) error {
 	if err := ValidateToolName(definition.Name); err != nil {
 		return err
@@ -182,13 +172,12 @@ func ValidateToolDefinition(definition ToolDefinition) error {
 	if !utf8.ValidString(definition.Description) || utf8.RuneCountInString(definition.Description) > 4096 {
 		return validationError(CodeInvalidContent, "description")
 	}
-	if err := ValidatePortableJSONSchema(definition.InputSchema); err != nil {
+	if err := ValidatePortableToolSchema(definition.InputSchema); err != nil {
 		return validationError(CodeInvalidSchema, "input_schema")
 	}
 	return nil
 }
 
-// ValidateToolCall validates call identity, tool name, and structured arguments.
 func ValidateToolCall(call ToolCall) error {
 	if !validCallID(call.ID) {
 		return validationError(CodeInvalidToolCall, "id")
@@ -202,8 +191,6 @@ func ValidateToolCall(call ToolCall) error {
 	return nil
 }
 
-// ValidateToolResult validates a tool result and forbids recursive tool
-// call/result content in the result body.
 func ValidateToolResult(result ToolResult) error {
 	if !validCallID(result.CallID) {
 		return validationError(CodeInvalidToolResult, "call_id")
@@ -229,7 +216,6 @@ func validCallID(value string) bool {
 	return value != "" && utf8.ValidString(value) && utf8.RuneCountInString(value) <= 256
 }
 
-// ValidateFinishReason validates one portable completion reason.
 func ValidateFinishReason(reason FinishReason) error {
 	if !reason.Valid() {
 		return validationError(CodeInvalidFinishReason, "finish_reason")
@@ -237,8 +223,6 @@ func ValidateFinishReason(reason FinishReason) error {
 	return nil
 }
 
-// ValidateUsage rejects counters outside the non-negative JSON safe-integer
-// range so serialized values remain exact in JavaScript/TypeScript runtimes.
 func ValidateUsage(usage Usage) error {
 	values := [...]int64{usage.InputTokens, usage.OutputTokens, usage.CachedInputTokens, usage.ReasoningTokens}
 	for _, value := range values {
@@ -249,8 +233,6 @@ func ValidateUsage(usage Usage) error {
 	return nil
 }
 
-// ValidateCapabilities validates known portable capability names and rejects
-// duplicates so serialized capability sets remain unambiguous.
 func ValidateCapabilities(capabilities []Capability) error {
 	if len(capabilities) > 64 {
 		return validationError(CodeInvalidCapability, "capabilities")
