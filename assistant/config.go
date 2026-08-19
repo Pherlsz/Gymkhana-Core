@@ -1,8 +1,6 @@
 package assistant
 
-import (
-	"unicode/utf8"
-)
+import "unicode/utf8"
 
 // ModuleID identifies one independently configurable Assistant capability.
 type ModuleID string
@@ -35,21 +33,21 @@ type InstructionBlock struct {
 	Text string `json:"text"`
 }
 
-// AssistantDefinition describes one reusable Assistant profile. Different
-// definitions may use different modules, tools, RAG policy, skills, and model
-// routing while sharing the same provider-neutral runtime contracts.
+// AssistantDefinition describes one reusable Assistant profile. Modules are
+// enabled by default; OptionalModules are available for explicit per-run enablement.
 type AssistantDefinition struct {
-	ID           string             `json:"id"`
-	Name         string             `json:"name"`
-	Description  string             `json:"description,omitempty"`
-	Instructions []InstructionBlock `json:"instructions,omitempty"`
-	Modules      []ModuleID         `json:"modules"`
-	Skills       []Skill            `json:"skills,omitempty"`
-	Tools        []string           `json:"tools,omitempty"`
-	ModelPolicy  ModelPolicy        `json:"model_policy"`
-	Credentials  CredentialPolicy   `json:"credentials"`
-	Retrieval    *RetrievalPolicy   `json:"retrieval,omitempty"`
-	Budget       ExecutionBudget    `json:"budget,omitempty"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	Description     string             `json:"description,omitempty"`
+	Instructions    []InstructionBlock `json:"instructions,omitempty"`
+	Modules         []ModuleID         `json:"modules"`
+	OptionalModules []ModuleID         `json:"optional_modules,omitempty"`
+	Skills          []Skill            `json:"skills,omitempty"`
+	Tools           []string           `json:"tools,omitempty"`
+	ModelPolicy     ModelPolicy        `json:"model_policy"`
+	Credentials     CredentialPolicy   `json:"credentials"`
+	Retrieval       *RetrievalPolicy   `json:"retrieval,omitempty"`
+	Budget          ExecutionBudget    `json:"budget,omitempty"`
 }
 
 // ExecutionBudget bounds potentially expensive multi-step behavior. Zero means
@@ -75,15 +73,15 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 	if len(def.Modules) == 0 {
 		return validationError(CodeEmpty, "modules")
 	}
-	seenModules := make(map[ModuleID]struct{}, len(def.Modules))
-	for _, module := range def.Modules {
+	allModules := make(map[ModuleID]struct{}, len(def.Modules)+len(def.OptionalModules))
+	for _, module := range append(append([]ModuleID{}, def.Modules...), def.OptionalModules...) {
 		if !module.Valid() {
 			return validationError(CodeInvalidModule, "modules")
 		}
-		if _, exists := seenModules[module]; exists {
+		if _, exists := allModules[module]; exists {
 			return validationError(CodeDuplicateModule, "modules")
 		}
-		seenModules[module] = struct{}{}
+		allModules[module] = struct{}{}
 	}
 	for _, instruction := range def.Instructions {
 		if instruction.Role != RoleSystem && instruction.Role != RoleDeveloper {
@@ -106,11 +104,11 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 		}
 		seenTools[tool] = struct{}{}
 	}
-	if len(def.Tools) > 0 && !moduleEnabled(seenModules, ModuleTools) {
+	if len(def.Tools) > 0 && !moduleEnabled(allModules, ModuleTools) {
 		return validationError(CodeInvalidAssistant, "tools")
 	}
 	if def.Retrieval != nil {
-		if !moduleEnabled(seenModules, ModuleRetrieval) {
+		if !moduleEnabled(allModules, ModuleRetrieval) {
 			return validationError(CodeInvalidAssistant, "retrieval")
 		}
 		if err := ValidateRetrievalPolicy(*def.Retrieval); err != nil {
