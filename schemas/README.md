@@ -6,8 +6,11 @@ They complement, but do not replace, the normative prose in `spec/` and the obse
 
 Use schemas for data contracts where generation is appropriate. Do not attempt to generate nontrivial algorithms solely to avoid writing idiomatic implementations in each language.
 
-Current schema:
+Current schemas:
 
-- `conformance.schema.json` — shape of shared conformance suites.
+- `conformance.schema.json` — shape of shared conformance suites;
+- `assistant.schema.json` — provider-neutral Assistant message, content, media-reference, tool, finish-reason, usage, and capability shapes.
 
-Future schemas may cover provider-neutral Assistant/OCR contracts, stable error envelopes, and other genuinely cross-language serialized values.
+The Assistant schema intentionally contains no provider SDK fields, credentials, model IDs, HTTP concerns, or provider-specific extension bag. Provider adapters keep such metadata outside the portable Core serialized shape.
+
+Future schemas may cover OCR contracts, stable error envelopes, and other genuinely cross-language serialized values.
