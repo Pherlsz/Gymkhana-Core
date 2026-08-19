@@ -173,6 +173,14 @@
       "error": "invalid_usage"
     },
     {
+      "name": "reject usage above portable JSON safe integer",
+      "operation": "assistant.usage.validate",
+      "input": {
+        "input_tokens": 9007199254740992
+      },
+      "error": "invalid_usage"
+    },
+    {
       "name": "validate capabilities",
       "operation": "assistant.capabilities.validate",
       "input": ["text", "image_input", "tool_calling", "streaming"],
