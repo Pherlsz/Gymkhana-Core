@@ -18,7 +18,10 @@
           "items": {"$ref": "assistant-config.schema.json#/$defs/ModuleID"}
         },
         "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
-        "credential": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"}
+        "credentials": {
+          "type": "array",
+          "items": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"}
+        }
       }
     },
     "ProviderDescriptor": {
