@@ -20,7 +20,8 @@
         "model": {"$ref": "assistant-config.schema.json#/$defs/ModelRef"},
         "credentials": {
           "type": "array",
-          "items": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"}
+          "items": {"$ref": "assistant-config.schema.json#/$defs/CredentialRef"},
+          "description": "At most one semantic credential binding per provider; enforced by Core validation."
         }
       }
     },
