@@ -18,6 +18,17 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 - Core specification advances from `0.1` to `0.2` for the new fingerprint operation family; `conformance/v0.2` carries the complete applicable normalize, temporal, and fingerprint suite set.
 - Canonical JSON is explicitly deferred until a precise cross-language structured canonicalization contract is selected; fingerprinting never performs implicit Unicode, locale, JSON, or application normalization.
 
+## [0.3.1] - 2026-08-18
+
+### Fixed
+
+- Preserve `FormatBlock` and `FormatApartment` idempotency when a canonical payload itself matches a recognized slot label, such as `bl. BL` or `apt. AP`.
+
+### Changed
+
+- Updated `golang.org/x/text` from `v0.40.0` to `v0.41.0`.
+- Updated pinned GitHub Actions to `actions/checkout v7.0.1` and `actions/setup-go v7.0.0`.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
