@@ -23,13 +23,39 @@ type CredentialPolicy struct {
 	AllowedModes []CredentialMode `json:"allowed_modes"`
 }
 
-// CredentialRef is an opaque runtime handle. Reference must point to an
-// application-owned secure store or ephemeral credential binding and must not
-// contain raw API-key/secret material.
+// CredentialRef is an opaque runtime credential binding.
+//
+// ID is a stable non-secret logical identity used for usage attribution and
+// deduplication. Reference points to an application-owned secret store or
+// ephemeral binding and must never contain raw API-key/secret material.
+// QuotaScope is an optional opaque application-owned label identifying the
+// provider quota/account/project scope shared by credentials. Two credentials
+// with the same non-empty QuotaScope may consume the same provider limits.
 type CredentialRef struct {
-	Provider  ProviderID     `json:"provider"`
-	Mode      CredentialMode `json:"mode"`
-	Reference string         `json:"reference"`
+	ID         string         `json:"id"`
+	Provider   ProviderID     `json:"provider"`
+	Mode       CredentialMode `json:"mode"`
+	Reference  string         `json:"reference"`
+	QuotaScope string         `json:"quota_scope,omitempty"`
+}
+
+// CredentialIdentity is safe to persist in usage/trace metadata because it
+// deliberately excludes the secret-store Reference handle.
+type CredentialIdentity struct {
+	ID         string         `json:"id"`
+	Provider   ProviderID     `json:"provider"`
+	Mode       CredentialMode `json:"mode"`
+	QuotaScope string         `json:"quota_scope,omitempty"`
+}
+
+// Identity returns the persistable identity of a runtime credential binding.
+func (ref CredentialRef) Identity() CredentialIdentity {
+	return CredentialIdentity{
+		ID:         ref.ID,
+		Provider:   ref.Provider,
+		Mode:       ref.Mode,
+		QuotaScope: ref.QuotaScope,
+	}
 }
 
 // ValidateCredentialPolicy validates allowed authorization modes.
@@ -52,8 +78,22 @@ func ValidateCredentialPolicy(policy CredentialPolicy) error {
 
 // ValidateCredentialRef validates an opaque runtime credential binding.
 func ValidateCredentialRef(ref CredentialRef) error {
-	if !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validOpaqueModelID(ref.Reference, 256) {
+	if !validPortableID(ref.ID, 128) || !validPortableID(string(ref.Provider), 128) || !ref.Mode.Valid() || !validOpaqueModelID(ref.Reference, 256) {
 		return validationError(CodeInvalidCredential, "credential")
+	}
+	if ref.QuotaScope != "" && !validOpaqueModelID(ref.QuotaScope, 256) {
+		return validationError(CodeInvalidCredential, "credential.quota_scope")
+	}
+	return nil
+}
+
+// ValidateCredentialIdentity validates persistable credential metadata.
+func ValidateCredentialIdentity(identity CredentialIdentity) error {
+	if !validPortableID(identity.ID, 128) || !validPortableID(string(identity.Provider), 128) || !identity.Mode.Valid() {
+		return validationError(CodeInvalidCredential, "credential_identity")
+	}
+	if identity.QuotaScope != "" && !validOpaqueModelID(identity.QuotaScope, 256) {
+		return validationError(CodeInvalidCredential, "credential_identity.quota_scope")
 	}
 	return nil
 }
