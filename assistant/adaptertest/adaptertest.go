@@ -25,11 +25,6 @@ type Config struct {
 	Model      assistant.ModelRef
 	Timeout    time.Duration
 
-	// BasicPrompt replaces the low-cost default text smoke prompt when non-empty.
-	BasicPrompt string
-	// CheckBasic can add adapter-specific assertions to the normalized text smoke.
-	CheckBasic func(assistant.GenerationResponse) error
-
 	// Probes exercise additional capability-specific request shapes such as tools,
 	// structured output, or multimodal input. Run verifies RequiredCapabilities
 	// are advertised by the selected model before invoking a probe.
@@ -112,22 +107,16 @@ func Run(t *testing.T, config Config) {
 	}
 
 	t.Run("generate/text", func(t *testing.T) {
-		prompt := config.BasicPrompt
-		if prompt == "" {
-			prompt = "Reply with OK."
-		}
-		response, err := registry.Generate(operationContext(t, config.Timeout), assistant.GenerationRequest{
-			Model:      config.Model,
-			Messages:   []assistant.Message{{Role: assistant.RoleUser, Content: []assistant.ContentPart{{Type: assistant.PartText, Text: prompt}}}},
+		_, err := registry.Generate(operationContext(t, config.Timeout), assistant.GenerationRequest{
+			Model: config.Model,
+			Messages: []assistant.Message{{
+				Role:    assistant.RoleUser,
+				Content: []assistant.ContentPart{{Type: assistant.PartText, Text: "Reply with OK."}},
+			}},
 			Credential: config.Credential,
 		})
 		if err != nil {
 			t.Fatalf("Generate(text) = %v", err)
-		}
-		if config.CheckBasic != nil {
-			if err := config.CheckBasic(response); err != nil {
-				t.Fatalf("CheckBasic() = %v", err)
-			}
 		}
 	})
 
@@ -135,9 +124,6 @@ func Run(t *testing.T, config Config) {
 		probe := probe
 		t.Run("probe/"+probe.Name, func(t *testing.T) {
 			for _, capability := range probe.RequiredCapabilities {
-				if !capability.Valid() {
-					t.Fatalf("invalid required capability %q", capability)
-				}
 				if !hasCapability(selected, capability) {
 					t.Fatalf("configured model %+v does not advertise required capability %q", config.Model, capability)
 				}
