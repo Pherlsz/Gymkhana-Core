@@ -98,6 +98,7 @@ func TestPortableEnumsAndUsage(t *testing.T) {
 		t.Fatalf("ValidateUsage(valid) = %v", err)
 	}
 	assertCode(t, assistant.ValidateUsage(assistant.Usage{InputTokens: -1}), assistant.CodeInvalidUsage)
+	assertCode(t, assistant.ValidateUsage(assistant.Usage{InputTokens: 9007199254740992}), assistant.CodeInvalidUsage)
 
 	capabilities := []assistant.Capability{
 		assistant.CapabilityText,
