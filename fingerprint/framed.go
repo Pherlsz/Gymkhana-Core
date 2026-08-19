@@ -14,14 +14,20 @@ var frameMagic = [...]byte{'C', 'F', 'P', FrameVersion}
 // portable Core FingerPrint frame. Part boundaries and namespaces are included
 // in the hash input, preventing ambiguous concatenation and cross-domain reuse.
 func SumFramed(namespace string, parts ...[]byte) (Digest, error) {
+	if err := validateFrame(namespace, len(parts)); err != nil {
+		return Digest{}, err
+	}
 	return framed(namespace, len(parts), func(index int) []byte {
 		return parts[index]
-	})
+	}), nil
 }
 
 // SumFramedText is SumFramed for exact UTF-8 string bytes. It performs no
 // Unicode or application-level canonicalization and rejects invalid UTF-8.
 func SumFramedText(namespace string, parts ...string) (Digest, error) {
+	if err := validateFrame(namespace, len(parts)); err != nil {
+		return Digest{}, err
+	}
 	for _, part := range parts {
 		if !utf8.ValidString(part) {
 			return Digest{}, validationError(CodeInvalidUTF8)
@@ -29,17 +35,20 @@ func SumFramedText(namespace string, parts ...string) (Digest, error) {
 	}
 	return framed(namespace, len(parts), func(index int) []byte {
 		return []byte(parts[index])
-	})
+	}), nil
 }
 
-func framed(namespace string, partCount int, part func(index int) []byte) (Digest, error) {
+func validateFrame(namespace string, partCount int) error {
 	if !validNamespace(namespace) {
-		return Digest{}, validationError(CodeInvalidNamespace)
+		return validationError(CodeInvalidNamespace)
 	}
 	if uint64(partCount) > uint64(^uint32(0)) {
-		return Digest{}, validationError(CodeTooManyParts)
+		return validationError(CodeTooManyParts)
 	}
+	return nil
+}
 
+func framed(namespace string, partCount int, part func(index int) []byte) Digest {
 	hash := sha256.New()
 	_, _ = hash.Write(frameMagic[:])
 
@@ -60,7 +69,7 @@ func framed(namespace string, partCount int, part func(index int) []byte) (Diges
 
 	var digest Digest
 	copy(digest[:], hash.Sum(nil))
-	return digest, nil
+	return digest
 }
 
 func validNamespace(value string) bool {
