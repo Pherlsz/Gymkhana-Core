@@ -188,13 +188,13 @@ func executeFingerprint(testCase vector) (any, string) {
 		if !ok {
 			return nil, "invalid_conformance_input"
 		}
-		return fingerprintResult(fingerprint.String(input))
+		return fingerprintResult(fingerprint.SumText(input))
 	case "fingerprint.sha256.framed_text":
 		input, ok := structuredFingerprintInput(testCase.Input)
 		if !ok {
 			return nil, "invalid_conformance_input"
 		}
-		return fingerprintResult(fingerprint.FramedStrings(input.Namespace, input.Parts...))
+		return fingerprintResult(fingerprint.SumFramedText(input.Namespace, input.Parts...))
 	case "fingerprint.digest.parse":
 		input, ok := stringInput(testCase.Input)
 		if !ok {
