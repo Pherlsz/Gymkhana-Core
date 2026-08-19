@@ -13,6 +13,10 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 - Language-neutral fingerprint specification and shared conformance vectors under Core Spec `0.2`, including exact digest, framing, namespace separation, boundary preservation, and parsing behavior.
 - Bounded fingerprint parse fuzzing integrated into `make fuzz-smoke`.
 
+### Fixed
+
+- Preserve `FormatHouseNumber` idempotency when punctuation would otherwise canonicalize a standalone number label or empty marker into a value such as `N`, `NUM`, or `SN` that the next pass removes.
+
 ### Changed
 
 - Core specification advances from `0.1` to `0.2` for the new fingerprint operation family; `conformance/v0.2` carries the complete applicable normalize, temporal, and fingerprint suite set.
