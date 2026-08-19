@@ -3,137 +3,190 @@
   "$id": "https://github.com/Pherlsz/Gymkhana-Core/schemas/assistant-config.schema.json",
   "title": "Gymkhana Core Assistant configuration",
   "$defs": {
-    "PortableID": {
-      "type": "string",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_./-]{0,127}$"
-    },
-    "OpaqueRef": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256,
-      "pattern": "^[!-~]+$"
-    },
+    "SafeInteger": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "PortableID": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_./-]{0,127}$"},
+    "OpaqueRef": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[!-~]+$"},
+    "CredentialHandle": {"type": "string", "minLength": 3, "maxLength": 256, "pattern": "^[a-z][a-z0-9_.-]{0,63}:[!-~]+$"},
     "ProviderID": {"$ref": "#/$defs/PortableID"},
     "ModelID": {"$ref": "#/$defs/OpaqueRef"},
     "ModelRef": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["provider", "model"],
-      "properties": {
-        "provider": {"$ref": "#/$defs/ProviderID"},
-        "model": {"$ref": "#/$defs/ModelID"}
-      }
+      "type": "object", "additionalProperties": false, "required": ["provider", "model"],
+      "properties": {"provider": {"$ref": "#/$defs/ProviderID"}, "model": {"$ref": "#/$defs/ModelID"}}
     },
     "AccessTier": {"type": "string", "enum": ["free", "paid", "local", "unknown"]},
     "ModelRole": {"type": "string", "enum": ["generation", "embedding", "reranking"]},
     "ModelDescriptor": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["ref", "access", "roles"],
+      "type": "object", "additionalProperties": false, "required": ["ref", "access", "roles"],
       "properties": {
         "ref": {"$ref": "#/$defs/ModelRef"},
-        "display_name": {"type": "string"},
+        "display_name": {"type": "string", "maxLength": 512},
         "access": {"$ref": "#/$defs/AccessTier"},
-        "roles": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ModelRole"}},
-        "capabilities": {"type": "array", "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/Capability"}},
-        "context_window": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
-        "max_output_tokens": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}
+        "roles": {"type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": {"$ref": "#/$defs/ModelRole"}},
+        "capabilities": {"$ref": "assistant.schema.json#/$defs/Capabilities"},
+        "context_window": {"$ref": "#/$defs/SafeInteger"},
+        "max_output_tokens": {"$ref": "#/$defs/SafeInteger"}
       }
     },
     "ModelPolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["mode"],
+      "type": "object", "additionalProperties": false, "required": ["mode"],
       "properties": {
         "mode": {"enum": ["manual", "ordered_fallback", "dynamic"]},
         "manual": {"$ref": "#/$defs/ModelRef"},
-        "candidates": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ModelRef"}},
-        "allowed_providers": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ProviderID"}},
+        "candidates": {"type": "array", "minItems": 1, "maxItems": 4096, "uniqueItems": true, "items": {"$ref": "#/$defs/ModelRef"}},
+        "allowed_providers": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "#/$defs/ProviderID"}},
         "allowed_access": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/AccessTier"}},
         "preferred_access": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/AccessTier"}},
-        "required_capabilities": {"type": "array", "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/Capability"}}
+        "required_capabilities": {"$ref": "assistant.schema.json#/$defs/Capabilities"}
       },
       "allOf": [
         {"if": {"properties": {"mode": {"const": "manual"}}, "required": ["mode"]}, "then": {"required": ["manual"], "not": {"required": ["candidates"]}}},
         {"if": {"properties": {"mode": {"const": "ordered_fallback"}}, "required": ["mode"]}, "then": {"required": ["candidates"], "not": {"required": ["manual"]}}},
         {"if": {"properties": {"mode": {"const": "dynamic"}}, "required": ["mode"]}, "then": {"not": {"anyOf": [{"required": ["manual"]}, {"required": ["candidates"]}]}}}
-      ]
+      ],
+      "description": "preferred_access must be a subset of allowed_access when allowed_access is non-empty; semantic validation enforces this."
     },
-    "CredentialMode": {"type": "string", "enum": ["managed", "byok"]},
+    "CredentialMode": {"type": "string", "enum": ["none", "managed", "byok"]},
     "CredentialPolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["allowed_modes"],
-      "properties": {"allowed_modes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/CredentialMode"}}}
+      "type": "object", "additionalProperties": false, "required": ["allowed_modes"],
+      "properties": {"allowed_modes": {"type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true, "items": {"$ref": "#/$defs/CredentialMode"}}}
     },
     "CredentialRef": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["provider", "mode", "reference"],
+      "type": "object", "additionalProperties": false, "required": ["id", "provider", "mode", "reference"],
       "properties": {
+        "id": {"$ref": "#/$defs/PortableID"},
         "provider": {"$ref": "#/$defs/ProviderID"},
-        "mode": {"$ref": "#/$defs/CredentialMode"},
-        "reference": {"$ref": "#/$defs/OpaqueRef"}
+        "mode": {"enum": ["managed", "byok"]},
+        "reference": {"$ref": "#/$defs/CredentialHandle"},
+        "quota_scope": {"$ref": "#/$defs/OpaqueRef"}
       }
     },
-    "ModuleID": {"type": "string", "enum": ["text", "vision", "audio_input", "video_input", "file_input", "tools", "retrieval", "memory", "structured_output"]},
+    "CredentialIdentity": {
+      "type": "object", "additionalProperties": false, "required": ["id", "provider", "mode"],
+      "properties": {
+        "id": {"$ref": "#/$defs/PortableID"},
+        "provider": {"$ref": "#/$defs/ProviderID"},
+        "mode": {"enum": ["managed", "byok"]},
+        "quota_scope": {"$ref": "#/$defs/OpaqueRef"}
+      }
+    },
+    "FailureClass": {
+      "type": "string",
+      "enum": ["auth", "rate_limit", "quota", "timeout", "unavailable", "network", "context_limit", "unsupported_capability", "safety", "invalid_request", "cancelled", "unknown"]
+    },
+    "CredentialFallbackPolicy": {
+      "type": "object", "additionalProperties": false, "required": ["on", "skip_same_quota_scope"],
+      "properties": {
+        "on": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/FailureClass"}},
+        "skip_same_quota_scope": {"type": "boolean"}
+      }
+    },
+    "RoutingFallbackPolicy": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "model_on": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/FailureClass"}},
+        "provider_on": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/FailureClass"}},
+        "max_attempts": {"$ref": "#/$defs/SafeInteger"}
+      }
+    },
+    "ModuleID": {
+      "type": "string",
+      "enum": ["text", "vision", "audio_input", "video_input", "file_input", "image_output", "audio_output", "video_output", "file_output", "tools", "retrieval", "memory", "structured_output"]
+    },
     "InstructionBlock": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["role", "text"],
+      "type": "object", "additionalProperties": false, "required": ["role", "text"],
       "properties": {"role": {"enum": ["system", "developer"]}, "text": {"type": "string", "minLength": 1}}
     },
+    "ToolEffect": {"type": "string", "enum": ["unknown", "read_only", "write", "destructive"]},
+    "ToolConfirmation": {"type": "string", "enum": ["never", "side_effect", "always"]},
+    "ToolPolicy": {
+      "type": "object", "additionalProperties": false, "required": ["name", "effect", "confirmation"],
+      "properties": {
+        "name": {"$ref": "assistant.schema.json#/$defs/ToolName"},
+        "effect": {"$ref": "#/$defs/ToolEffect"},
+        "confirmation": {"$ref": "#/$defs/ToolConfirmation"},
+        "parallel_safe": {"type": "boolean"},
+        "idempotent": {"type": "boolean"},
+        "max_calls": {"$ref": "#/$defs/SafeInteger"},
+        "timeout_millis": {"type": "integer", "minimum": 0, "maximum": 86400000},
+        "max_result_bytes": {"type": "integer", "minimum": 0, "maximum": 67108864}
+      },
+      "description": "Unknown tools must always confirm; writes may not use never; destructive tools must always confirm. Semantic validation enforces these relationships."
+    },
     "RetrievalPolicy": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["mode", "search", "query_transform", "candidate_limit", "context_limit", "rerank", "grounding", "require_citations"],
       "properties": {
         "mode": {"enum": ["on_demand", "always"]},
         "search": {"enum": ["lexical", "vector", "hybrid"]},
         "query_transform": {"enum": ["original", "rewrite", "multi_query"]},
-        "candidate_limit": {"type": "integer", "minimum": 1},
-        "context_limit": {"type": "integer", "minimum": 1},
+        "candidate_limit": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "context_limit": {"type": "integer", "minimum": 1, "maximum": 1024},
         "rerank": {"type": "boolean"},
         "grounding": {"enum": ["preferred", "required"]},
         "require_citations": {"type": "boolean"},
         "embedding_model": {"$ref": "#/$defs/ModelRef"},
         "reranking_model": {"$ref": "#/$defs/ModelRef"}
+      },
+      "description": "candidate_limit >= context_limit and reranking_model requires rerank=true; semantic validation enforces these relationships."
+    },
+    "MemoryScope": {"type": "string", "enum": ["session", "assistant", "user", "tenant"]},
+    "MemoryPolicy": {
+      "type": "object", "additionalProperties": false, "required": ["write_mode", "sensitive"],
+      "properties": {
+        "read_scopes": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/MemoryScope"}},
+        "write_mode": {"enum": ["disabled", "explicit", "confirmed"]},
+        "write_scope": {"$ref": "#/$defs/MemoryScope"},
+        "sensitive": {"enum": ["exclude", "confirm"]},
+        "max_items": {"$ref": "#/$defs/SafeInteger"},
+        "max_item_bytes": {"$ref": "#/$defs/SafeInteger"}
       }
     },
-    "ExecutionBudget": {
-      "type": "object",
-      "additionalProperties": false,
+    "LearningScope": {"type": "string", "enum": ["skill_hint", "retrieval_hint", "tool_hint", "model_routing_hint"]},
+    "LearningPolicy": {
+      "type": "object", "additionalProperties": false, "required": ["mode"],
       "properties": {
-        "max_turns": {"type": "integer", "minimum": 0},
-        "max_tool_calls": {"type": "integer", "minimum": 0},
-        "max_retrieval_rounds": {"type": "integer", "minimum": 0},
-        "max_output_tokens": {"type": "integer", "minimum": 0}
+        "mode": {"enum": ["disabled", "propose", "auto_promote"]},
+        "min_evidence": {"type": "integer", "minimum": 1, "maximum": 256},
+        "max_evidence": {"type": "integer", "minimum": 1, "maximum": 256},
+        "auto_promote_scopes": {"type": "array", "uniqueItems": true, "items": {"enum": ["retrieval_hint", "tool_hint", "model_routing_hint"]}}
+      },
+      "description": "Disabled mode uses zero evidence fields; free-form skill_hint is never auto-promotable."
+    },
+    "ExecutionBudget": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "max_turns": {"$ref": "#/$defs/SafeInteger"},
+        "max_tool_calls": {"$ref": "#/$defs/SafeInteger"},
+        "max_retrieval_rounds": {"$ref": "#/$defs/SafeInteger"},
+        "max_output_tokens": {"$ref": "#/$defs/SafeInteger"}
       }
     },
     "AssistantDefinition": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["id", "name", "modules", "model_policy", "credentials"],
       "properties": {
         "id": {"$ref": "#/$defs/PortableID"},
-        "name": {"type": "string", "minLength": 1},
-        "description": {"type": "string"},
-        "instructions": {"type": "array", "items": {"$ref": "#/$defs/InstructionBlock"}},
-        "modules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/ModuleID"}},
-        "optional_modules": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/ModuleID"}, "description": "Must be disjoint from modules; enforced by Core semantic validation."},
-        "skills": {"type": "array", "items": {"$ref": "assistant.schema.json#/$defs/Skill"}},
-        "tools": {"type": "array", "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/ToolName"}},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096},
+        "instructions": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/InstructionBlock"}},
+        "modules": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/ModuleID"}},
+        "optional_modules": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/ModuleID"}, "description": "Must be disjoint from modules; semantic validation enforces this."},
+        "skills": {"$ref": "assistant.schema.json#/$defs/Skills"},
+        "tools": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"$ref": "assistant.schema.json#/$defs/ToolName"}},
+        "tool_policies": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/ToolPolicy"}},
         "model_policy": {"$ref": "#/$defs/ModelPolicy"},
         "credentials": {"$ref": "#/$defs/CredentialPolicy"},
+        "routing_fallback": {"$ref": "#/$defs/RoutingFallbackPolicy"},
         "retrieval": {"$ref": "#/$defs/RetrievalPolicy"},
+        "memory": {"$ref": "#/$defs/MemoryPolicy"},
+        "learning": {"$ref": "#/$defs/LearningPolicy"},
         "budget": {"$ref": "#/$defs/ExecutionBudget"}
-      }
+      },
+      "description": "Tool/retrieval/memory policies must correspond to declared default or optional modules; semantic validation enforces cross-field invariants."
     },
     "AssistantCatalog": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["assistants"],
-      "properties": {"assistants": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/AssistantDefinition"}}}
+      "type": "object", "additionalProperties": false, "required": ["assistants"],
+      "properties": {"assistants": {"type": "array", "minItems": 1, "maxItems": 1024, "items": {"$ref": "#/$defs/AssistantDefinition"}}}
     }
   }
 }
