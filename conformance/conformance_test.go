@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/civiltime"
+	"github.com/Pherlsz/Gymkhana-Core/fingerprint"
 	"github.com/Pherlsz/Gymkhana-Core/normalize"
 )
 
@@ -35,6 +36,10 @@ func TestNormalizeConformance(t *testing.T) {
 
 func TestTemporalConformance(t *testing.T) {
 	runSuite(t, "temporal.json", executeTemporal)
+}
+
+func TestFingerprintConformance(t *testing.T) {
+	runSuite(t, "fingerprint.json", executeFingerprint)
 }
 
 func runSuite(t *testing.T, filename string, execute executor) {
@@ -176,6 +181,31 @@ func executeTemporal(testCase vector) (any, string) {
 	}
 }
 
+func executeFingerprint(testCase vector) (any, string) {
+	switch testCase.Operation {
+	case "fingerprint.sha256.text":
+		input, ok := stringInput(testCase.Input)
+		if !ok {
+			return nil, "invalid_conformance_input"
+		}
+		return fingerprint.String(input).String(), ""
+	case "fingerprint.sha256.framed_text":
+		input, ok := structuredFingerprintInput(testCase.Input)
+		if !ok {
+			return nil, "invalid_conformance_input"
+		}
+		return fingerprintResult(fingerprint.FramedStrings(input.Namespace, input.Parts...))
+	case "fingerprint.digest.parse":
+		input, ok := stringInput(testCase.Input)
+		if !ok {
+			return nil, "invalid_conformance_input"
+		}
+		return fingerprintResult(fingerprint.Parse(input))
+	default:
+		return nil, "unsupported_operation"
+	}
+}
+
 func executeNormalizeString(input json.RawMessage, operation func(string) (string, error)) (any, string) {
 	value, ok := stringInput(input)
 	if !ok {
@@ -205,11 +235,35 @@ func structuredDocumentInput(raw json.RawMessage) (documentInput, bool) {
 	return value, true
 }
 
+type fingerprintInput struct {
+	Namespace string   `json:"namespace"`
+	Parts     []string `json:"parts"`
+}
+
+func structuredFingerprintInput(raw json.RawMessage) (fingerprintInput, bool) {
+	var value fingerprintInput
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return fingerprintInput{}, false
+	}
+	return value, true
+}
+
 func normalizeResult(value string, err error) (any, string) {
 	if err == nil {
 		return value, ""
 	}
 	var validation *normalize.ValidationError
+	if errors.As(err, &validation) {
+		return nil, string(validation.Code)
+	}
+	return nil, "unknown_error"
+}
+
+func fingerprintResult(value fingerprint.Digest, err error) (any, string) {
+	if err == nil {
+		return value.String(), ""
+	}
+	var validation *fingerprint.ValidationError
 	if errors.As(err, &validation) {
 		return nil, string(validation.Code)
 	}
