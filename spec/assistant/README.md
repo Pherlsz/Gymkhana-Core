@@ -1,8 +1,10 @@
 # Assistant semantics
 
-Core Assistant defines provider-neutral conversation and tool contracts that can be shared by applications without importing a model-provider SDK into domain code.
+Core Assistant defines provider-neutral multimodal conversation, tool, configuration, model-routing, BYOK-reference, and retrieval contracts that can be shared by applications without importing a model-provider SDK into domain code.
 
-The initial contract is intentionally transport-neutral. It does not define HTTP, authentication, retries, model IDs, pricing, provider options, persistence, orchestration, or prompt-management policy.
+The contract is transport-neutral. It does not define provider HTTP payloads, raw authentication secrets, retries, volatile price tables, provider SDK objects, persistence, or an autonomous unbounded agent loop.
+
+Detailed configuration/model-routing semantics are defined in [`CONFIGURATION.md`](CONFIGURATION.md). Portable RAG semantics are defined in [`RAG.md`](RAG.md).
 
 ## Roles
 
@@ -23,8 +25,10 @@ A `Message` contains a valid role and one or more ordered content parts. Part or
 Portable part types are:
 
 - `text` — non-empty UTF-8 text;
-- `image` — an external media reference intended as image input;
-- `file` — an external media reference intended as file/document input;
+- `image` — external image reference;
+- `audio` — external audio reference;
+- `video` — external video reference;
+- `file` — external generic file/document reference;
 - `tool_call` — an assistant request to invoke a named tool with structured arguments;
 - `tool_result` — the result corresponding to a prior tool call.
 
@@ -34,7 +38,7 @@ Each part is a discriminated union: exactly the payload matching its `type` is p
 
 Media is represented by an opaque non-empty `uri`, with optional `media_type` and `name` metadata. Core does not fetch the URI and does not constrain URI schemes in Spec `0.3`; adapters and consuming applications own accessibility, authorization, size, lifetime, and supported-scheme policy.
 
-Inline binary encoding, uploads, provider file IDs, and media transformation remain adapter/application concerns in this revision.
+Inline binary encoding, uploads, provider file IDs, transcoding, frame extraction, speech preprocessing, and other media transformation remain adapter/application concerns in this revision.
 
 ## Tools
 
@@ -56,7 +60,7 @@ Core requires `input_schema` to be a JSON object but does not enforce a particul
 
 A `ToolCall` contains an opaque non-empty Unicode `id` of at most 256 Unicode scalar values, a valid tool `name`, and `arguments` as a JSON object. Argument property ordering is not semantic.
 
-A `ToolResult` references the original call through `call_id`, contains one or more result content parts, and may set `is_error`. Tool-result content may contain `text`, `image`, or `file`; nested `tool_call` and `tool_result` parts are invalid.
+A `ToolResult` references the original call through `call_id`, contains one or more result content parts, and may set `is_error`. Tool-result content may contain `text`, `image`, `audio`, `video`, or `file`; nested `tool_call` and `tool_result` parts are invalid.
 
 ## Finish reasons
 
@@ -88,6 +92,10 @@ Portable capability identifiers are:
 
 - `text`;
 - `image_input`;
+- `image_output`;
+- `audio_input`;
+- `audio_output`;
+- `video_input`;
 - `file_input`;
 - `tool_calling`;
 - `structured_output`;
@@ -95,9 +103,56 @@ Portable capability identifiers are:
 
 A capability set contains no duplicates. Capability discovery itself is adapter/application-owned; Core only defines portable names.
 
+Assistant module configuration automatically contributes required generation-model capabilities during routing. This prevents a multimodal/tool-enabled Assistant from dynamically selecting a model that cannot satisfy the active module set.
+
+## Multiple assistants
+
+Applications create independent `AssistantDefinition` values for distinct functions rather than mutating one global Assistant.
+
+A definition can configure:
+
+- instructions;
+- default/optional modules;
+- skills;
+- tools;
+- model selection/routing;
+- managed/BYOK credential acceptance;
+- optional RAG;
+- bounded execution budgets.
+
+`AssistantCatalog` validates collections of uniquely identified definitions. Per-run overrides can temporarily toggle declared modules, choose a model manually, or bind a credential reference without mutating the persisted definition.
+
+## Providers and models
+
+Concrete AI systems are adapters. The Go implementation exposes a `ProviderAdapter` interface and runtime-local `AdapterRegistry`; other languages may expose equivalent idiomatic substitution boundaries.
+
+Model catalogs are supplied live by adapters. Core does not ship a frozen model-name or pricing table. Catalog entries declare current access tier (`free`, `paid`, `local`, `unknown`), roles, capabilities, and optional context/output limits.
+
+Portable model selection supports:
+
+- `manual` — exact model selection;
+- `ordered_fallback` — explicit benchmarked fallback order;
+- `dynamic` — deterministic filtering/ranking over the current model catalog.
+
+Common provider IDs such as `openai`, `anthropic`, `google`, `openrouter`, `groq`, `ollama`, `mistral`, and `xai` are convenience constants, not a closed enum.
+
+## BYOK
+
+`CredentialPolicy` controls whether a definition accepts `managed`, `byok`, or both modes.
+
+A `CredentialRef` contains only provider, mode, and an opaque application-owned reference. Raw API keys are never valid Core configuration. The host stores user-supplied keys securely/ephemerally and configures adapters to resolve the opaque handle outside Core.
+
+## RAG
+
+`RetrievalPolicy` supports lexical, vector, or hybrid retrieval; original/rewrite/multi-query search queries; candidate and final context limits; optional reranking; grounding requirements; citations; and optional embedding/reranking model references.
+
+Authorization/filtering happens before retrieved evidence is exposed to a generation model. Retrieved content is untrusted data and never instruction authority.
+
+See [`RAG.md`](RAG.md) for the normative retrieval pipeline and evidence boundary.
+
 ## Built-in skills
 
-Assistant skills are versioned provider-neutral behavior profiles. They are not provider prompts, authorization rules, hidden chain-of-thought instructions, or model-specific configuration objects. A provider adapter may realize a skill through native settings, context construction, concise instructions, or a combination of those mechanisms, but the observable intent must remain portable.
+Assistant skills are versioned provider-neutral behavior profiles. They are not provider prompts, authorization rules, hidden chain-of-thought instructions, or model-specific configuration objects. A provider adapter may realize a skill through native settings, context construction, concise instructions, caching, or a combination of those mechanisms, but the observable intent must remain portable.
 
 Spec `0.3` defines one built-in skill:
 
@@ -120,38 +175,35 @@ The skill does **not** define a universal tokenizer, exact input-token estimator
 
 ## Stable errors
 
-Assistant validation uses stable, non-localized codes:
+Assistant validation uses stable, non-localized codes including:
 
 - `empty`;
 - `invalid_role`;
-- `invalid_content`;
-- `invalid_content_type`;
-- `invalid_media`;
-- `invalid_tool_name`;
-- `invalid_json`;
-- `invalid_tool_call`;
-- `invalid_tool_result`;
-- `invalid_finish_reason`;
-- `invalid_usage`;
-- `invalid_capability`;
-- `duplicate_capability`;
-- `invalid_skill`;
-- `duplicate_skill`.
+- `invalid_content` / `invalid_content_type` / `invalid_media`;
+- `invalid_tool_name` / `invalid_json` / `invalid_tool_call` / `invalid_tool_result`;
+- `invalid_finish_reason` / `invalid_usage` / `invalid_capability` / `duplicate_capability`;
+- `invalid_skill` / `duplicate_skill`;
+- `invalid_assistant` / `duplicate_assistant`;
+- `invalid_module` / `duplicate_module`;
+- `invalid_model` / `invalid_model_policy` / `model_unavailable`;
+- `invalid_credential`;
+- `invalid_retrieval`;
+- `invalid_provider` / `duplicate_provider`.
 
-Errors must not embed prompt text, tool arguments, tool results, URIs, or other sensitive original values.
+Errors must not embed prompt text, tool arguments, tool results, media URIs, raw credentials, retrieved sensitive values, or other sensitive original values.
 
 ## Serialization
 
-Portable serialized contracts use the JSON field names defined under `schemas/assistant.schema.json`. Provider adapters may expose idiomatic language APIs but must preserve the same semantics at serialization boundaries.
+Portable message/tool/media/skill contracts use `schemas/assistant.schema.json`. Assistant/model/BYOK/RAG configuration uses `schemas/assistant-config.schema.json`.
 
-Unknown provider-specific fields do not belong in the Core serialized shape. Applications that need provider metadata should keep it in adapter-owned envelopes rather than weakening the portable contract.
+Provider adapters may expose idiomatic language APIs but must preserve the same semantics at serialization boundaries. Unknown provider-specific fields do not belong in portable Core shapes; adapters keep such metadata in adapter-owned envelopes.
 
 ## Streaming
 
-Spec `0.3` defines `streaming` as a capability but deliberately does not standardize a `StreamEvent` shape yet. Providers differ materially in text deltas, tool-argument fragments, usage timing, error events, and event ordering. A later specification revision should define streaming only after the contract has been exercised against multiple provider adapters.
+Spec `0.3` defines `streaming` as a capability but deliberately does not standardize a `StreamEvent` shape yet. Providers differ materially in text deltas, tool-argument fragments, usage timing, error events, and event ordering. A later specification revision should define streaming only after the contract has been exercised against multiple real provider adapters.
 
 ## Security and privacy
 
-Assistant contracts can carry sensitive prompts, files, tool arguments, and tool results. Core performs no redaction, encryption, persistence, logging, or retention. Consuming applications own those policies.
+Assistant contracts can carry sensitive prompts, files, tool arguments, tool results, retrieved evidence, and credential references. Core performs no redaction, encryption, persistence, logging, or retention. Consuming applications own those policies.
 
 Tool definitions and tool calls are data, not authorization. A consumer must independently authorize every side effect before executing a tool call.
