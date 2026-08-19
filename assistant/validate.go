@@ -6,6 +6,8 @@ import (
 	"unicode/utf8"
 )
 
+const maxPortableJSONInteger int64 = 1<<53 - 1
+
 // ValidateMessage validates portable message semantics.
 func ValidateMessage(message Message) error {
 	if !message.Role.Valid() {
@@ -160,10 +162,14 @@ func ValidateFinishReason(reason FinishReason) error {
 	return nil
 }
 
-// ValidateUsage rejects negative provider counters.
+// ValidateUsage rejects counters outside the non-negative JSON safe-integer
+// range so serialized values remain exact in JavaScript/TypeScript runtimes.
 func ValidateUsage(usage Usage) error {
-	if usage.InputTokens < 0 || usage.OutputTokens < 0 || usage.CachedInputTokens < 0 || usage.ReasoningTokens < 0 {
-		return validationError(CodeInvalidUsage, "usage")
+	values := [...]int64{usage.InputTokens, usage.OutputTokens, usage.CachedInputTokens, usage.ReasoningTokens}
+	for _, value := range values {
+		if value < 0 || value > maxPortableJSONInteger {
+			return validationError(CodeInvalidUsage, "usage")
+		}
 	}
 	return nil
 }
