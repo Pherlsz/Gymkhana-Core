@@ -15,6 +15,12 @@
       "error": "invalid_json"
     },
     {
+      "name": "reject unpaired UTF16 surrogate escape",
+      "operation": "portablejson.object.validate",
+      "input": {"value": "\ud800"},
+      "error": "invalid_json"
+    },
+    {
       "name": "reject non object at object boundary",
       "operation": "portablejson.object.validate",
       "input": [1, 2, 3],
@@ -83,6 +89,33 @@
           "additionalProperties": false
         },
         "instance": {"value": 9007199254740992}
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "keep distinct exact decimal enum values",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": "number", "enum": [0.1]},
+        "instance": 0.10000000000000001
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "reject excessive decimal exponent",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": "number"},
+        "instance": 1e-1025
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "portable integer rejects fractional lexical form",
+      "operation": "portablejson.instance.validate",
+      "input": {
+        "schema": {"type": "integer"},
+        "instance": 1.0
       },
       "error": "invalid_schema"
     },
