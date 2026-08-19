@@ -9,15 +9,17 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 ### Added
 
 - Provider-neutral `assistant` Go package with portable message roles, ordered content parts, external image/file references, tool definitions/calls/results, finish reasons, usage counters, and capability identifiers.
+- Versioned Assistant skill contracts plus built-in `token_economy/v1`, covering concise responses, restatement avoidance, prior-context reuse, tool-result compaction, and mandatory preservation of instruction hierarchy and unresolved constraints.
 - Core Spec `0.3` Assistant semantics with explicit provider/transport boundaries, portable tool-name rules, stable validation errors, and security guidance for tool authorization and sensitive conversation data.
-- `schemas/assistant.schema.json` for language-neutral serialized Assistant contracts.
-- Complete `conformance/v0.3` suite set with Assistant message/tool/usage/capability vectors plus the existing normalize, temporal, and fingerprint suites.
+- `schemas/assistant.schema.json` for language-neutral serialized Assistant contracts, including portable built-in skill shapes.
+- Complete `conformance/v0.3` suite set with Assistant message/tool/usage/capability/skill vectors plus the existing normalize, temporal, and fingerprint suites.
 - Bounded Assistant JSON round-trip fuzzing integrated into `make fuzz-smoke`.
 
 ### Changed
 
 - Core specification advances from `0.2` to `0.3` for the new Assistant contract family.
 - Streaming is represented as a portable capability but its event/delta wire contract is intentionally deferred until multiple provider adapters have exercised the semantics.
+- Token-economy behavior is defined as a portable semantic profile rather than provider prompt text; consumers remain responsible for provider tokenization and any lossy context compaction.
 
 ## [0.4.0] - 2026-08-18
 
