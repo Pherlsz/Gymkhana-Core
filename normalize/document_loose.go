@@ -59,7 +59,11 @@ func canonicalLooseDocument(kind DocumentKind, value string) (string, error) {
 		return "", validationError(ValueKind(kind), CodeInvalidFormat)
 	}
 
-	canonical := joinIdentifierTokens(strings.ToUpper(norm.NFC.String(value)))
+	normalized := strings.ToUpper(norm.NFC.String(value))
+	canonical := normalized
+	if Alphanumeric(normalized) != normalized {
+		canonical = joinIdentifierTokens(normalized)
+	}
 	if canonical == "" {
 		return "", validationError(ValueKind(kind), CodeEmpty)
 	}
