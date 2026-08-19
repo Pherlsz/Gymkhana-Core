@@ -67,6 +67,51 @@
       "operation": "contact.phone.br.canonicalize",
       "input": "(51) 99999-1234",
       "output": "+5551999991234"
+    },
+    {
+      "name": "canonical OAB with explicit state",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "oab",
+        "value": "OAB/RS 114.458"
+      },
+      "output": "114458/RS"
+    },
+    {
+      "name": "format alphanumeric CNPJ through document contract",
+      "operation": "identity.br.document.format",
+      "input": {
+        "kind": "cnpj",
+        "value": "12.abc.345/01de-35"
+      },
+      "output": "12.ABC.345/01DE-35"
+    },
+    {
+      "name": "canonical PIS through document contract",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "pis",
+        "value": "120.5824.883-1"
+      },
+      "output": "12058248831"
+    },
+    {
+      "name": "reject professional registration without state",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "oab",
+        "value": "114458"
+      },
+      "error": "missing_state"
+    },
+    {
+      "name": "reject unknown document kind",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "unknown",
+        "value": "123"
+      },
+      "error": "unknown_kind"
     }
   ]
 }
