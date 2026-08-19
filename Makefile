@@ -11,7 +11,7 @@ STATICCHECK_VERSION := v0.7.0
 GOVULNCHECK_VERSION := v1.6.0
 OSV_SCANNER_VERSION := v2.4.0
 
-.PHONY: setup setup-quality setup-security format format-check vet lint test test-race fuzz-smoke vuln osv security check clean
+.PHONY: setup setup-quality setup-security format format-check vet lint test conformance test-race fuzz-smoke vuln osv security check clean
 
 setup: setup-quality setup-security
 
@@ -49,6 +49,9 @@ lint:
 
 test:
 	@$(GO) test ./...
+
+conformance:
+	@$(GO) test ./conformance
 
 test-race:
 	@$(GO) test -race ./...
