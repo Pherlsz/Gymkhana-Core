@@ -16,8 +16,8 @@ func TestValidateObject(t *testing.T) {
 		t.Fatalf("ValidateObject(valid) = %v", err)
 	}
 	for name, raw := range map[string]json.RawMessage{
-		"duplicate_key": json.RawMessage("{\"a\":1,\"a\":2}"),
-		"array_root":    json.RawMessage("[1,2,3]"),
+		"duplicate_key":  json.RawMessage("{\"a\":1,\"a\":2}"),
+		"array_root":     json.RawMessage("[1,2,3]"),
 		"trailing_value": json.RawMessage("{} {}"),
 	} {
 		name, raw := name, raw
