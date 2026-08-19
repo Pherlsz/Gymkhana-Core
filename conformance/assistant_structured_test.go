@@ -19,12 +19,6 @@ func executeAssistantStructured(testCase vector) (any, string) {
 			return nil, "invalid_conformance_input"
 		}
 		return assistantValidationResult(assistant.ValidateToolArguments(value.Definition, value.Call))
-	case "assistant.schema_instance.validate":
-		var value schemaInstanceInput
-		if err := json.Unmarshal(testCase.Input, &value); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return assistantValidationResult(assistant.ValidatePortableJSONInstance(value.Schema, value.Instance))
 	case "assistant.model.next":
 		var value modelFallbackInput
 		if err := json.Unmarshal(testCase.Input, &value); err != nil {
@@ -45,17 +39,12 @@ type toolArgumentsInput struct {
 	Call       assistant.ToolCall       `json:"call"`
 }
 
-type schemaInstanceInput struct {
-	Schema   json.RawMessage `json:"schema"`
-	Instance json.RawMessage `json:"instance"`
-}
-
 type modelFallbackInput struct {
-	Candidates []assistant.ModelRef             `json:"candidates"`
-	Current    int                              `json:"current"`
-	Attempts   int64                            `json:"attempts"`
-	Failure    assistant.FailureClass           `json:"failure"`
-	Policy     assistant.RoutingFallbackPolicy  `json:"policy"`
+	Candidates []assistant.ModelRef            `json:"candidates"`
+	Current    int                             `json:"current"`
+	Attempts   int64                           `json:"attempts"`
+	Failure    assistant.FailureClass          `json:"failure"`
+	Policy     assistant.RoutingFallbackPolicy `json:"policy"`
 }
 
 type modelFallbackOutput struct {
