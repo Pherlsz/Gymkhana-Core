@@ -9,8 +9,10 @@ Use schemas for data contracts where generation is appropriate. Do not attempt t
 Current schemas:
 
 - `conformance.schema.json` — shape of shared conformance suites;
-- `assistant.schema.json` — provider-neutral Assistant message, content, media-reference, tool, finish-reason, usage, and capability shapes.
+- `assistant.schema.json` — provider-neutral Assistant message, content, media-reference, tool, finish-reason, usage, capability, and built-in skill shapes.
 
 The Assistant schema intentionally contains no provider SDK fields, credentials, model IDs, HTTP concerns, or provider-specific extension bag. Provider adapters keep such metadata outside the portable Core serialized shape.
+
+Built-in Assistant skills are versioned semantic profiles. The schema currently defines `token_economy/v1`; it does not prescribe provider prompt text or a provider-specific tokenization strategy.
 
 Future schemas may cover OCR contracts, stable error envelopes, and other genuinely cross-language serialized values.
