@@ -1,209 +1,175 @@
 # Assistant semantics
 
-Core Assistant defines provider-neutral multimodal conversation, tool, configuration, model-routing, BYOK-reference, and retrieval contracts that can be shared by applications without importing a model-provider SDK into domain code.
+Core Assistant defines provider-neutral multimodal conversation, configuration, model-routing, BYOK-reference, retrieval, tool-safety, learning, usage/quota, and observability contracts without importing a model-provider SDK into domain code.
 
-The contract is transport-neutral. It does not define provider HTTP payloads, raw authentication secrets, retries, volatile price tables, provider SDK objects, persistence, or an autonomous unbounded agent loop.
+The contract is transport-neutral. It does not define provider HTTP payloads, raw authentication secrets, volatile price tables, provider SDK objects, product persistence, or an autonomous unbounded agent loop.
 
-Detailed configuration/model-routing semantics are defined in [`CONFIGURATION.md`](CONFIGURATION.md). Portable RAG semantics are defined in [`RAG.md`](RAG.md).
+Normative companion documents:
 
-## Roles
+- [`CONFIGURATION.md`](CONFIGURATION.md) — modular Assistants, providers, model routing, BYOK, fallback, and budgets;
+- [`STRUCTURED-OUTPUT.md`](STRUCTURED-OUTPUT.md) — strict portable JSON/schema profile;
+- [`TOOLS.md`](TOOLS.md) — tool allowlist, side-effect policy, confirmation, and remote/MCP boundary;
+- [`RAG.md`](RAG.md) — retrieval and grounding;
+- [`LEARNING.md`](LEARNING.md) — task-scoped reviewable Skill Build;
+- [`OBSERVABILITY.md`](OBSERVABILITY.md) — usage, quotas, credential attribution, and content-free traces.
 
-Portable message roles are:
+## Roles and conversation authority
 
-- `system` — global behavioral or contextual instruction;
-- `developer` — application/developer instruction distinct from end-user input;
-- `user` — end-user supplied content;
-- `assistant` — model/assistant produced content;
-- `tool` — tool execution result content.
+Portable roles are `system`, `developer`, `user`, `assistant`, and `tool`.
 
-Adapters may need to merge or translate roles when a provider does not expose the same native role set. They must not silently reinterpret `user` content as a higher-authority instruction.
+Adapters may translate roles when providers expose a different native vocabulary, but they must not promote user/tool/document content to higher instruction authority.
 
-## Messages and content parts
+Role/content invariants:
 
-A `Message` contains a valid role and one or more ordered content parts. Part order is semantically significant.
+- system/developer/user messages may not contain `tool_call` or `tool_result` parts;
+- assistant messages may contain tool calls but not tool results;
+- tool-role messages contain tool results only;
+- tool call IDs are unique within a generation request;
+- each tool result resolves one outstanding prior call exactly once;
+- a new generation request may not contain unresolved client-side tool calls.
 
-Portable part types are:
+## Multimodal content
 
-- `text` — non-empty UTF-8 text;
-- `image` — external image reference;
-- `audio` — external audio reference;
-- `video` — external video reference;
-- `file` — external generic file/document reference;
-- `tool_call` — an assistant request to invoke a named tool with structured arguments;
-- `tool_result` — the result corresponding to a prior tool call.
+Portable ordered content parts are:
 
-Each part is a discriminated union: exactly the payload matching its `type` is present. A part carrying fields from another variant is invalid.
+- `text`;
+- `image`;
+- `audio`;
+- `video`;
+- `file`;
+- `tool_call`;
+- `tool_result`.
 
-### Media references
+Media uses opaque URI references with optional media type/name. Core does not fetch, authorize, upload, transcode, render, or persist media.
 
-Media is represented by an opaque non-empty `uri`, with optional `media_type` and `name` metadata. Core does not fetch the URI and does not constrain URI schemes in Spec `0.3`; adapters and consuming applications own accessibility, authorization, size, lifetime, and supported-scheme policy.
+Portable model capabilities include text, image/audio/video/file input, image/audio/video/file output, tool calling, structured output, and streaming discovery.
 
-Inline binary encoding, uploads, provider file IDs, transcoding, frame extraction, speech preprocessing, and other media transformation remain adapter/application concerns in this revision.
+## Multiple modular Assistants
+
+Applications create separate `AssistantDefinition` values for different functions instead of mutating one global Assistant. A definition may configure instructions, default/optional modules, skills, tools and tool policies, model selection, credentials, routing fallback, RAG, memory, learning, and bounded execution budgets.
+
+Per-run overrides may enable declared optional modules, disable defaults, select a concrete model, bind ordered credentials, and override bounded fallback policy without changing the persisted Assistant definition.
+
+## Models and providers
+
+Concrete AI systems are adapters. Model catalogs are discovered at runtime rather than frozen into Core releases.
+
+Portable selection modes are:
+
+- `manual` — one exact provider/model;
+- `ordered_fallback` — explicit caller/benchmark-defined order;
+- `dynamic` — deterministic filtering/ranking of current catalog metadata.
+
+Active modules contribute required capabilities automatically. For example, an Assistant with `vision + tools` cannot route to a model lacking `image_input + tool_calling`.
+
+Model identity is the pair `(provider, model)`. It is never represented internally by ambiguous string concatenation.
+
+Convenience provider IDs such as OpenAI, Anthropic, Google, OpenRouter, Groq, Ollama, Mistral, and xAI are not a closed enum.
+
+## Credentials and BYOK
+
+Portable credential modes are:
+
+- `none` — no credential reference, typically local/public runtime;
+- `managed` — application/provider-managed authorization;
+- `byok` — user/application-owned key resolved through an external secret store.
+
+A runtime `CredentialRef` contains:
+
+- logical non-secret credential ID;
+- provider;
+- mode;
+- namespaced secret-store handle;
+- optional quota-scope label.
+
+Raw API keys are not portable Core configuration. The secret-store handle is also excluded from usage ledgers and run traces; those carry `CredentialIdentity` only.
+
+Multiple credentials for a provider form an ordered chain. Default BYOK fallback occurs only after normalized quota/rate-limit exhaustion and skips later credentials known to share the same non-empty quota scope.
+
+Provider quotas are not assumed to be per API key. See [`OBSERVABILITY.md`](OBSERVABILITY.md).
+
+## Failure and routing semantics
+
+Adapters may normalize vendor/transport failures into stable classes including auth, rate-limit, quota, timeout, unavailable, network, context-limit, unsupported-capability, safety, invalid-request, cancelled, and unknown.
+
+Automatic model/provider fallback is bounded and permitted only for classes configured by `RoutingFallbackPolicy`. Authentication, safety, invalid-request, and caller-cancellation failures cannot be configured as automatic failover triggers in Spec `0.3`.
+
+## Structured JSON
+
+Tool arguments, tool schemas, and response schemas use strict portable JSON rules. Duplicate keys, ambiguous Unicode surrogate escapes, excessive nesting, and oversized values are rejected.
+
+`portable_json_schema/v1` is deliberately smaller than full JSON Schema. Provider adapters must reject unsupported translation rather than silently weaken schema semantics.
+
+See [`STRUCTURED-OUTPUT.md`](STRUCTURED-OUTPUT.md).
 
 ## Tools
 
-A `ToolDefinition` contains:
+Tool calls are data, not authorization. `ToolPolicy` classifies read/write/destructive risk, required confirmation, idempotency, concurrency safety, call limits, timeout, and result-size projection.
 
-- `name` — portable tool identifier;
-- optional `description`;
-- `input_schema` — a non-null JSON object describing accepted arguments.
+Unknown tools default to requiring confirmation. Destructive tools always require confirmation. Product ACL/authorization remains mandatory regardless of confirmation policy.
 
-The portable tool-name subset is ASCII and matches:
+See [`TOOLS.md`](TOOLS.md).
 
-```text
-[A-Za-z_][A-Za-z0-9_-]{0,63}
-```
+## RAG
 
-This conservative subset is intended to travel across providers without provider-specific name rewriting.
+`RetrievalPolicy` supports lexical/vector/hybrid retrieval, original/rewrite/multi-query transformation, bounded candidate/context sets, optional reranking, grounding rules, citations, and optional embedding/reranking model references.
 
-Core requires `input_schema` to be a JSON object but does not enforce a particular JSON Schema dialect in Spec `0.3`, because provider schema support differs. Consumers may impose a stricter dialect.
+Authorization/filtering occurs before evidence reaches the model. Retrieved content remains untrusted data and never instruction authority.
 
-A `ToolCall` contains an opaque non-empty Unicode `id` of at most 256 Unicode scalar values, a valid tool `name`, and `arguments` as a JSON object. Argument property ordering is not semantic.
+Evidence content/metadata, scores, counts, and model roles are validated/bounded before admission to portable RAG flows.
 
-A `ToolResult` references the original call through `call_id`, contains one or more result content parts, and may set `is_error`. Tool-result content may contain `text`, `image`, `audio`, `video`, or `file`; nested `tool_call` and `tool_result` parts are invalid.
+## Memory
+
+The optional `memory` module requires an explicit `MemoryPolicy`. Persistent writes are disabled, explicit, or confirmation-gated; Spec `0.3` intentionally provides no unrestricted automatic-write mode.
+
+Read/write scope can be session, Assistant, user, or tenant. Sensitive data is excluded or confirmation-gated according to host classification. Core owns neither identity nor persistence.
+
+## Built-in token economy
+
+`token_economy/v1` requests:
+
+- concise-but-complete responses;
+- avoidance of unnecessary restatement;
+- safe reuse of stable prior context;
+- compact projection of tool results;
+- mandatory preservation of instruction hierarchy;
+- mandatory preservation of unresolved constraints/state.
+
+It is a semantic profile rather than provider prompt text. It does not define a universal tokenizer, lossy summarizer, message-deletion algorithm, cache ID, or guaranteed savings percentage.
+
+## Skill Build / learning
+
+Learning is task-scoped and proposal-driven. A `TaskSignature` identifies a reusable task family without storing raw prompts. `SkillLearningProposal` references content-free run/evaluation evidence and may suggest retrieval, tool, routing, or behavior improvements.
+
+Core never rewrites an Assistant by itself. Free-form `skill_hint` proposals cannot auto-promote in Spec `0.3`; only low-authority policy scopes may become eligible for host-owned auto-promotion after evidence thresholds.
 
 ## Finish reasons
 
 Portable finish reasons are:
 
-- `stop` — normal completion;
-- `length` — provider/model output limit reached;
-- `tool_calls` — generation paused/completed to request one or more tools;
-- `content_filter` — generation stopped by a safety/content filter;
-- `error` — generation terminated because of an execution/provider error;
-- `other` — a provider reason with no more precise portable mapping.
+- `stop`;
+- `length`;
+- `tool_calls`;
+- `refusal`;
+- `paused`;
+- `content_filter`;
+- `error`;
+- `other`.
 
-Provider-specific raw reasons may be retained by adapters outside the Core contract when diagnostics require them.
+`refusal` is distinct from a provider/transport error. `paused` represents a resumable provider turn rather than normal completion.
 
-## Usage
+## Usage, quota, and traces
 
-`Usage` exposes counters for:
+`Usage` contains provider-reported input/output/cached/reasoning token counters bounded to the JSON safe-integer range.
 
-- `input_tokens`;
-- `output_tokens`;
-- `cached_input_tokens`;
-- `reasoning_tokens`.
-
-Every counter is an integer in the inclusive range `0..9007199254740991` (`2^53-1`), the largest integer that remains exact in JSON-backed JavaScript/TypeScript runtimes. Token accounting and tokenization are provider/model-defined. Counts from different models are not assumed to be directly comparable. Zero means not reported or zero consumed; Core does not infer missing counts.
-
-## Capabilities
-
-Portable capability identifiers are:
-
-- `text`;
-- `image_input`;
-- `image_output`;
-- `audio_input`;
-- `audio_output`;
-- `video_input`;
-- `file_input`;
-- `tool_calling`;
-- `structured_output`;
-- `streaming`.
-
-A capability set contains no duplicates. Capability discovery itself is adapter/application-owned; Core only defines portable names.
-
-Assistant module configuration automatically contributes required generation-model capabilities during routing. This prevents a multimodal/tool-enabled Assistant from dynamically selecting a model that cannot satisfy the active module set.
-
-## Multiple assistants
-
-Applications create independent `AssistantDefinition` values for distinct functions rather than mutating one global Assistant.
-
-A definition can configure:
-
-- instructions;
-- default/optional modules;
-- skills;
-- tools;
-- model selection/routing;
-- managed/BYOK credential acceptance;
-- optional RAG;
-- bounded execution budgets.
-
-`AssistantCatalog` validates collections of uniquely identified definitions. Per-run overrides can temporarily toggle declared modules, choose a model manually, or bind a credential reference without mutating the persisted definition.
-
-## Providers and models
-
-Concrete AI systems are adapters. The Go implementation exposes a `ProviderAdapter` interface and runtime-local `AdapterRegistry`; other languages may expose equivalent idiomatic substitution boundaries.
-
-Model catalogs are supplied live by adapters. Core does not ship a frozen model-name or pricing table. Catalog entries declare current access tier (`free`, `paid`, `local`, `unknown`), roles, capabilities, and optional context/output limits.
-
-Portable model selection supports:
-
-- `manual` — exact model selection;
-- `ordered_fallback` — explicit benchmarked fallback order;
-- `dynamic` — deterministic filtering/ranking over the current model catalog.
-
-Common provider IDs such as `openai`, `anthropic`, `google`, `openrouter`, `groq`, `ollama`, `mistral`, and `xai` are convenience constants, not a closed enum.
-
-## BYOK
-
-`CredentialPolicy` controls whether a definition accepts `managed`, `byok`, or both modes.
-
-A `CredentialRef` contains only provider, mode, and an opaque application-owned reference. Raw API keys are never valid Core configuration. The host stores user-supplied keys securely/ephemerally and configures adapters to resolve the opaque handle outside Core.
-
-## RAG
-
-`RetrievalPolicy` supports lexical, vector, or hybrid retrieval; original/rewrite/multi-query search queries; candidate and final context limits; optional reranking; grounding requirements; citations; and optional embedding/reranking model references.
-
-Authorization/filtering happens before retrieved evidence is exposed to a generation model. Retrieved content is untrusted data and never instruction authority.
-
-See [`RAG.md`](RAG.md) for the normative retrieval pipeline and evidence boundary.
-
-## Built-in skills
-
-Assistant skills are versioned provider-neutral behavior profiles. They are not provider prompts, authorization rules, hidden chain-of-thought instructions, or model-specific configuration objects. A provider adapter may realize a skill through native settings, context construction, concise instructions, caching, or a combination of those mechanisms, but the observable intent must remain portable.
-
-Spec `0.3` defines one built-in skill:
-
-### `token_economy/v1`
-
-The canonical token-economy profile enables these behaviors:
-
-- `prefer_concise_responses` — prefer the shortest complete answer that satisfies the request;
-- `avoid_restatement` — do not repeat user input, already-established decisions, or prior output unless repetition is needed for correctness;
-- `reuse_prior_context` — reference stable prior context instead of duplicating it when the consumer/provider can preserve the reference safely;
-- `compact_tool_results` — when the consumer controls tool-result projection, include only fields needed for the current task rather than forwarding irrelevant payload;
-- `preserve_instruction_hierarchy` — token reduction must never weaken or remove higher-authority instructions;
-- `preserve_unresolved_constraints` — compaction must retain unresolved requirements, decisions, identifiers, error conditions, and other state still needed to complete the task.
-
-The last two properties are mandatory for every valid `token_economy/v1` profile. At least one of the four optimization properties must be enabled.
-
-The skill does **not** define a universal tokenizer, exact input-token estimator, lossy summarizer, automatic message deletion policy, or guaranteed token-savings percentage. Tokenization differs by provider/model, and deleting/summarizing context without application knowledge can change semantics. Consumers that perform context compaction remain responsible for preserving instruction authority, tool-call/result linkage, required evidence, and unresolved constraints.
-
-`BuiltinTokenEconomySkill`/equivalent language APIs return the canonical profile with every defined behavior enabled. `BuiltinSkills`/equivalent language APIs include this skill by default. Consumers may explicitly select a narrower skill set, but a modified profile must still satisfy the safety-preservation invariants above.
-
-## Stable errors
-
-Assistant validation uses stable, non-localized codes including:
-
-- `empty`;
-- `invalid_role`;
-- `invalid_content` / `invalid_content_type` / `invalid_media`;
-- `invalid_tool_name` / `invalid_json` / `invalid_tool_call` / `invalid_tool_result`;
-- `invalid_finish_reason` / `invalid_usage` / `invalid_capability` / `duplicate_capability`;
-- `invalid_skill` / `duplicate_skill`;
-- `invalid_assistant` / `duplicate_assistant`;
-- `invalid_module` / `duplicate_module`;
-- `invalid_model` / `invalid_model_policy` / `model_unavailable`;
-- `invalid_credential`;
-- `invalid_retrieval`;
-- `invalid_provider` / `duplicate_provider`.
-
-Errors must not embed prompt text, tool arguments, tool results, media URIs, raw credentials, retrieved sensitive values, or other sensitive original values.
-
-## Serialization
-
-Portable message/tool/media/skill contracts use `schemas/assistant.schema.json`. Assistant/model/BYOK/RAG configuration uses `schemas/assistant-config.schema.json`.
-
-Provider adapters may expose idiomatic language APIs but must preserve the same semantics at serialization boundaries. Unknown provider-specific fields do not belong in portable Core shapes; adapters keep such metadata in adapter-owned envelopes.
+`UsageLedgerEntry` attributes usage to run + attempt + Assistant + model + optional logical credential identity. `RunTrace` records content-free routing/fallback/tool/retrieval/usage metadata for observability and learning without duplicating prompts or provider error bodies.
 
 ## Streaming
 
-Spec `0.3` defines `streaming` as a capability but deliberately does not standardize a `StreamEvent` shape yet. Providers differ materially in text deltas, tool-argument fragments, usage timing, error events, and event ordering. A later specification revision should define streaming only after the contract has been exercised against multiple real provider adapters.
+`streaming` remains a capability in Spec `0.3`; a provider-neutral stream-event wire shape is deliberately deferred until multiple concrete adapters prove the common event lifecycle. Providers differ in text deltas, partial tool arguments, pause/resume semantics, usage timing, and errors.
 
 ## Security and privacy
 
-Assistant contracts can carry sensitive prompts, files, tool arguments, tool results, retrieved evidence, and credential references. Core performs no redaction, encryption, persistence, logging, or retention. Consuming applications own those policies.
+Core validation errors and observability structures must not embed prompt text, raw tool payloads, media URIs, retrieved content, provider error bodies, raw credentials, or secret-store reference handles.
 
-Tool definitions and tool calls are data, not authorization. A consumer must independently authorize every side effect before executing a tool call.
+Consumers own encryption, redaction, persistence, retention, permissions, secret resolution, network policy, and user-facing consent.
