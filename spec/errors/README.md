@@ -10,7 +10,7 @@ Common validation codes currently include:
 - `invalid_checksum`
 - `unknown_kind`
 
-Domain-specific specifications may define additional stable codes when a generic code would lose useful semantics. Current examples include temporal codes such as `invalid_year`, `invalid_month`, `invalid_day`, `zero_value`, and `out_of_range`, and normalization codes such as `invalid_area_code`, `invalid_number`, `missing_state`, `invalid_state`, and `ambiguous`.
+Domain-specific specifications may define additional stable codes when a generic code would lose useful semantics. Current examples include temporal codes such as `invalid_year`, `invalid_month`, `invalid_day`, `zero_value`, and `out_of_range`; normalization codes such as `invalid_area_code`, `invalid_number`, `missing_state`, `invalid_state`, and `ambiguous`; and fingerprint codes such as `invalid_namespace`, `invalid_utf8`, and `too_many_parts`.
 
 A code's meaning belongs to the specification area that defines it. New implementations must not compare localized message text to determine error behavior.
 

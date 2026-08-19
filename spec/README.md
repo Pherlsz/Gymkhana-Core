@@ -17,18 +17,19 @@ The active specification version is stored in `VERSION`; its compatibility rules
 
 ## Specification layout
 
-The initial specification areas are:
+The current specification areas are:
 
 - `text/` — language-agnostic text normalization semantics;
 - `temporal/` — civil date and year-month semantics;
 - `contact/` — email and explicitly contextualized telephone semantics;
 - `identity/` — generic typed identifier concepts;
 - `postal/` — explicitly jurisdiction-aware postal identifiers;
+- `fingerprint/` — exact SHA-256 digest semantics and versioned domain-separated framing;
 - `jurisdictions/` — country/jurisdiction-specific semantics, beginning with Brazil because those capabilities already exist in the Go implementation;
 - `standards/` — international/cross-jurisdiction standards when a reusable contract is justified;
 - `errors/` — stable, non-localized error semantics.
 
-Future areas may include `fingerprint/`, `assistant/`, `ocr/`, `matching/`, and `solver/`.
+Future areas may include `assistant/`, `ocr/`, `matching/`, and `solver/`.
 
 Jurisdiction-specific behavior must be namespaced explicitly, for example `identity.br.cpf` or `postal.br.cep`. A consumer must not be forced to assume a country, language, locale, currency, or timezone from another one of those concepts.
 

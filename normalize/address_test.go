@@ -47,6 +47,9 @@ func TestFormatHouseNumber(t *testing.T) {
 		{"8e", "8E"},
 		{"s/n", ""},
 		{"sem numero", ""},
+		{"n", ""},
+		{"n!", ""},
+		{"num?", ""},
 	}
 	for _, test := range tests {
 		got := normalize.FormatHouseNumber(test.in)

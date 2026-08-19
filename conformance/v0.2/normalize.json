@@ -1,0 +1,117 @@
+{
+  "spec_version": "0.2",
+  "suite": "normalize",
+  "cases": [
+    {
+      "name": "collapse display whitespace",
+      "operation": "text.display",
+      "input": "  João\t da\nSilva  ",
+      "output": "João da Silva"
+    },
+    {
+      "name": "search text folds accents and punctuation",
+      "operation": "text.search",
+      "input": "  São-João / Nº 42  ",
+      "output": "sao joao no 42"
+    },
+    {
+      "name": "canonical email preserves local part and lowercases domain",
+      "operation": "contact.email.canonicalize",
+      "input": "User.Name@EXAMPLE.COM",
+      "output": "User.Name@example.com"
+    },
+    {
+      "name": "canonical CPF",
+      "operation": "identity.br.cpf.canonicalize",
+      "input": "529.982.247-25",
+      "output": "52998224725"
+    },
+    {
+      "name": "reject repeated CPF checksum",
+      "operation": "identity.br.cpf.canonicalize",
+      "input": "111.111.111-11",
+      "error": "invalid_checksum"
+    },
+    {
+      "name": "canonical numeric CNPJ",
+      "operation": "identity.br.cnpj.canonicalize",
+      "input": "11.222.333/0001-81",
+      "output": "11222333000181"
+    },
+    {
+      "name": "canonical alphanumeric CNPJ",
+      "operation": "identity.br.cnpj.canonicalize",
+      "input": "12.abc.345/01de-35",
+      "output": "12ABC34501DE35"
+    },
+    {
+      "name": "reject invalid CNPJ checksum",
+      "operation": "identity.br.cnpj.canonicalize",
+      "input": "00.000.000/0000-00",
+      "error": "invalid_checksum"
+    },
+    {
+      "name": "canonical Brazilian postal code",
+      "operation": "postal.br.cep.canonicalize",
+      "input": "90010-000",
+      "output": "90010000"
+    },
+    {
+      "name": "reject short Brazilian postal code",
+      "operation": "postal.br.cep.canonicalize",
+      "input": "90010-00",
+      "error": "invalid_length"
+    },
+    {
+      "name": "canonical Brazilian mobile phone",
+      "operation": "contact.phone.br.canonicalize",
+      "input": "(51) 99999-1234",
+      "output": "+5551999991234"
+    },
+    {
+      "name": "canonical OAB with explicit state",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "oab",
+        "value": "OAB/RS 114.458"
+      },
+      "output": "114458/RS"
+    },
+    {
+      "name": "format alphanumeric CNPJ through document contract",
+      "operation": "identity.br.document.format",
+      "input": {
+        "kind": "cnpj",
+        "value": "12.abc.345/01de-35"
+      },
+      "output": "12.ABC.345/01DE-35"
+    },
+    {
+      "name": "canonical PIS through document contract",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "pis",
+        "value": "120.5824.883-1"
+      },
+      "output": "12058248831"
+    },
+    {
+      "name": "reject professional registration without state",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "oab",
+        "value": "114458"
+      },
+      "error": "missing_state"
+    },
+    {
+      "name": "reject unknown document kind",
+      "operation": "identity.br.document.canonicalize",
+      "input": {
+        "kind": "unknown",
+        "value": "123"
+      },
+      "error": "unknown_kind"
+    }
+  ]
+}
