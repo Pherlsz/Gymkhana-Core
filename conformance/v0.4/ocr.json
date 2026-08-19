@@ -7,11 +7,23 @@
       "operation": "ocr.request.validate",
       "input": {
         "mode": "schema_guided",
-        "sources": [{"id": "document-1", "modality": "document", "media_type": "application/pdf"}],
+        "sources": [
+          {
+            "id": "document-1",
+            "modality": "document",
+            "media_type": "application/pdf"
+          }
+        ],
         "target_schema": {
           "type": "object",
-          "properties": {"name": {"type": "string"}},
-          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
           "additionalProperties": false
         },
         "max_candidates": 16
@@ -23,24 +35,54 @@
       "operation": "ocr.request.validate",
       "input": {
         "mode": "discovery",
-        "sources": [{"id": "image-1", "modality": "image"}],
-        "target_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": false}
+        "sources": [
+          {
+            "id": "image-1",
+            "modality": "image"
+          }
+        ],
+        "target_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
       },
       "error": "invalid_schema"
     },
     {
       "name": "discovery requires data identification skill",
       "operation": "ocr.required_skills",
-      "input": {"mode": "discovery", "sources": [{"id": "image-1", "modality": "image"}]},
-      "output": ["data_identification/v1"]
+      "input": {
+        "mode": "discovery",
+        "sources": [
+          {
+            "id": "image-1",
+            "modality": "image"
+          }
+        ]
+      },
+      "output": [
+        "data_identification/v1"
+      ]
     },
     {
       "name": "schema guided extraction requires no discovery skill",
       "operation": "ocr.required_skills",
       "input": {
         "mode": "schema_guided",
-        "sources": [{"id": "document-1", "modality": "document"}],
-        "target_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": false}
+        "sources": [
+          {
+            "id": "document-1",
+            "modality": "document"
+          }
+        ],
+        "target_schema": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        }
       },
       "output": []
     },
@@ -66,33 +108,63 @@
       "input": {
         "request": {
           "mode": "schema_guided",
-          "sources": [{"id": "document-1", "modality": "document"}],
+          "sources": [
+            {
+              "id": "document-1",
+              "modality": "document"
+            }
+          ],
           "target_schema": {
             "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
             "additionalProperties": false
           }
         },
         "result": {
           "mode": "schema_guided",
-          "observations": [{
-            "id": "obs-1",
-            "evidence": [{"source_id": "document-1", "page": 1, "region": {"x": 100000, "y": 100000, "width": 400000, "height": 100000}}],
-            "raw_text": "Alice",
-            "confidence": 9800
-          }],
-          "candidates": [{
-            "path": "/name",
-            "state": "present",
-            "value": "Alice",
-            "observation_ids": ["obs-1"],
-            "basis": "observed",
-            "confidence": 9800,
-            "validation": "valid",
-            "review": "unreviewed"
-          }],
-          "structured_data": {"name": "Alice"},
+          "observations": [
+            {
+              "id": "obs-1",
+              "evidence": [
+                {
+                  "source_id": "document-1",
+                  "page": 1,
+                  "region": {
+                    "x": 100000,
+                    "y": 100000,
+                    "width": 400000,
+                    "height": 100000
+                  }
+                }
+              ],
+              "raw_text": "Alice",
+              "confidence": 9800
+            }
+          ],
+          "candidates": [
+            {
+              "path": "/name",
+              "state": "present",
+              "value": "Alice",
+              "observation_ids": [
+                "obs-1"
+              ],
+              "basis": "observed",
+              "confidence": 9800,
+              "validation": "valid",
+              "review": "unreviewed"
+            }
+          ],
+          "structured_data": {
+            "name": "Alice"
+          },
           "validation": "valid",
           "review": "unreviewed"
         }
@@ -105,19 +177,54 @@
       "input": {
         "request": {
           "mode": "schema_guided",
-          "sources": [{"id": "document-1", "modality": "document"}],
+          "sources": [
+            {
+              "id": "document-1",
+              "modality": "document"
+            }
+          ],
           "target_schema": {
             "type": "object",
-            "properties": {"name": {"type": "string"}},
-            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ],
             "additionalProperties": false
           }
         },
         "result": {
           "mode": "schema_guided",
-          "observations": [{"id": "obs-1", "evidence": [{"source_id": "document-1"}], "raw_text": "Alice"}],
-          "candidates": [{"path": "/name", "state": "present", "value": "Bob", "observation_ids": ["obs-1"], "basis": "observed", "validation": "valid", "review": "unreviewed"}],
-          "structured_data": {"name": "Alice"},
+          "observations": [
+            {
+              "id": "obs-1",
+              "evidence": [
+                {
+                  "source_id": "document-1"
+                }
+              ],
+              "raw_text": "Alice"
+            }
+          ],
+          "candidates": [
+            {
+              "path": "/name",
+              "state": "present",
+              "value": "Bob",
+              "observation_ids": [
+                "obs-1"
+              ],
+              "basis": "observed",
+              "validation": "valid",
+              "review": "unreviewed"
+            }
+          ],
+          "structured_data": {
+            "name": "Alice"
+          },
           "validation": "valid",
           "review": "unreviewed"
         }
@@ -130,19 +237,54 @@
       "input": {
         "request": {
           "mode": "schema_guided",
-          "sources": [{"id": "document-1", "modality": "document"}],
+          "sources": [
+            {
+              "id": "document-1",
+              "modality": "document"
+            }
+          ],
           "target_schema": {
             "type": "object",
-            "properties": {"score": {"type": "number"}},
-            "required": ["score"],
+            "properties": {
+              "score": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "score"
+            ],
             "additionalProperties": false
           }
         },
         "result": {
           "mode": "schema_guided",
-          "observations": [{"id": "obs-1", "evidence": [{"source_id": "document-1"}], "value": 1.0}],
-          "candidates": [{"path": "/score", "state": "present", "value": 1.0, "observation_ids": ["obs-1"], "basis": "observed", "validation": "valid", "review": "unreviewed"}],
-          "structured_data": {"score": 1},
+          "observations": [
+            {
+              "id": "obs-1",
+              "evidence": [
+                {
+                  "source_id": "document-1"
+                }
+              ],
+              "value": 1.0
+            }
+          ],
+          "candidates": [
+            {
+              "path": "/score",
+              "state": "present",
+              "value": 1.0,
+              "observation_ids": [
+                "obs-1"
+              ],
+              "basis": "observed",
+              "validation": "valid",
+              "review": "unreviewed"
+            }
+          ],
+          "structured_data": {
+            "score": 1
+          },
           "validation": "valid",
           "review": "unreviewed"
         }
@@ -154,16 +296,32 @@
       "operation": "ocr.result.validate",
       "input": {
         "mode": "discovery",
-        "observations": [{"id": "obs-label", "evidence": [{"source_id": "image-1"}], "raw_text": "Passport number"}],
-        "candidates": [{
-          "path": "/passport_number",
-          "state": "missing",
-          "observation_ids": ["obs-label"],
-          "basis": "observed",
-          "semantic_type_candidates": ["identity.passport"],
-          "validation": "not_validated",
-          "review": "needs_review"
-        }],
+        "observations": [
+          {
+            "id": "obs-label",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "Passport number"
+          }
+        ],
+        "candidates": [
+          {
+            "path": "/passport_number",
+            "state": "missing",
+            "observation_ids": [
+              "obs-label"
+            ],
+            "basis": "observed",
+            "semantic_type_candidates": [
+              "identity.passport"
+            ],
+            "validation": "not_validated",
+            "review": "needs_review"
+          }
+        ],
         "validation": "not_validated",
         "review": "needs_review"
       },
@@ -174,8 +332,30 @@
       "operation": "ocr.result.validate",
       "input": {
         "mode": "discovery",
-        "observations": [{"id": "obs-label", "evidence": [{"source_id": "image-1"}], "raw_text": "Passport number"}],
-        "candidates": [{"path": "/passport_number", "state": "missing", "value": null, "observation_ids": ["obs-label"], "basis": "observed", "validation": "not_validated", "review": "needs_review"}],
+        "observations": [
+          {
+            "id": "obs-label",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "Passport number"
+          }
+        ],
+        "candidates": [
+          {
+            "path": "/passport_number",
+            "state": "missing",
+            "value": null,
+            "observation_ids": [
+              "obs-label"
+            ],
+            "basis": "observed",
+            "validation": "not_validated",
+            "review": "needs_review"
+          }
+        ],
         "validation": "not_validated",
         "review": "needs_review"
       },
@@ -185,10 +365,29 @@
       "name": "reject non document page evidence",
       "operation": "ocr.exchange.validate",
       "input": {
-        "request": {"mode": "discovery", "sources": [{"id": "image-1", "modality": "image"}]},
+        "request": {
+          "mode": "discovery",
+          "sources": [
+            {
+              "id": "image-1",
+              "modality": "image"
+            }
+          ]
+        },
         "result": {
           "mode": "discovery",
-          "observations": [{"id": "obs-1", "evidence": [{"source_id": "image-1", "page": 1}], "raw_text": "text"}],
+          "observations": [
+            {
+              "id": "obs-1",
+              "evidence": [
+                {
+                  "source_id": "image-1",
+                  "page": 1
+                }
+              ],
+              "raw_text": "text"
+            }
+          ],
           "candidates": [],
           "validation": "not_validated",
           "review": "unreviewed"
@@ -200,10 +399,28 @@
       "name": "reject unknown evidence source",
       "operation": "ocr.exchange.validate",
       "input": {
-        "request": {"mode": "discovery", "sources": [{"id": "image-1", "modality": "image"}]},
+        "request": {
+          "mode": "discovery",
+          "sources": [
+            {
+              "id": "image-1",
+              "modality": "image"
+            }
+          ]
+        },
         "result": {
           "mode": "discovery",
-          "observations": [{"id": "obs-1", "evidence": [{"source_id": "other-image"}], "raw_text": "text"}],
+          "observations": [
+            {
+              "id": "obs-1",
+              "evidence": [
+                {
+                  "source_id": "other-image"
+                }
+              ],
+              "raw_text": "text"
+            }
+          ],
           "candidates": [],
           "validation": "not_validated",
           "review": "unreviewed"
@@ -216,7 +433,18 @@
       "operation": "ocr.result.validate",
       "input": {
         "mode": "discovery",
-        "observations": [{"id": "obs-1", "evidence": [{"source_id": "image-1"}], "raw_text": "text", "confidence": 10001}],
+        "observations": [
+          {
+            "id": "obs-1",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "text",
+            "confidence": 10001
+          }
+        ],
         "candidates": [],
         "validation": "not_validated",
         "review": "unreviewed"
@@ -228,12 +456,174 @@
       "operation": "ocr.result.validate",
       "input": {
         "mode": "discovery",
-        "observations": [{"id": "obs-1", "evidence": [{"source_id": "image-1"}], "raw_text": "  Alice  "}],
-        "candidates": [{"path": "/name", "state": "present", "value": "  Alice  ", "normalized_value": "Alice", "observation_ids": ["obs-1"], "basis": "derived", "validation": "not_validated", "review": "unreviewed"}],
+        "observations": [
+          {
+            "id": "obs-1",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "  Alice  "
+          }
+        ],
+        "candidates": [
+          {
+            "path": "/name",
+            "state": "present",
+            "value": "  Alice  ",
+            "normalized_value": "Alice",
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "derived",
+            "validation": "not_validated",
+            "review": "unreviewed"
+          }
+        ],
         "validation": "not_validated",
         "review": "unreviewed"
       },
       "error": "invalid_candidate"
+    },
+    {
+      "name": "reject silent duplicate path ambiguity",
+      "operation": "ocr.result.validate",
+      "input": {
+        "mode": "discovery",
+        "observations": [
+          {
+            "id": "obs-1",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "42"
+          }
+        ],
+        "validation": "not_validated",
+        "review": "needs_review",
+        "candidates": [
+          {
+            "path": "/number",
+            "state": "present",
+            "value": "42",
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "observed",
+            "validation": "not_validated",
+            "review": "unreviewed"
+          },
+          {
+            "path": "/number",
+            "state": "present",
+            "value": 42,
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "inferred",
+            "validation": "not_validated",
+            "review": "needs_review"
+          }
+        ]
+      },
+      "error": "invalid_candidate"
+    },
+    {
+      "name": "accept explicit duplicate path ambiguity",
+      "operation": "ocr.result.validate",
+      "input": {
+        "mode": "discovery",
+        "observations": [
+          {
+            "id": "obs-1",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "42"
+          }
+        ],
+        "validation": "not_validated",
+        "review": "needs_review",
+        "candidates": [
+          {
+            "path": "/number",
+            "state": "present",
+            "value": "42",
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "observed",
+            "validation": "not_validated",
+            "review": "unreviewed",
+            "ambiguous": true
+          },
+          {
+            "path": "/number",
+            "state": "present",
+            "value": 42,
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "inferred",
+            "validation": "not_validated",
+            "review": "needs_review",
+            "ambiguous": true
+          }
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "reject accepted candidate with unresolved alternative",
+      "operation": "ocr.result.validate",
+      "input": {
+        "mode": "discovery",
+        "observations": [
+          {
+            "id": "obs-1",
+            "evidence": [
+              {
+                "source_id": "image-1"
+              }
+            ],
+            "raw_text": "42"
+          }
+        ],
+        "validation": "not_validated",
+        "review": "needs_review",
+        "candidates": [
+          {
+            "path": "/number",
+            "state": "present",
+            "value": "42",
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "observed",
+            "validation": "not_validated",
+            "review": "accepted",
+            "ambiguous": true
+          },
+          {
+            "path": "/number",
+            "state": "present",
+            "value": 42,
+            "observation_ids": [
+              "obs-1"
+            ],
+            "basis": "inferred",
+            "validation": "not_validated",
+            "review": "unreviewed",
+            "ambiguous": true
+          }
+        ]
+      },
+      "error": "invalid_review"
     }
   ]
 }

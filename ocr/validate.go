@@ -3,7 +3,6 @@ package ocr
 import (
 	"bytes"
 	"encoding/json"
-	"math/big"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -105,6 +104,9 @@ func ValidateExtractionResult(result ExtractionResult) error {
 		if dataBytes > MaxResultDataBytes {
 			return validationError(CodeInvalidLimit, "result_data")
 		}
+	}
+	if err := validateCandidateAmbiguity(result.Candidates); err != nil {
+		return err
 	}
 	for _, warning := range result.Warnings {
 		if !warning.Code.Valid() || (warning.Path != "" && !validJSONPointer(warning.Path)) {
@@ -361,12 +363,7 @@ func portableValueEqual(left, right any) bool {
 		return ok && l == r
 	case json.Number:
 		r, ok := right.(json.Number)
-		if !ok {
-			return false
-		}
-		leftNumber, leftOK := parseComparableNumber(l)
-		rightNumber, rightOK := parseComparableNumber(r)
-		return leftOK && rightOK && leftNumber.Cmp(rightNumber) == 0
+		return ok && portablejson.EqualNumbers(l, r)
 	case []any:
 		r, ok := right.([]any)
 		if !ok || len(l) != len(r) {
@@ -393,28 +390,6 @@ func portableValueEqual(left, right any) bool {
 	default:
 		return false
 	}
-}
-
-func parseComparableNumber(number json.Number) (*big.Rat, bool) {
-	text := number.String()
-	if len(text) == 0 || len(text) > portablejson.MaxNumberLexemeBytes {
-		return nil, false
-	}
-	if exponentAt := strings.IndexAny(text, "eE"); exponentAt >= 0 {
-		exponent, err := strconv.ParseInt(text[exponentAt+1:], 10, 32)
-		if err != nil || exponent < -portablejson.MaxDecimalExponent || exponent > portablejson.MaxDecimalExponent {
-			return nil, false
-		}
-	}
-	value, ok := new(big.Rat).SetString(text)
-	if !ok {
-		return nil, false
-	}
-	limit := new(big.Rat).SetInt64(portablejson.MaxSafeInteger)
-	if new(big.Rat).Abs(value).Cmp(limit) > 0 {
-		return nil, false
-	}
-	return value, true
 }
 
 func validIdentifier(value string) bool {

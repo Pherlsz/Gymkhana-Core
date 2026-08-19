@@ -169,7 +169,7 @@ func (s ReviewStatus) Valid() bool {
 }
 
 // FieldCandidate is a semantic candidate backed by one or more observations.
-// Path is an RFC 6901 JSON Pointer. NormalizedValue is allowed only together
+// Path is a non-root RFC 6901 JSON Pointer. NormalizedValue is allowed only together
 // with an explicit Core/consumer canonicalizer identifier.
 type FieldCandidate struct {
 	Path                   string           `json:"path"`

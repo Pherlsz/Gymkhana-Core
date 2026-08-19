@@ -39,7 +39,7 @@ The result MUST contain a portable JSON object in `structured_data`. During exch
 
 1. every evidence reference MUST point to a source declared by the request;
 2. every field candidate MUST be backed by declared observations;
-3. every `present` candidate MUST resolve through its RFC 6901 JSON Pointer to a mathematically equivalent value in `structured_data`;
+3. every `present` candidate MUST resolve through its non-root RFC 6901 JSON Pointer to a mathematically equivalent value in `structured_data`;
 4. every `missing` candidate MUST point to a location absent from `structured_data`;
 5. `structured_data` MUST be validated against the exact request target schema;
 6. result `validation` MUST be `valid` when schema-instance validation succeeds and `invalid` when it fails.
@@ -86,7 +86,7 @@ Evidence references do not copy source content. They are locators into host-owne
 
 ## Candidates
 
-A `FieldCandidate` has an RFC 6901 JSON Pointer path, state (`present` or `missing`), evidence observation IDs, basis, optional confidence, optional semantic/jurisdiction candidates, ambiguity state, validation state, and review state.
+A `FieldCandidate` has a non-root RFC 6901 JSON Pointer path, state (`present` or `missing`), evidence observation IDs, basis, optional confidence, optional semantic/jurisdiction candidates, ambiguity state, validation state, and review state.
 
 Candidate basis is:
 
@@ -96,7 +96,7 @@ Candidate basis is:
 
 A normalized candidate value is legal only when accompanied by an explicit canonicalizer namespace. Core never assumes that provider-formatted text is canonical.
 
-Multiple candidates may share a path, particularly during discovery. Ambiguity MUST remain explicit until a host or reviewer resolves it.
+Multiple candidates may share a path, particularly during discovery. Ambiguity MUST remain explicit until a host or reviewer resolves it. Multiple active candidates at the same path therefore require `ambiguous=true`; rejected alternatives do not keep the path active. A candidate carrying multiple semantic-type or jurisdiction alternatives likewise requires `ambiguous=true` unless it is rejected. An accepted candidate MUST NOT retain unresolved semantic/jurisdiction alternatives, and an accepted candidate cannot coexist with a non-rejected alternative at the same path.
 
 ## Confidence
 
@@ -128,7 +128,7 @@ Raw sensitive values must not appear in stable validation errors, fingerprints, 
 
 ## Resource bounds
 
-Implementations MUST reject work outside the portable bounds represented by the Go implementation and serialized schemas, including source, observation, candidate, evidence, warning, page/coordinate, identifier, text, and aggregate result-data limits.
+Implementations MUST reject work outside the portable bounds represented by the Go implementation and serialized schemas, including source, observation, candidate, evidence, warning, page/coordinate, identifier, text, and aggregate result-data limits. Observation `raw_text` is bounded by its UTF-8 encoded byte length (16 KiB), not Unicode code-point count.
 
 These bounds prevent a provider-produced extraction from becoming an unbounded memory or validation workload.
 
