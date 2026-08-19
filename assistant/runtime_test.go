@@ -15,14 +15,14 @@ func TestEffectiveModulesAndRunModelOverride(t *testing.T) {
 	definition.OptionalModules = []assistant.ModuleID{assistant.ModuleAudioInput}
 	overrideModel := assistant.ModelRef{Provider: "gateway", Model: "audio/model:paid"}
 	overrides := assistant.RunOverrides{
-		EnableModules: []assistant.ModuleID{assistant.ModuleAudioInput},
+		EnableModules:  []assistant.ModuleID{assistant.ModuleAudioInput},
 		DisableModules: []assistant.ModuleID{assistant.ModuleVision},
-		Model: &overrideModel,
-		Credential: &assistant.CredentialRef{
+		Model:          &overrideModel,
+		Credentials: []assistant.CredentialRef{{
 			Provider:  "gateway",
 			Mode:      assistant.CredentialBYOK,
 			Reference: "session/key_02",
-		},
+		}},
 	}
 
 	modules, err := assistant.EffectiveModules(definition, overrides)
@@ -32,6 +32,11 @@ func TestEffectiveModulesAndRunModelOverride(t *testing.T) {
 	wantModules := []assistant.ModuleID{assistant.ModuleText, assistant.ModuleTools, assistant.ModuleRetrieval, assistant.ModuleAudioInput}
 	if !reflect.DeepEqual(modules, wantModules) {
 		t.Fatalf("modules = %#v, want %#v", modules, wantModules)
+	}
+
+	credential, ok := assistant.CredentialForProvider(overrides, "gateway")
+	if !ok || credential.Reference != "session/key_02" {
+		t.Fatalf("CredentialForProvider = %#v, %v", credential, ok)
 	}
 
 	catalog := []assistant.ModelDescriptor{{
@@ -59,6 +64,17 @@ func TestRunOverrideCannotEnableUndeclaredModule(t *testing.T) {
 	definition := validAssistantDefinition()
 	overrides := assistant.RunOverrides{EnableModules: []assistant.ModuleID{assistant.ModuleAudioInput}}
 	assertAssistantCode(t, assistant.ValidateRunOverrides(definition, overrides), assistant.CodeInvalidModule)
+}
+
+func TestRunOverrideRejectsDuplicateProviderCredential(t *testing.T) {
+	t.Parallel()
+
+	definition := validAssistantDefinition()
+	overrides := assistant.RunOverrides{Credentials: []assistant.CredentialRef{
+		{Provider: "gateway", Mode: assistant.CredentialBYOK, Reference: "session/key_01"},
+		{Provider: "gateway", Mode: assistant.CredentialBYOK, Reference: "session/key_02"},
+	}}
+	assertAssistantCode(t, assistant.ValidateRunOverrides(definition, overrides), assistant.CodeInvalidCredential)
 }
 
 func TestAdapterRegistry(t *testing.T) {
