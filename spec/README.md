@@ -25,11 +25,12 @@ The current specification areas are:
 - `identity/` — generic typed identifier concepts;
 - `postal/` — explicitly jurisdiction-aware postal identifiers;
 - `fingerprint/` — exact SHA-256 digest semantics and versioned domain-separated framing;
+- `assistant/` — provider-neutral messages, multimodal references, tools, finish reasons, usage, and capability semantics;
 - `jurisdictions/` — country/jurisdiction-specific semantics, beginning with Brazil because those capabilities already exist in the Go implementation;
 - `standards/` — international/cross-jurisdiction standards when a reusable contract is justified;
 - `errors/` — stable, non-localized error semantics.
 
-Future areas may include `assistant/`, `ocr/`, `matching/`, and `solver/`.
+Future areas may include `ocr/`, `matching/`, and `solver/`. Assistant streaming event semantics are intentionally deferred until multiple provider adapters have exercised the contract.
 
 Jurisdiction-specific behavior must be namespaced explicitly, for example `identity.br.cpf` or `postal.br.cep`. A consumer must not be forced to assume a country, language, locale, currency, or timezone from another one of those concepts.
 
