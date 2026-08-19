@@ -1,14 +1,15 @@
 package assistant
 
 import (
-	"bytes"
 	"encoding/json"
+	"strings"
 	"unicode/utf8"
 )
 
 const maxPortableJSONInteger int64 = 1<<53 - 1
 
-// ValidateMessage validates portable message semantics.
+// ValidateMessage validates portable message semantics including the allowed
+// tool-content relationship for each semantic role.
 func ValidateMessage(message Message) error {
 	if !message.Role.Valid() {
 		return validationError(CodeInvalidRole, "role")
@@ -20,6 +21,58 @@ func ValidateMessage(message Message) error {
 		if err := ValidateContentPart(part); err != nil {
 			return err
 		}
+		switch message.Role {
+		case RoleSystem, RoleDeveloper, RoleUser:
+			if part.Type == PartToolCall || part.Type == PartToolResult {
+				return validationError(CodeInvalidRole, "content.type")
+			}
+		case RoleAssistant:
+			if part.Type == PartToolResult {
+				return validationError(CodeInvalidRole, "content.type")
+			}
+		case RoleTool:
+			if part.Type != PartToolResult {
+				return validationError(CodeInvalidRole, "content.type")
+			}
+		}
+	}
+	return nil
+}
+
+// ValidateConversation validates cross-message tool-call/result linkage. Tool
+// call IDs are unique within the request, every tool result resolves one prior
+// call exactly once, and no unresolved call remains when a new generation is
+// requested.
+func ValidateConversation(messages []Message) error {
+	if len(messages) == 0 {
+		return validationError(CodeEmpty, "messages")
+	}
+	pending := make(map[string]struct{})
+	seenCalls := make(map[string]struct{})
+	for _, message := range messages {
+		if err := ValidateMessage(message); err != nil {
+			return err
+		}
+		for _, part := range message.Content {
+			switch part.Type {
+			case PartToolCall:
+				id := part.ToolCall.ID
+				if _, duplicate := seenCalls[id]; duplicate {
+					return validationError(CodeInvalidToolCall, "messages.tool_call.id")
+				}
+				seenCalls[id] = struct{}{}
+				pending[id] = struct{}{}
+			case PartToolResult:
+				id := part.ToolResult.CallID
+				if _, exists := pending[id]; !exists {
+					return validationError(CodeInvalidToolResult, "messages.tool_result.call_id")
+				}
+				delete(pending, id)
+			}
+		}
+	}
+	if len(pending) > 0 {
+		return validationError(CodeUnresolvedToolCall, "messages")
 	}
 	return nil
 }
@@ -39,7 +92,7 @@ func ValidateContentPart(part ContentPart) error {
 		if part.Text != "" || part.Media == nil || part.ToolCall != nil || part.ToolResult != nil {
 			return validationError(CodeInvalidContent, "content")
 		}
-		return validateMedia(*part.Media)
+		return validateMedia(part.Type, *part.Media)
 	case PartToolCall:
 		if part.Text != "" || part.Media != nil || part.ToolCall == nil || part.ToolResult != nil {
 			return validationError(CodeInvalidContent, "content")
@@ -55,14 +108,31 @@ func ValidateContentPart(part ContentPart) error {
 	}
 }
 
-func validateMedia(media MediaRef) error {
-	if media.URI == "" || !utf8.ValidString(media.URI) {
+func validateMedia(partType PartType, media MediaRef) error {
+	if media.URI == "" || !utf8.ValidString(media.URI) || utf8.RuneCountInString(media.URI) > 8192 {
 		return validationError(CodeInvalidMedia, "media.uri")
 	}
-	if media.MediaType != "" && !utf8.ValidString(media.MediaType) {
-		return validationError(CodeInvalidMedia, "media.media_type")
+	if media.MediaType != "" {
+		if !utf8.ValidString(media.MediaType) || len(media.MediaType) > 256 {
+			return validationError(CodeInvalidMedia, "media.media_type")
+		}
+		lower := strings.ToLower(media.MediaType)
+		switch partType {
+		case PartImage:
+			if !strings.HasPrefix(lower, "image/") {
+				return validationError(CodeInvalidMedia, "media.media_type")
+			}
+		case PartAudio:
+			if !strings.HasPrefix(lower, "audio/") {
+				return validationError(CodeInvalidMedia, "media.media_type")
+			}
+		case PartVideo:
+			if !strings.HasPrefix(lower, "video/") {
+				return validationError(CodeInvalidMedia, "media.media_type")
+			}
+		}
 	}
-	if media.Name != "" && !utf8.ValidString(media.Name) {
+	if media.Name != "" && (!utf8.ValidString(media.Name) || utf8.RuneCountInString(media.Name) > 512) {
 		return validationError(CodeInvalidMedia, "media.name")
 	}
 	return nil
@@ -92,17 +162,17 @@ func asciiLetter(value byte) bool {
 	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z'
 }
 
-// ValidateToolDefinition validates portable tool metadata and the top-level
-// shape of its input schema.
+// ValidateToolDefinition validates portable tool metadata and the conservative
+// portable JSON-schema profile used across provider adapters.
 func ValidateToolDefinition(definition ToolDefinition) error {
 	if err := ValidateToolName(definition.Name); err != nil {
 		return err
 	}
-	if !utf8.ValidString(definition.Description) {
+	if !utf8.ValidString(definition.Description) || utf8.RuneCountInString(definition.Description) > 4096 {
 		return validationError(CodeInvalidContent, "description")
 	}
-	if !validJSONObject(definition.InputSchema) {
-		return validationError(CodeInvalidJSON, "input_schema")
+	if err := ValidatePortableJSONSchema(definition.InputSchema); err != nil {
+		return validationError(CodeInvalidSchema, "input_schema")
 	}
 	return nil
 }
@@ -115,7 +185,7 @@ func ValidateToolCall(call ToolCall) error {
 	if err := ValidateToolName(call.Name); err != nil {
 		return err
 	}
-	if !validJSONObject(call.Arguments) {
+	if err := ValidatePortableJSONObject(call.Arguments); err != nil {
 		return validationError(CodeInvalidJSON, "arguments")
 	}
 	return nil
@@ -146,12 +216,7 @@ func validCallID(value string) bool {
 }
 
 func validJSONObject(raw json.RawMessage) bool {
-	trimmed := bytes.TrimSpace(raw)
-	if len(trimmed) < 2 || trimmed[0] != '{' || trimmed[len(trimmed)-1] != '}' || !json.Valid(trimmed) {
-		return false
-	}
-	var object map[string]json.RawMessage
-	return json.Unmarshal(trimmed, &object) == nil && object != nil
+	return ValidatePortableJSONObject(raw) == nil
 }
 
 // ValidateFinishReason validates one portable completion reason.
