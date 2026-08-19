@@ -19,14 +19,25 @@ The initial specification areas are:
 
 - `text/` — language-agnostic text normalization semantics;
 - `temporal/` — civil date and year-month semantics;
-- `identity/` — generic identifier concepts plus jurisdictional identifiers;
-- `errors/` — stable, non-localized error semantics;
-- future areas may include `fingerprint/`, `assistant/`, `ocr/`, `matching/`, `solver/`, and international standards.
+- `contact/` — email and explicitly contextualized telephone semantics;
+- `identity/` — generic typed identifier concepts;
+- `postal/` — explicitly jurisdiction-aware postal identifiers;
+- `jurisdictions/` — country/jurisdiction-specific semantics, beginning with Brazil because those capabilities already exist in the Go implementation;
+- `standards/` — international/cross-jurisdiction standards when a reusable contract is justified;
+- `errors/` — stable, non-localized error semantics.
 
-Jurisdiction-specific behavior must be namespaced explicitly, for example `identity/br/cpf`. A consumer must not be forced to assume a country, language, locale, currency, or timezone from another one of those concepts.
+Future areas may include `fingerprint/`, `assistant/`, `ocr/`, `matching/`, and `solver/`.
+
+Jurisdiction-specific behavior must be namespaced explicitly, for example `identity.br.cpf` or `postal.br.cep`. A consumer must not be forced to assume a country, language, locale, currency, or timezone from another one of those concepts.
+
+## Normative versus implementation material
+
+`spec/` describes semantics. `conformance/` proves observable behavior. `schemas/` defines portable serialized shapes where machine-readable contracts are useful.
+
+Language implementations may expose idiomatic APIs; they do not have to reproduce Go package/function naming. The cross-language contract is semantic behavior and stable serialization, not syntax.
 
 ## Conformance
 
 Machine-readable behavior vectors live under `conformance/`. Every language implementation that claims support for a specification version must pass the applicable vectors.
 
-The specification defines semantics. Each implementation may expose idiomatic APIs for its language as long as observable behavior remains conformant.
+Changing an existing vector's semantics requires an explicit specification-version decision. Language-local tests may add coverage but may not contradict the shared vectors.
