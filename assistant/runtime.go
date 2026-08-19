@@ -5,11 +5,12 @@ package assistant
 // disabled, one concrete model may be selected, and ordered provider credential
 // handles may be supplied for dynamic/fallback routing.
 type RunOverrides struct {
-	EnableModules      []ModuleID                `json:"enable_modules,omitempty"`
-	DisableModules     []ModuleID                `json:"disable_modules,omitempty"`
-	Model              *ModelRef                 `json:"model,omitempty"`
-	Credentials        []CredentialRef           `json:"credentials,omitempty"`
-	CredentialFallback *CredentialFallbackPolicy `json:"credential_fallback,omitempty"`
+	EnableModules      []ModuleID                 `json:"enable_modules,omitempty"`
+	DisableModules     []ModuleID                 `json:"disable_modules,omitempty"`
+	Model              *ModelRef                  `json:"model,omitempty"`
+	Credentials        []CredentialRef            `json:"credentials,omitempty"`
+	CredentialFallback *CredentialFallbackPolicy  `json:"credential_fallback,omitempty"`
+	RoutingFallback    *RoutingFallbackPolicy     `json:"routing_fallback,omitempty"`
 }
 
 // EffectiveModules returns deterministic effective modules for one run.
@@ -43,6 +44,9 @@ func EffectiveModules(def AssistantDefinition, overrides RunOverrides) ([]Module
 		if enabled[module] {
 			result = append(result, module)
 		}
+	}
+	if len(result) == 0 {
+		return nil, validationError(CodeInvalidModule, "run.modules")
 	}
 	return result, nil
 }
@@ -82,7 +86,7 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 		return validationError(CodeInvalidModel, "run.model")
 	}
 
-	seenRefs := make(map[string]struct{}, len(overrides.Credentials))
+	seenCredentials := make(map[CredentialIdentity]struct{}, len(overrides.Credentials))
 	for _, credential := range overrides.Credentials {
 		if err := ValidateCredentialRef(credential); err != nil {
 			return err
@@ -90,14 +94,19 @@ func ValidateRunOverrides(def AssistantDefinition, overrides RunOverrides) error
 		if !def.Credentials.Allows(credential.Mode) {
 			return validationError(CodeInvalidCredential, "run.credentials")
 		}
-		key := string(credential.Provider) + "|" + string(credential.Mode) + "|" + credential.Reference
-		if _, duplicate := seenRefs[key]; duplicate {
+		identity := credential.Identity()
+		if _, duplicate := seenCredentials[identity]; duplicate {
 			return validationError(CodeInvalidCredential, "run.credentials")
 		}
-		seenRefs[key] = struct{}{}
+		seenCredentials[identity] = struct{}{}
 	}
 	if overrides.CredentialFallback != nil {
 		if err := ValidateCredentialFallbackPolicy(*overrides.CredentialFallback); err != nil {
+			return err
+		}
+	}
+	if overrides.RoutingFallback != nil {
+		if err := ValidateRoutingFallbackPolicy(*overrides.RoutingFallback); err != nil {
 			return err
 		}
 	}
@@ -116,8 +125,10 @@ func CredentialsForProvider(overrides RunOverrides, provider ProviderID) []Crede
 	return result
 }
 
-// NextCredential returns the next credential in provider order when policy
-// permits fallback for the normalized failure class.
+// NextCredential returns the next eligible credential in provider order when
+// policy permits fallback for the normalized failure class. For quota/rate-limit
+// failures, credentials known to share the current quota scope are skipped when
+// the policy requests it.
 func NextCredential(overrides RunOverrides, provider ProviderID, current int, failure FailureClass) (CredentialRef, int, error) {
 	chain := CredentialsForProvider(overrides, provider)
 	if len(chain) == 0 || current < -1 || current >= len(chain) {
@@ -127,14 +138,22 @@ func NextCredential(overrides RunOverrides, provider ProviderID, current int, fa
 	if overrides.CredentialFallback != nil {
 		policy = *overrides.CredentialFallback
 	}
-	if current >= 0 && !policy.Allows(failure) {
-		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+	if current >= 0 {
+		if !failure.Valid() || !policy.Allows(failure) {
+			return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+		}
 	}
-	next := current + 1
-	if next >= len(chain) {
-		return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
+
+	for next := current + 1; next < len(chain); next++ {
+		if current >= 0 && policy.SkipSameQuotaScope && (failure == FailureQuota || failure == FailureRateLimit) {
+			currentScope := chain[current].QuotaScope
+			if currentScope != "" && chain[next].QuotaScope == currentScope {
+				continue
+			}
+		}
+		return chain[next], next, nil
 	}
-	return chain[next], next, nil
+	return CredentialRef{}, -1, validationError(CodeCredentialExhausted, "run.credentials")
 }
 
 // ResolveAssistantModelsForRun applies module and manual model overrides before
