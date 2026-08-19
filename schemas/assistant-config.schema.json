@@ -7,14 +7,17 @@
       "type": "string",
       "pattern": "^[A-Za-z_][A-Za-z0-9_./-]{0,127}$"
     },
-    "ProviderID": {
-      "$ref": "#/$defs/PortableID"
-    },
-    "ModelID": {
+    "OpaqueRef": {
       "type": "string",
       "minLength": 1,
       "maxLength": 256,
       "pattern": "^[!-~]+$"
+    },
+    "ProviderID": {
+      "$ref": "#/$defs/PortableID"
+    },
+    "ModelID": {
+      "$ref": "#/$defs/OpaqueRef"
     },
     "ModelRef": {
       "type": "object",
@@ -129,7 +132,7 @@
       "properties": {
         "provider": {"$ref": "#/$defs/ProviderID"},
         "mode": {"$ref": "#/$defs/CredentialMode"},
-        "reference": {"$ref": "#/$defs/PortableID"}
+        "reference": {"$ref": "#/$defs/OpaqueRef"}
       }
     },
     "ModuleID": {
@@ -197,6 +200,11 @@
         "modules": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/ModuleID"}
+        },
+        "optional_modules": {
+          "type": "array",
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/ModuleID"}
         },
