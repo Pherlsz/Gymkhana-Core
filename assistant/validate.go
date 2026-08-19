@@ -3,7 +3,6 @@ package assistant
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -55,13 +54,13 @@ func ValidateContentPart(part ContentPart) error {
 }
 
 func validateMedia(media MediaRef) error {
-	if strings.TrimSpace(media.URI) == "" || !utf8.ValidString(media.URI) {
+	if media.URI == "" || !utf8.ValidString(media.URI) {
 		return validationError(CodeInvalidMedia, "media.uri")
 	}
-	if media.MediaType != "" && (!utf8.ValidString(media.MediaType) || strings.TrimSpace(media.MediaType) == "") {
+	if media.MediaType != "" && !utf8.ValidString(media.MediaType) {
 		return validationError(CodeInvalidMedia, "media.media_type")
 	}
-	if media.Name != "" && (!utf8.ValidString(media.Name) || strings.TrimSpace(media.Name) == "") {
+	if media.Name != "" && !utf8.ValidString(media.Name) {
 		return validationError(CodeInvalidMedia, "media.name")
 	}
 	return nil
@@ -141,7 +140,7 @@ func ValidateToolResult(result ToolResult) error {
 }
 
 func validCallID(value string) bool {
-	return len(value) > 0 && len(value) <= 256 && utf8.ValidString(value) && strings.TrimSpace(value) != ""
+	return value != "" && utf8.ValidString(value) && utf8.RuneCountInString(value) <= 256
 }
 
 func validJSONObject(raw json.RawMessage) bool {
