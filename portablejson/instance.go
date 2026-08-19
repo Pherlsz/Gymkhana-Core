@@ -3,7 +3,6 @@ package portablejson
 import (
 	"bytes"
 	"encoding/json"
-	"math"
 	"reflect"
 	"strconv"
 	"unicode/utf8"
@@ -221,8 +220,7 @@ func validatePortableNumber(value any) error {
 	if !ok {
 		return validationError(CodeInvalidSchema, "instance.number")
 	}
-	parsed, err := strconv.ParseFloat(number.String(), 64)
-	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) || math.Abs(parsed) > float64(MaxSafeInteger) {
+	if _, err := parsePortableNumber(number.String()); err != nil {
 		return validationError(CodeInvalidSchema, "instance.number")
 	}
 	return nil
@@ -233,18 +231,18 @@ func validateNumericBounds(schema map[string]any, value any) error {
 	if !ok {
 		return validationError(CodeInvalidSchema, "instance.number")
 	}
-	actual, err := strconv.ParseFloat(number.String(), 64)
-	if err != nil || math.IsNaN(actual) || math.IsInf(actual, 0) {
+	actual, err := parsePortableNumber(number.String())
+	if err != nil {
 		return validationError(CodeInvalidSchema, "instance.number")
 	}
 	if minimum, set, err := schemaNumber(schema["minimum"]); err != nil {
 		return validationError(CodeInvalidSchema, "instance.minimum")
-	} else if set && actual < minimum {
+	} else if set && actual.Cmp(minimum) < 0 {
 		return validationError(CodeInvalidSchema, "instance.minimum")
 	}
 	if maximum, set, err := schemaNumber(schema["maximum"]); err != nil {
 		return validationError(CodeInvalidSchema, "instance.maximum")
-	} else if set && actual > maximum {
+	} else if set && actual.Cmp(maximum) > 0 {
 		return validationError(CodeInvalidSchema, "instance.maximum")
 	}
 	return nil
@@ -257,9 +255,9 @@ func scalarEqual(left, right any) bool {
 		if !leftIsNumber || !rightIsNumber {
 			return false
 		}
-		leftFloat, leftErr := strconv.ParseFloat(leftNumber.String(), 64)
-		rightFloat, rightErr := strconv.ParseFloat(rightNumber.String(), 64)
-		return leftErr == nil && rightErr == nil && leftFloat == rightFloat
+		leftRat, leftErr := parsePortableNumber(leftNumber.String())
+		rightRat, rightErr := parsePortableNumber(rightNumber.String())
+		return leftErr == nil && rightErr == nil && leftRat.Cmp(rightRat) == 0
 	}
 	return reflect.DeepEqual(left, right)
 }
