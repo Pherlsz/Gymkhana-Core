@@ -29,12 +29,12 @@ type Skill struct {
 // input/output token usage without weakening instruction authority or dropping
 // unresolved requirements.
 type TokenEconomyPolicy struct {
-	PreferConciseResponses          bool `json:"prefer_concise_responses"`
-	AvoidRestatement                bool `json:"avoid_restatement"`
-	ReusePriorContext               bool `json:"reuse_prior_context"`
-	CompactToolResults              bool `json:"compact_tool_results"`
-	PreserveInstructionHierarchy    bool `json:"preserve_instruction_hierarchy"`
-	PreserveUnresolvedConstraints   bool `json:"preserve_unresolved_constraints"`
+	PreferConciseResponses        bool `json:"prefer_concise_responses"`
+	AvoidRestatement              bool `json:"avoid_restatement"`
+	ReusePriorContext             bool `json:"reuse_prior_context"`
+	CompactToolResults            bool `json:"compact_tool_results"`
+	PreserveInstructionHierarchy  bool `json:"preserve_instruction_hierarchy"`
+	PreserveUnresolvedConstraints bool `json:"preserve_unresolved_constraints"`
 }
 
 // BuiltinTokenEconomySkill returns the canonical Core token-economy profile.
