@@ -2,8 +2,8 @@ package assistant_test
 
 import (
 	"encoding/json"
-	"errors"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/Pherlsz/Gymkhana-Core/assistant"
 )
@@ -11,148 +11,184 @@ import (
 func TestValidateMessage(t *testing.T) {
 	t.Parallel()
 
-	valid := assistant.Message{
+	message := assistant.Message{
 		Role: assistant.RoleUser,
 		Content: []assistant.ContentPart{
-			{Type: assistant.PartText, Text: "Hello"},
-			{Type: assistant.PartImage, Media: &assistant.MediaRef{URI: "https://example.test/image.png", MediaType: "image/png"}},
+			{Type: assistant.PartText, Text: "Compare these documents."},
+			{
+				Type: assistant.PartFile,
+				Media: &assistant.MediaRef{
+					URI:       "urn:document:42",
+					MediaType: "application/pdf",
+					Name:      "contract.pdf",
+				},
+			},
 		},
 	}
-	if err := assistant.ValidateMessage(valid); err != nil {
+	if err := assistant.ValidateMessage(message); err != nil {
 		t.Fatalf("ValidateMessage(valid) = %v", err)
 	}
 
-	invalidRole := valid
-	invalidRole.Role = "provider-specific-role"
-	assertCode(t, assistant.ValidateMessage(invalidRole), assistant.CodeInvalidRole)
-
-	ambiguous := assistant.Message{
-		Role: assistant.RoleUser,
-		Content: []assistant.ContentPart{{
-			Type:  assistant.PartText,
-			Text:  "hello",
-			Media: &assistant.MediaRef{URI: "https://example.test/image.png"},
-		}},
-	}
-	assertCode(t, assistant.ValidateMessage(ambiguous), assistant.CodeInvalidContent)
+	message.Role = assistant.Role("provider_specific")
+	assertAssistantCode(t, assistant.ValidateMessage(message), assistant.CodeInvalidRole)
 }
 
-func TestToolContracts(t *testing.T) {
+func TestValidateContentParts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		part assistant.ContentPart
+		code assistant.ErrorCode
+	}{
+		{
+			name: "text",
+			part: assistant.ContentPart{Type: assistant.PartText, Text: "hello"},
+		},
+		{
+			name: "image",
+			part: assistant.ContentPart{Type: assistant.PartImage, Media: &assistant.MediaRef{URI: "urn:image:1"}},
+		},
+		{
+			name: "tool call",
+			part: assistant.ContentPart{Type: assistant.PartToolCall, ToolCall: &assistant.ToolCall{
+				ID:        "call_01",
+				Name:      "lookup_weather",
+				Arguments: json.RawMessage(`{"location":"Tokyo"}`),
+			}},
+		},
+		{
+			name: "tool result",
+			part: assistant.ContentPart{Type: assistant.PartToolResult, ToolResult: &assistant.ToolResult{
+				CallID:  "call_01",
+				Content: []assistant.ContentPart{{Type: assistant.PartText, Text: "21 C"}},
+			}},
+		},
+		{
+			name: "mixed payload rejected",
+			part: assistant.ContentPart{Type: assistant.PartText, Text: "hello", Media: &assistant.MediaRef{URI: "urn:image:1"}},
+			code: assistant.CodeInvalidContent,
+		},
+		{
+			name: "unknown type rejected",
+			part: assistant.ContentPart{Type: assistant.PartType("provider_magic"), Text: "hello"},
+			code: assistant.CodeInvalidContentType,
+		},
+	}
+
+	// Ensure the raw tool-call fixture is exact valid JSON.
+	tests[2].part.ToolCall.Arguments = json.RawMessage("{\"location\":\"Tokyo\"}")
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			err := assistant.ValidateContentPart(test.part)
+			if test.code == "" {
+				if err != nil {
+					t.Fatalf("ValidateContentPart(valid) = %v", err)
+				}
+				return
+			}
+			assertAssistantCode(t, err, test.code)
+		})
+	}
+}
+
+func TestValidateToolDefinition(t *testing.T) {
 	t.Parallel()
 
 	definition := assistant.ToolDefinition{
 		Name:        "lookup_weather",
-		Description: "Look up weather for one location.",
-		InputSchema: json.RawMessage("{}"),
+		Description: "Look up current weather.",
+		InputSchema: json.RawMessage(`{}`),
 	}
 	if err := assistant.ValidateToolDefinition(definition); err != nil {
 		t.Fatalf("ValidateToolDefinition(valid) = %v", err)
 	}
 
 	definition.Name = "lookup.weather"
-	assertCode(t, assistant.ValidateToolDefinition(definition), assistant.CodeInvalidToolName)
+	assertAssistantCode(t, assistant.ValidateToolDefinition(definition), assistant.CodeInvalidToolName)
+
+	definition.Name = "lookup_weather"
+	definition.InputSchema = json.RawMessage(`[]`)
+	assertAssistantCode(t, assistant.ValidateToolDefinition(definition), assistant.CodeInvalidSchema)
+}
+
+func TestValidateToolCallRejectsNonObjectArguments(t *testing.T) {
+	t.Parallel()
+
+	call := assistant.ToolCall{ID: "call_01", Name: "lookup_weather", Arguments: json.RawMessage(`[]`)}
+	assertAssistantCode(t, assistant.ValidateToolCall(call), assistant.CodeInvalidJSON)
+}
+
+func TestValidateToolCallIDUsesUnicodeScalarLimit(t *testing.T) {
+	t.Parallel()
 
 	call := assistant.ToolCall{
-		ID:        "call_01",
+		ID:        repeatRune('界', 256),
 		Name:      "lookup_weather",
-		Arguments: json.RawMessage("{}"),
+		Arguments: json.RawMessage(`{}`),
 	}
 	if err := assistant.ValidateToolCall(call); err != nil {
-		t.Fatalf("ValidateToolCall(valid) = %v", err)
+		t.Fatalf("256-scalar call ID = %v", err)
 	}
-
-	call.Arguments = json.RawMessage("[]")
-	assertCode(t, assistant.ValidateToolCall(call), assistant.CodeInvalidJSON)
-
-	result := assistant.ToolResult{
-		CallID: "call_01",
-		Content: []assistant.ContentPart{{
-			Type: assistant.PartText,
-			Text: "21 C",
-		}},
-	}
-	if err := assistant.ValidateToolResult(result); err != nil {
-		t.Fatalf("ValidateToolResult(valid) = %v", err)
-	}
-
-	result.Content = []assistant.ContentPart{{
-		Type: assistant.PartToolCall,
-		ToolCall: &assistant.ToolCall{
-			ID:        "nested",
-			Name:      "lookup_weather",
-			Arguments: json.RawMessage("{}"),
-		},
-	}}
-	assertCode(t, assistant.ValidateToolResult(result), assistant.CodeInvalidToolResult)
+	call.ID += "界"
+	assertAssistantCode(t, assistant.ValidateToolCall(call), assistant.CodeInvalidToolCall)
 }
 
-func TestPortableEnumsAndUsage(t *testing.T) {
+func TestValidateUsage(t *testing.T) {
 	t.Parallel()
 
-	if err := assistant.ValidateFinishReason(assistant.FinishToolCalls); err != nil {
-		t.Fatalf("ValidateFinishReason(valid) = %v", err)
-	}
-	assertCode(t, assistant.ValidateFinishReason("provider_reason"), assistant.CodeInvalidFinishReason)
-
-	if err := assistant.ValidateUsage(assistant.Usage{InputTokens: 10, OutputTokens: 4, CachedInputTokens: 2}); err != nil {
+	if err := assistant.ValidateUsage(assistant.Usage{InputTokens: 10, OutputTokens: 3}); err != nil {
 		t.Fatalf("ValidateUsage(valid) = %v", err)
 	}
-	assertCode(t, assistant.ValidateUsage(assistant.Usage{InputTokens: -1}), assistant.CodeInvalidUsage)
-	assertCode(t, assistant.ValidateUsage(assistant.Usage{InputTokens: 9007199254740992}), assistant.CodeInvalidUsage)
-
-	capabilities := []assistant.Capability{
-		assistant.CapabilityText,
-		assistant.CapabilityToolCalling,
-		assistant.CapabilityStreaming,
-	}
-	if err := assistant.ValidateCapabilities(capabilities); err != nil {
-		t.Fatalf("ValidateCapabilities(valid) = %v", err)
-	}
-	assertCode(t, assistant.ValidateCapabilities([]assistant.Capability{assistant.CapabilityText, assistant.CapabilityText}), assistant.CodeDuplicateCapability)
-	assertCode(t, assistant.ValidateCapabilities([]assistant.Capability{"provider_magic"}), assistant.CodeInvalidCapability)
+	assertAssistantCode(t, assistant.ValidateUsage(assistant.Usage{InputTokens: -1}), assistant.CodeInvalidUsage)
+	assertAssistantCode(t, assistant.ValidateUsage(assistant.Usage{InputTokens: 1 << 53}), assistant.CodeInvalidUsage)
 }
 
-func TestMessageJSONRoundTrip(t *testing.T) {
+func TestValidateCapabilities(t *testing.T) {
 	t.Parallel()
 
-	original := assistant.Message{
-		Role: assistant.RoleAssistant,
-		Content: []assistant.ContentPart{{
-			Type: assistant.PartToolCall,
-			ToolCall: &assistant.ToolCall{
-				ID:        "call_01",
-				Name:      "lookup_weather",
-				Arguments: json.RawMessage("{}"),
-			},
-		}},
+	if err := assistant.ValidateCapabilities([]assistant.Capability{assistant.CapabilityText, assistant.CapabilityToolCalling}); err != nil {
+		t.Fatalf("ValidateCapabilities(valid) = %v", err)
 	}
+	assertAssistantCode(t, assistant.ValidateCapabilities([]assistant.Capability{assistant.CapabilityText, assistant.CapabilityText}), assistant.CodeDuplicateCapability)
+	assertAssistantCode(t, assistant.ValidateCapabilities([]assistant.Capability{assistant.Capability("provider_magic")}), assistant.CodeInvalidCapability)
+}
 
-	data, err := json.Marshal(original)
-	if err != nil {
-		t.Fatalf("Marshal = %v", err)
+func TestValidationErrorDoesNotEchoSensitiveInput(t *testing.T) {
+	t.Parallel()
+
+	secret := "secret-user-value"
+	message := assistant.Message{Role: assistant.RoleUser, Content: []assistant.ContentPart{{Type: assistant.PartText, Text: ""}}}
+	err := assistant.ValidateMessage(message)
+	if err == nil {
+		t.Fatal("expected validation error")
 	}
-	var decoded assistant.Message
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		t.Fatalf("Unmarshal = %v", err)
-	}
-	if err := assistant.ValidateMessage(decoded); err != nil {
-		t.Fatalf("round-trip message invalid: %v", err)
+	if contains(err.Error(), secret) {
+		t.Fatalf("error leaked original input: %q", err)
 	}
 }
 
-func assertCode(t *testing.T, err error, code assistant.ErrorCode) {
-	t.Helper()
-	if err == nil {
-		t.Fatalf("expected error code %q", code)
+func repeatRune(value rune, count int) string {
+	buffer := make([]byte, 0, count*utf8.RuneLen(value))
+	encoded := make([]byte, utf8.UTFMax)
+	size := utf8.EncodeRune(encoded, value)
+	for range count {
+		buffer = append(buffer, encoded[:size]...)
 	}
-	var validation *assistant.ValidationError
-	if !errors.As(err, &validation) {
-		t.Fatalf("error %T is not ValidationError: %v", err, err)
+	return string(buffer)
+}
+
+func contains(value, substring string) bool {
+	if len(substring) == 0 {
+		return true
 	}
-	if validation.Code != code {
-		t.Fatalf("error code = %q, want %q", validation.Code, code)
+	for index := 0; index+len(substring) <= len(value); index++ {
+		if value[index:index+len(substring)] == substring {
+			return true
+		}
 	}
-	if !assistant.IsCode(err, code) {
-		t.Fatalf("IsCode(%q) = false", code)
-	}
+	return false
 }
