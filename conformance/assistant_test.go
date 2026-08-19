@@ -12,6 +12,10 @@ func TestAssistantConformance(t *testing.T) {
 	runSuite(t, "assistant.json", executeAssistant)
 }
 
+func TestAssistantConfigConformance(t *testing.T) {
+	runSuite(t, "assistant-config.json", executeAssistantConfig)
+}
+
 func executeAssistant(testCase vector) (any, string) {
 	switch testCase.Operation {
 	case "assistant.message.validate":
@@ -55,6 +59,61 @@ func executeAssistant(testCase vector) (any, string) {
 	default:
 		return nil, "unsupported_operation"
 	}
+}
+
+func executeAssistantConfig(testCase vector) (any, string) {
+	switch testCase.Operation {
+	case "assistant.definition.validate":
+		var value assistant.AssistantDefinition
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateAssistantDefinition(value))
+	case "assistant.credential_ref.validate":
+		var value assistant.CredentialRef
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateCredentialRef(value))
+	case "assistant.retrieval.validate":
+		var value assistant.RetrievalPolicy
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateRetrievalPolicy(value))
+	case "assistant.model.resolve":
+		var value modelResolutionInput
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		resolved, err := assistant.ResolveModelCandidates(value.Policy, value.Catalog)
+		if err != nil {
+			return assistantValidationResult(err)
+		}
+		return resolved, ""
+	case "assistant.definition.resolve_models":
+		var value assistantResolutionInput
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		resolved, err := assistant.ResolveAssistantModels(value.Assistant, value.Catalog)
+		if err != nil {
+			return assistantValidationResult(err)
+		}
+		return resolved, ""
+	default:
+		return nil, "unsupported_operation"
+	}
+}
+
+type modelResolutionInput struct {
+	Policy  assistant.ModelPolicy       `json:"policy"`
+	Catalog []assistant.ModelDescriptor `json:"catalog"`
+}
+
+type assistantResolutionInput struct {
+	Assistant assistant.AssistantDefinition `json:"assistant"`
+	Catalog   []assistant.ModelDescriptor   `json:"catalog"`
 }
 
 func assistantValidationResult(err error) (any, string) {
