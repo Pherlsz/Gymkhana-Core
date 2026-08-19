@@ -9,11 +9,11 @@ import (
 
 func FuzzAssistantMessageJSON(f *testing.F) {
 	for _, seed := range []string{
-		`{"role":"user","content":[{"type":"text","text":"hello"}]}`,
-		`{"role":"assistant","content":[{"type":"tool_call","tool_call":{"id":"call_01","name":"lookup_weather","arguments":{"location":"Tokyo"}}}]}`,
-		`{"role":"tool","content":[{"type":"tool_result","tool_result":{"call_id":"call_01","content":[{"type":"text","text":"21 C"}]}}]}`,
-		`{}`,
-		`null`,
+		"{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"}]}",
+		"{\"role\":\"assistant\",\"content\":[{\"type\":\"tool_call\",\"tool_call\":{\"id\":\"call_01\",\"name\":\"lookup_weather\",\"arguments\":{\"location\":\"Tokyo\"}}}]}",
+		"{\"role\":\"tool\",\"content\":[{\"type\":\"tool_result\",\"tool_result\":{\"call_id\":\"call_01\",\"content\":[{\"type\":\"text\",\"text\":\"21 C\"}]}}]}",
+		"{}",
+		"null",
 	} {
 		f.Add(seed)
 	}
