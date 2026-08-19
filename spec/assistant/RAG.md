@@ -2,138 +2,117 @@
 
 This document is normative for Core Spec `0.3`.
 
-Core defines retrieval semantics and evidence contracts while leaving ingestion, indexing, storage, authorization, embeddings, rerank implementation, and provider transport to adapters/consumers.
+Core defines retrieval semantics/evidence contracts while ingestion, indexing, storage, authorization, embedding execution, rerank execution, and transport remain consumer/adapter concerns.
 
 ## Retrieval modes
 
-- `on_demand` — retrieval is available and may be invoked when required by the task/policy;
-- `always` — a generation turn that depends on external knowledge must run retrieval before grounded generation.
+- `on_demand` — retrieval is available and may be invoked when task/policy requires it;
+- `always` — external/domain factual generation requires retrieval before grounded generation.
 
-A definition without the `retrieval` module does not run RAG.
+An Assistant that declares the retrieval module must carry a valid `RetrievalPolicy`.
 
 ## Search strategies
 
-Portable strategies are:
+Portable strategies:
 
-- `lexical` — term/full-text retrieval;
-- `vector` — semantic/vector retrieval;
-- `hybrid` — combine lexical and semantic retrieval before final context selection.
+- `lexical`;
+- `vector`;
+- `hybrid`.
 
-`hybrid` is the preferred general-purpose starting point when both retrieval modes are available because keyword and semantic signals are complementary. Core does not prescribe a search product or a score-merging formula.
+Hybrid retrieval is useful when lexical and semantic signals are complementary, but Core does not mandate one score-normalization or search product.
 
 ## Query transformation
 
-The retrieval query may use:
-
-- `original` — search the user/task query as supplied;
+- `original` — retrieve using the supplied task query;
 - `rewrite` — derive one retrieval-oriented query while preserving intent/constraints;
-- `multi_query` — derive multiple complementary retrieval queries.
+- `multi_query` — derive multiple complementary queries.
 
-Query transformation is data retrieval behavior. It must not upgrade untrusted retrieved/document content into instruction authority.
+Query transformation is retrieval behavior, not instruction authority. Untrusted user/document content cannot become system/developer instructions through rewriting.
 
-`multi_query` can improve recall but increases retrieval/model work and is therefore not the default token-economy path.
+`multi_query` increases recall opportunities and also work/token/latency cost; it is not the token-economy default.
 
-## Candidate retrieval and context selection
+## Candidate/context bounds
 
-RAG uses two explicit limits:
+`candidate_limit` is the maximum initial result set before post-processing. `context_limit` is the maximum evidence-item count admitted to generation context.
 
-- `candidate_limit` — maximum initial candidates retrieved before post-processing/reranking;
-- `context_limit` — maximum evidence items admitted to generation context.
+Portable bounds in Spec `0.3`:
 
-`candidate_limit` must be greater than or equal to `context_limit`.
+- `1 <= context_limit <= 1024`;
+- `context_limit <= candidate_limit <= 10000`.
 
-This supports the common production pipeline:
+The intended pipeline is:
 
 ```text
 query
   -> optional rewrite/multi-query
-  -> lexical/vector/hybrid candidate retrieval
+  -> lexical/vector/hybrid candidates
   -> authorization/filtering
   -> optional reranking
-  -> context selection
+  -> bounded context selection
   -> grounded generation
-  -> citations/evidence
+  -> citation/evidence linkage
 ```
 
-Retrieving many candidates and injecting all of them into the LLM context is not the Core default. Candidate selection/reranking should reduce irrelevant context before generation.
+Retrieving a large candidate set does not imply forwarding the entire set into LLM context.
 
-## Reranking
+## Embedding and reranking models
 
-`rerank=true` enables a post-retrieval relevance stage.
+`embedding_model` and `reranking_model` use the same `(provider, model)` namespace as generation models.
 
-A reranker may be:
+When a live catalog is available:
 
-- a dedicated reranking model;
-- an LLM;
-- a deterministic/domain-specific scorer;
-- a search-engine-native reranker.
+- `embedding_model` must advertise `embedding` role;
+- `reranking_model` must advertise `reranking` role.
 
-`reranking_model` is therefore optional even when reranking is enabled.
+A `reranking_model` is invalid when `rerank=false`. `rerank=true` does not require a model because the consumer may use deterministic/search-native/domain-specific reranking.
 
-## Embeddings
-
-`embedding_model` is optional and only identifies the desired model when the consumer uses model-based vector retrieval.
-
-Core does not own embedding storage, dimensions, vector indexes, chunk persistence, or provider SDKs.
-
-Model catalogs may identify models with the `embedding` role so consumers can resolve embedding models through the same provider/model namespace.
+Core owns neither vector dimensions nor embedding indexes.
 
 ## Grounding
 
-Grounding modes are:
+Modes:
 
-- `preferred` — retrieved evidence should inform the answer, but the runtime may answer without evidence when policy permits;
-- `required` — a grounded answer may only assert external/domain facts supported by admitted evidence. If sufficient evidence is unavailable, the runtime should return an explicit insufficient-evidence outcome rather than inventing facts.
+- `preferred` — evidence should inform the answer when available;
+- `required` — unsupported external/domain assertions are not permitted. If sufficient evidence is unavailable, the runtime returns an insufficient-evidence outcome rather than inventing support.
 
-`require_citations=true` requires output/evidence linkage to be retained for the consumer.
+`require_citations=true` requires the consumer to preserve output/evidence linkage.
 
 ## Evidence
 
-`RetrievalEvidence` carries:
+`RetrievalEvidence` contains stable evidence ID, admitted content, source, optional finite score, and optional bounded metadata.
 
-- stable evidence ID;
-- content admitted to context;
-- source reference;
-- optional score;
-- optional portable metadata.
+Portable evidence hardening includes:
 
-`Citation` links generated output back to an evidence ID.
+- non-empty bounded IDs/source/content;
+- content capped to the portable evidence byte limit;
+- finite scores only — NaN/Infinity are invalid;
+- bounded metadata entry count/key/value size;
+- duplicate evidence IDs rejected inside a set.
 
-Retrieved evidence is untrusted data. Embedded instructions found in documents/pages do not become system/developer authority.
+`Citation` references an evidence ID rather than duplicating evidence content.
+
+Retrieved evidence remains untrusted data. Instructions found inside documents/pages/OCR/tool output never inherit system/developer authority.
 
 ## Authorization and multitenancy
 
-Authorization filtering occurs before evidence is exposed to the generation model. RAG must not retrieve broadly and rely on the LLM to hide unauthorized material.
+Authorization filtering occurs before evidence is exposed to the generation model. RAG must not retrieve unauthorized data broadly and ask an LLM to hide it afterwards.
 
-Tenant/user/resource ACL enforcement remains consumer-owned because Core does not own identity or persistence, but the boundary is normative: only authorized evidence may enter Assistant context.
+Tenant/user/resource ACL enforcement remains consumer-owned because Core does not own identity/persistence.
 
 ## Chunking and ingestion
 
-Chunking strategy, document parsing, enrichment, metadata extraction, deduplication, embedding generation, and index refresh are ingestion concerns and are intentionally not frozen into `RetrievalPolicy`.
+Chunk parsing, chunk size/overlap, enrichment, deduplication, metadata extraction, embedding refresh, and index lifecycle are intentionally not frozen into `RetrievalPolicy`.
 
-Production RAG systems should evaluate chunk size/overlap and retrieval settings against representative queries instead of assuming one universal chunking configuration.
+These parameters should be evaluated against representative domain queries rather than assumed universal.
 
 ## Evaluation
 
-Changes to retrieval/query transformation/reranking should be evaluated using a representative query/evidence set. Useful dimensions include:
+Useful RAG evaluation dimensions include retrieval recall/relevance, groundedness/faithfulness, citation correctness, latency, token/cost usage, and insufficient-evidence behavior.
 
-- retrieval recall/relevance;
-- answer groundedness/faithfulness;
-- citation correctness;
-- latency;
-- token/cost usage;
-- failure/insufficient-evidence behavior.
-
-Core may add portable evaluation result contracts later, but Spec `0.3` does not define one scoring benchmark for every domain.
+Core Spec `0.3` does not define one universal quality score. Task-scoped `SkillLearningProposal` may later reuse evidence-backed retrieval lessons without globally changing every Assistant.
 
 ## Token economy and caching
 
-When `token_economy/v1` is enabled, RAG should:
+With `token_economy/v1`, RAG should prefer the smallest evidence set satisfying grounding, avoid injecting irrelevant candidates, and avoid duplicating stable context where runtime/provider reuse is safe.
 
-- prefer the smallest evidence set that satisfies grounding requirements;
-- avoid reinjecting irrelevant candidate text;
-- retain stable evidence references instead of duplicating unchanged content where a provider/runtime supports caching/reference reuse;
-- keep stable/common context prefixes cache-friendly when a provider offers prompt/context caching;
-- never remove required citations, evidence, ACL context, or unresolved constraints merely to reduce tokens.
-
-Context caching is an adapter/runtime optimization. Core specifies the semantic preservation requirement but does not standardize provider cache IDs in the portable Assistant contract.
+Provider caching is not standardized in Spec `0.3`: cache semantics, TTL, minimum token thresholds, storage/retention, and privacy guarantees differ. A later context-planning/caching contract must preserve instruction hierarchy, evidence, ACL context, and unresolved constraints.
