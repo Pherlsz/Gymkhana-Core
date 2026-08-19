@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Pherlsz/Gymkhana-Core/schemas/assistant.schema.json",
+  "title": "Gymkhana Core Assistant contracts",
+  "$defs": {
+    "Role": {
+      "type": "string",
+      "enum": ["system", "developer", "user", "assistant", "tool"]
+    },
+    "ToolName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"
+    },
+    "CallID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "MediaRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri"],
+      "properties": {
+        "uri": {"type": "string", "minLength": 1},
+        "media_type": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1}
+      }
+    },
+    "ToolDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "input_schema"],
+      "properties": {
+        "name": {"$ref": "#/$defs/ToolName"},
+        "description": {"type": "string"},
+        "input_schema": {"type": "object"}
+      }
+    },
+    "ToolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "arguments"],
+      "properties": {
+        "id": {"$ref": "#/$defs/CallID"},
+        "name": {"$ref": "#/$defs/ToolName"},
+        "arguments": {"type": "object"}
+      }
+    },
+    "ResultContentPart": {
+      "oneOf": [
+        {"$ref": "#/$defs/TextPart"},
+        {"$ref": "#/$defs/ImagePart"},
+        {"$ref": "#/$defs/FilePart"}
+      ]
+    },
+    "ToolResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["call_id", "content"],
+      "properties": {
+        "call_id": {"$ref": "#/$defs/CallID"},
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/ResultContentPart"}
+        },
+        "is_error": {"type": "boolean", "default": false}
+      }
+    },
+    "TextPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": {"const": "text"},
+        "text": {"type": "string", "minLength": 1}
+      }
+    },
+    "ImagePart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {
+        "type": {"const": "image"},
+        "media": {"$ref": "#/$defs/MediaRef"}
+      }
+    },
+    "FilePart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "media"],
+      "properties": {
+        "type": {"const": "file"},
+        "media": {"$ref": "#/$defs/MediaRef"}
+      }
+    },
+    "ToolCallPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tool_call"],
+      "properties": {
+        "type": {"const": "tool_call"},
+        "tool_call": {"$ref": "#/$defs/ToolCall"}
+      }
+    },
+    "ToolResultPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tool_result"],
+      "properties": {
+        "type": {"const": "tool_result"},
+        "tool_result": {"$ref": "#/$defs/ToolResult"}
+      }
+    },
+    "ContentPart": {
+      "oneOf": [
+        {"$ref": "#/$defs/TextPart"},
+        {"$ref": "#/$defs/ImagePart"},
+        {"$ref": "#/$defs/FilePart"},
+        {"$ref": "#/$defs/ToolCallPart"},
+        {"$ref": "#/$defs/ToolResultPart"}
+      ]
+    },
+    "Message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": {"$ref": "#/$defs/Role"},
+        "content": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/ContentPart"}
+        }
+      }
+    },
+    "FinishReason": {
+      "type": "string",
+      "enum": ["stop", "length", "tool_calls", "content_filter", "error", "other"]
+    },
+    "Usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {"type": "integer", "minimum": 0},
+        "output_tokens": {"type": "integer", "minimum": 0},
+        "cached_input_tokens": {"type": "integer", "minimum": 0},
+        "reasoning_tokens": {"type": "integer", "minimum": 0}
+      }
+    },
+    "Capability": {
+      "type": "string",
+      "enum": ["text", "image_input", "file_input", "tool_calling", "structured_output", "streaming"]
+    },
+    "Capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/Capability"}
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "spec_version": "0.3",
+  "suite": "temporal",
+  "cases": [
+    {
+      "name": "parse leap-day civil date",
+      "operation": "temporal.civil_date.parse",
+      "input": "2024-02-29",
+      "output": "2024-02-29"
+    },
+    {
+      "name": "reject impossible civil date",
+      "operation": "temporal.civil_date.parse",
+      "input": "2023-02-29",
+      "error": "invalid_day"
+    },
+    {
+      "name": "reject non-ISO civil date",
+      "operation": "temporal.civil_date.parse",
+      "input": "29/02/2024",
+      "error": "invalid_format"
+    },
+    {
+      "name": "parse year month",
+      "operation": "temporal.year_month.parse",
+      "input": "2026-08",
+      "output": "2026-08"
+    },
+    {
+      "name": "reject invalid month",
+      "operation": "temporal.year_month.parse",
+      "input": "2026-13",
+      "error": "invalid_month"
+    },
+    {
+      "name": "reject empty civil date",
+      "operation": "temporal.civil_date.parse",
+      "input": "",
+      "error": "empty"
+    }
+  ]
+}

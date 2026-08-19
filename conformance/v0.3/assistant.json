@@ -1,0 +1,194 @@
+{
+  "spec_version": "0.3",
+  "suite": "assistant",
+  "cases": [
+    {
+      "name": "validate user text message",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "Hello"}
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "validate multimodal reference message",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "Describe this image"},
+          {"type": "image", "media": {"uri": "https://example.test/image.png", "media_type": "image/png"}}
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "validate assistant tool call",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "tool_call",
+            "tool_call": {
+              "id": "call_01",
+              "name": "lookup_weather",
+              "arguments": {"location": "Tokyo"}
+            }
+          }
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "validate tool result",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "tool",
+        "content": [
+          {
+            "type": "tool_result",
+            "tool_result": {
+              "call_id": "call_01",
+              "content": [
+                {"type": "text", "text": "21 C"}
+              ]
+            }
+          }
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "reject unknown role",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "provider_specific",
+        "content": [
+          {"type": "text", "text": "hello"}
+        ]
+      },
+      "error": "invalid_role"
+    },
+    {
+      "name": "reject empty message content",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": []
+      },
+      "error": "empty"
+    },
+    {
+      "name": "reject unknown content type",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "provider_magic", "text": "hello"}
+        ]
+      },
+      "error": "invalid_content_type"
+    },
+    {
+      "name": "reject mixed union payload",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "hello",
+            "media": {"uri": "https://example.test/image.png"}
+          }
+        ]
+      },
+      "error": "invalid_content"
+    },
+    {
+      "name": "validate tool definition",
+      "operation": "assistant.tool_definition.validate",
+      "input": {
+        "name": "lookup_weather",
+        "description": "Look up weather.",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "location": {"type": "string"}
+          }
+        }
+      },
+      "output": true
+    },
+    {
+      "name": "reject non portable tool name",
+      "operation": "assistant.tool_definition.validate",
+      "input": {
+        "name": "lookup.weather",
+        "input_schema": {"type": "object"}
+      },
+      "error": "invalid_tool_name"
+    },
+    {
+      "name": "reject non object tool schema",
+      "operation": "assistant.tool_definition.validate",
+      "input": {
+        "name": "lookup_weather",
+        "input_schema": ["not", "an", "object"]
+      },
+      "error": "invalid_json"
+    },
+    {
+      "name": "validate finish reason",
+      "operation": "assistant.finish_reason.validate",
+      "input": "tool_calls",
+      "output": true
+    },
+    {
+      "name": "reject provider finish reason",
+      "operation": "assistant.finish_reason.validate",
+      "input": "provider_reason",
+      "error": "invalid_finish_reason"
+    },
+    {
+      "name": "validate usage",
+      "operation": "assistant.usage.validate",
+      "input": {
+        "input_tokens": 20,
+        "output_tokens": 5,
+        "cached_input_tokens": 4,
+        "reasoning_tokens": 1
+      },
+      "output": true
+    },
+    {
+      "name": "reject negative usage",
+      "operation": "assistant.usage.validate",
+      "input": {
+        "input_tokens": -1
+      },
+      "error": "invalid_usage"
+    },
+    {
+      "name": "validate capabilities",
+      "operation": "assistant.capabilities.validate",
+      "input": ["text", "image_input", "tool_calling", "streaming"],
+      "output": true
+    },
+    {
+      "name": "reject duplicate capabilities",
+      "operation": "assistant.capabilities.validate",
+      "input": ["text", "text"],
+      "error": "duplicate_capability"
+    },
+    {
+      "name": "reject unknown capability",
+      "operation": "assistant.capabilities.validate",
+      "input": ["text", "provider_magic"],
+      "error": "invalid_capability"
+    }
+  ]
+}
