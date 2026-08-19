@@ -1,8 +1,6 @@
 package assistant
 
 // SkillID identifies a versioned provider-neutral Assistant behavior profile.
-// Built-in skills are semantic contracts; provider adapters may translate them
-// into native settings, context construction, or short instructions as needed.
 type SkillID string
 
 const (
@@ -19,7 +17,6 @@ func (id SkillID) Valid() bool {
 }
 
 // Skill is a discriminated union of versioned Assistant behavior profiles.
-// Exactly the payload associated with ID must be present.
 type Skill struct {
 	ID           SkillID             `json:"id"`
 	TokenEconomy *TokenEconomyPolicy `json:"token_economy,omitempty"`
@@ -37,9 +34,6 @@ type TokenEconomyPolicy struct {
 	PreserveUnresolvedConstraints bool `json:"preserve_unresolved_constraints"`
 }
 
-// BuiltinTokenEconomySkill returns the canonical Core token-economy profile.
-// It is intentionally conservative: optimization is never allowed to weaken
-// higher-authority instructions or discard unresolved constraints.
 func BuiltinTokenEconomySkill() Skill {
 	return Skill{
 		ID: SkillTokenEconomyV1,
@@ -54,18 +48,14 @@ func BuiltinTokenEconomySkill() Skill {
 	}
 }
 
-// BuiltinSkills returns the built-in Assistant skills enabled by the Core
-// default profile. Callers may choose a narrower explicit skill set.
 func BuiltinSkills() []Skill {
 	return []Skill{BuiltinTokenEconomySkill()}
 }
 
-// ValidateSkill validates one portable Assistant skill.
 func ValidateSkill(skill Skill) error {
 	if !skill.ID.Valid() {
 		return validationError(CodeInvalidSkill, "skill.id")
 	}
-
 	switch skill.ID {
 	case SkillTokenEconomyV1:
 		if skill.TokenEconomy == nil {
@@ -86,6 +76,9 @@ func ValidateSkill(skill Skill) error {
 
 // ValidateSkills validates an ordered skill set and rejects duplicate IDs.
 func ValidateSkills(skills []Skill) error {
+	if len(skills) > 32 {
+		return validationError(CodeInvalidSkill, "skills")
+	}
 	seen := make(map[SkillID]struct{}, len(skills))
 	for _, skill := range skills {
 		if err := ValidateSkill(skill); err != nil {
