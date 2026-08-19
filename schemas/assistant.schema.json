@@ -161,10 +161,6 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "prefer_concise_responses",
-        "avoid_restatement",
-        "reuse_prior_context",
-        "compact_tool_results",
         "preserve_instruction_hierarchy",
         "preserve_unresolved_constraints"
       ],
@@ -177,10 +173,22 @@
         "preserve_unresolved_constraints": {"const": true}
       },
       "anyOf": [
-        {"properties": {"prefer_concise_responses": {"const": true}}},
-        {"properties": {"avoid_restatement": {"const": true}}},
-        {"properties": {"reuse_prior_context": {"const": true}}},
-        {"properties": {"compact_tool_results": {"const": true}}}
+        {
+          "required": ["prefer_concise_responses"],
+          "properties": {"prefer_concise_responses": {"const": true}}
+        },
+        {
+          "required": ["avoid_restatement"],
+          "properties": {"avoid_restatement": {"const": true}}
+        },
+        {
+          "required": ["reuse_prior_context"],
+          "properties": {"reuse_prior_context": {"const": true}}
+        },
+        {
+          "required": ["compact_tool_results"],
+          "properties": {"compact_tool_results": {"const": true}}
+        }
       ]
     },
     "TokenEconomySkill": {
