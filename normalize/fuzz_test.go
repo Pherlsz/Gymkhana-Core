@@ -165,6 +165,8 @@ func FuzzFormatAddressSlots(f *testing.F) {
 		"apt. 202",
 		"apt. AP",
 		"123-A",
+		"n!",
+		"num?",
 		"",
 	} {
 		f.Add(seed)
