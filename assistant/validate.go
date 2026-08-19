@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	maxPortableJSONInteger   int64 = 1<<53 - 1
+	maxPortableJSONInteger  int64 = 1<<53 - 1
 	maxConversationMessages       = 4096
 	maxMessageParts               = 1024
 	maxTextPartBytes              = 1 << 20
