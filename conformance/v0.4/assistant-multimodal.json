@@ -1,0 +1,54 @@
+{
+  "spec_version": "0.4",
+  "suite": "assistant-multimodal",
+  "cases": [
+    {
+      "name": "validate audio reference message",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "audio", "media": {"uri": "https://example.test/audio.wav", "media_type": "audio/wav"}}
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "validate video reference message",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "video", "media": {"uri": "https://example.test/video.mp4", "media_type": "video/mp4"}}
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "validate mixed multimodal message",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "Summarize the attached media."},
+          {"type": "image", "media": {"uri": "https://example.test/image.png"}},
+          {"type": "audio", "media": {"uri": "https://example.test/audio.wav"}},
+          {"type": "video", "media": {"uri": "https://example.test/video.mp4"}},
+          {"type": "file", "media": {"uri": "https://example.test/document.pdf"}}
+        ]
+      },
+      "output": true
+    },
+    {
+      "name": "reject audio part carrying text payload",
+      "operation": "assistant.message.validate",
+      "input": {
+        "role": "user",
+        "content": [
+          {"type": "audio", "text": "not allowed", "media": {"uri": "https://example.test/audio.wav"}}
+        ]
+      },
+      "error": "invalid_content"
+    }
+  ]
+}

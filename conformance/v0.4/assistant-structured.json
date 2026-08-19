@@ -1,0 +1,122 @@
+{
+  "spec_version": "0.4",
+  "suite": "assistant-structured",
+  "cases": [
+    {
+      "name": "validate structured tool arguments",
+      "operation": "assistant.tool_arguments.validate",
+      "input": {
+        "definition": {
+          "name": "lookup_weather",
+          "input_schema": {
+            "type": "object",
+            "properties": {"city": {"type": "string"}},
+            "required": ["city"],
+            "additionalProperties": false
+          }
+        },
+        "call": {
+          "id": "call_01",
+          "name": "lookup_weather",
+          "arguments": {"city": "Porto Alegre"}
+        }
+      },
+      "output": true
+    },
+    {
+      "name": "reject undeclared tool argument property",
+      "operation": "assistant.tool_arguments.validate",
+      "input": {
+        "definition": {
+          "name": "lookup_weather",
+          "input_schema": {
+            "type": "object",
+            "properties": {"city": {"type": "string"}},
+            "required": ["city"],
+            "additionalProperties": false
+          }
+        },
+        "call": {
+          "id": "call_01",
+          "name": "lookup_weather",
+          "arguments": {"city": "Porto Alegre", "extra": true}
+        }
+      },
+      "error": "invalid_tool_call"
+    },
+    {
+      "name": "reject non object tool schema root",
+      "operation": "assistant.tool_arguments.validate",
+      "input": {
+        "definition": {
+          "name": "lookup_weather",
+          "input_schema": {"type": "string"}
+        },
+        "call": {
+          "id": "call_01",
+          "name": "lookup_weather",
+          "arguments": {"city": "Porto Alegre"}
+        }
+      },
+      "error": "invalid_schema"
+    },
+    {
+      "name": "fallback to next model in same provider",
+      "operation": "assistant.model.next",
+      "input": {
+        "candidates": [
+          {"provider": "openai", "model": "model/a"},
+          {"provider": "openai", "model": "model/b"},
+          {"provider": "google", "model": "model/c"}
+        ],
+        "current": 0,
+        "attempts": 1,
+        "failure": "context_limit",
+        "policy": {
+          "model_on": ["context_limit"],
+          "provider_on": ["rate_limit"],
+          "max_attempts": 4
+        }
+      },
+      "output": {"model": {"provider": "openai", "model": "model/b"}, "index": 1}
+    },
+    {
+      "name": "fallback across provider only when provider policy permits",
+      "operation": "assistant.model.next",
+      "input": {
+        "candidates": [
+          {"provider": "openai", "model": "model/a"},
+          {"provider": "google", "model": "model/b"}
+        ],
+        "current": 0,
+        "attempts": 1,
+        "failure": "rate_limit",
+        "policy": {
+          "model_on": [],
+          "provider_on": ["rate_limit"],
+          "max_attempts": 4
+        }
+      },
+      "output": {"model": {"provider": "google", "model": "model/b"}, "index": 1}
+    },
+    {
+      "name": "do not fallback on safety failure",
+      "operation": "assistant.model.next",
+      "input": {
+        "candidates": [
+          {"provider": "openai", "model": "model/a"},
+          {"provider": "google", "model": "model/b"}
+        ],
+        "current": 0,
+        "attempts": 1,
+        "failure": "safety",
+        "policy": {
+          "model_on": [],
+          "provider_on": ["rate_limit"],
+          "max_attempts": 4
+        }
+      },
+      "error": "model_unavailable"
+    }
+  ]
+}
