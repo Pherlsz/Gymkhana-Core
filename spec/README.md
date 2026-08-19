@@ -4,6 +4,8 @@ Gymkhana Core is a language-neutral, product-neutral, provider-neutral, and juri
 
 The specification in this directory defines behavior independently from any implementation language. Go is currently the first implementation, but Go source code is not the architectural source of truth.
 
+The active specification version is stored in `VERSION`; its compatibility rules are defined in [`VERSIONING.md`](VERSIONING.md).
+
 ## Principles
 
 1. **Language-neutral** — contracts and behavior must be portable to Go, TypeScript/Node.js, Java, .NET/C#, Python, Rust, PHP, and future implementations.
