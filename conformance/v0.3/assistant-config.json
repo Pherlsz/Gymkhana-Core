@@ -26,6 +26,15 @@
           }
         ],
         "tools": ["search_docs"],
+        "tool_policies": [
+          {
+            "name": "search_docs",
+            "effect": "read_only",
+            "confirmation": "never",
+            "parallel_safe": true,
+            "idempotent": true
+          }
+        ],
         "model_policy": {
           "mode": "dynamic",
           "allowed_access": ["free", "paid"],
@@ -43,6 +52,11 @@
           "rerank": true,
           "grounding": "required",
           "require_citations": true
+        },
+        "learning": {
+          "mode": "propose",
+          "min_evidence": 2,
+          "max_evidence": 32
         },
         "budget": {
           "max_turns": 8,
@@ -79,19 +93,33 @@
       "name": "validate BYOK credential reference",
       "operation": "assistant.credential_ref.validate",
       "input": {
+        "id": "key_01",
         "provider": "openai",
         "mode": "byok",
-        "reference": "session/key_01"
+        "reference": "session:key_01",
+        "quota_scope": "project:primary"
       },
       "output": true
+    },
+    {
+      "name": "reject raw credential value without handle namespace",
+      "operation": "assistant.credential_ref.validate",
+      "input": {
+        "id": "key_01",
+        "provider": "openai",
+        "mode": "byok",
+        "reference": "bare-secret-token"
+      },
+      "error": "invalid_credential"
     },
     {
       "name": "reject unknown credential mode",
       "operation": "assistant.credential_ref.validate",
       "input": {
+        "id": "key_01",
         "provider": "openai",
         "mode": "inline_secret",
-        "reference": "session/key_01"
+        "reference": "session:key_01"
       },
       "error": "invalid_credential"
     },
@@ -165,6 +193,31 @@
       },
       "output": [
         {"provider": "openrouter", "model": "vendor/model:free"}
+      ]
+    },
+    {
+      "name": "model references with slash boundaries do not collide",
+      "operation": "assistant.model.resolve",
+      "input": {
+        "policy": {"mode": "dynamic"},
+        "catalog": [
+          {
+            "ref": {"provider": "a", "model": "b/c"},
+            "access": "free",
+            "roles": ["generation"],
+            "capabilities": ["text"]
+          },
+          {
+            "ref": {"provider": "a/b", "model": "c"},
+            "access": "free",
+            "roles": ["generation"],
+            "capabilities": ["text"]
+          }
+        ]
+      },
+      "output": [
+        {"provider": "a", "model": "b/c"},
+        {"provider": "a/b", "model": "c"}
       ]
     },
     {
