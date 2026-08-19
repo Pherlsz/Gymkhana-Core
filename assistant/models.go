@@ -12,7 +12,9 @@ type ProviderID string
 // ModelID is a provider-local model identifier.
 type ModelID string
 
-// ModelRef identifies one concrete provider/model pair.
+// ModelRef identifies one concrete provider/model pair. It is comparable and is
+// therefore used directly as a map key; concatenated string keys are avoided so
+// provider/model names containing separators cannot collide.
 type ModelRef struct {
 	Provider ProviderID `json:"provider"`
 	Model    ModelID    `json:"model"`
@@ -107,16 +109,15 @@ func ValidateModelPolicy(policy ModelPolicy) error {
 	if policy.Manual != nil && !validModelRef(*policy.Manual) {
 		return validationError(CodeInvalidModel, "model_policy.manual")
 	}
-	seenCandidates := make(map[string]struct{}, len(policy.Candidates))
+	seenCandidates := make(map[ModelRef]struct{}, len(policy.Candidates))
 	for _, ref := range policy.Candidates {
 		if !validModelRef(ref) {
 			return validationError(CodeInvalidModel, "model_policy.candidates")
 		}
-		key := modelRefKey(ref)
-		if _, exists := seenCandidates[key]; exists {
+		if _, exists := seenCandidates[ref]; exists {
 			return validationError(CodeInvalidModelPolicy, "model_policy.candidates")
 		}
-		seenCandidates[key] = struct{}{}
+		seenCandidates[ref] = struct{}{}
 	}
 	if policy.Mode == ModelManual && policy.Manual == nil {
 		return validationError(CodeInvalidModelPolicy, "model_policy.manual")
@@ -138,6 +139,17 @@ func ValidateModelPolicy(policy ModelPolicy) error {
 	}
 	if err := validateAccessTiers(policy.PreferredAccess); err != nil {
 		return err
+	}
+	if len(policy.AllowedAccess) > 0 {
+		allowed := make(map[AccessTier]struct{}, len(policy.AllowedAccess))
+		for _, tier := range policy.AllowedAccess {
+			allowed[tier] = struct{}{}
+		}
+		for _, tier := range policy.PreferredAccess {
+			if _, ok := allowed[tier]; !ok {
+				return validationError(CodeInvalidModelPolicy, "model_policy.preferred_access")
+			}
+		}
 	}
 	if err := ValidateCapabilities(policy.RequiredCapabilities); err != nil {
 		return err
@@ -205,21 +217,20 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 	if err := ValidateModelPolicy(policy); err != nil {
 		return nil, err
 	}
-	byRef := make(map[string]ModelDescriptor, len(catalog))
+	byRef := make(map[ModelRef]ModelDescriptor, len(catalog))
 	for _, model := range catalog {
 		if err := ValidateModelDescriptor(model); err != nil {
 			return nil, err
 		}
-		key := modelRefKey(model.Ref)
-		if _, exists := byRef[key]; exists {
+		if _, exists := byRef[model.Ref]; exists {
 			return nil, validationError(CodeInvalidModel, "catalog")
 		}
-		byRef[key] = model
+		byRef[model.Ref] = model
 	}
 
 	switch policy.Mode {
 	case ModelManual:
-		model, ok := byRef[modelRefKey(*policy.Manual)]
+		model, ok := byRef[*policy.Manual]
 		if !ok || !modelEligible(model, policy) {
 			return nil, validationError(CodeModelUnavailable, "model_policy.manual")
 		}
@@ -227,7 +238,7 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 	case ModelOrderedFallback:
 		resolved := make([]ModelRef, 0, len(policy.Candidates))
 		for _, ref := range policy.Candidates {
-			if model, ok := byRef[modelRefKey(ref)]; ok && modelEligible(model, policy) {
+			if model, ok := byRef[ref]; ok && modelEligible(model, policy) {
 				resolved = append(resolved, model.Ref)
 			}
 		}
@@ -258,7 +269,7 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 			if iPreferred && pi != pj {
 				return pi < pj
 			}
-			return modelRefKey(models[i].Ref) < modelRefKey(models[j].Ref)
+			return modelRefLess(models[i].Ref, models[j].Ref)
 		})
 		resolved := make([]ModelRef, len(models))
 		for i, model := range models {
@@ -272,7 +283,7 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 
 // ValidateModelDescriptor validates adapter-supplied catalog metadata.
 func ValidateModelDescriptor(model ModelDescriptor) error {
-	if !validModelRef(model.Ref) || !model.Access.Valid() || !utf8.ValidString(model.DisplayName) {
+	if !validModelRef(model.Ref) || !model.Access.Valid() || !utf8.ValidString(model.DisplayName) || utf8.RuneCountInString(model.DisplayName) > 512 {
 		return validationError(CodeInvalidModel, "model")
 	}
 	if model.ContextWindow < 0 || model.ContextWindow > maxPortableJSONInteger || model.MaxOutputTokens < 0 || model.MaxOutputTokens > maxPortableJSONInteger {
@@ -295,6 +306,26 @@ func ValidateModelDescriptor(model ModelDescriptor) error {
 		return err
 	}
 	return nil
+}
+
+// ResolveModelRole validates that a concrete catalog model exists and advertises
+// the requested semantic role, for example embedding or reranking in a RAG stack.
+func ResolveModelRole(ref ModelRef, role ModelRole, catalog []ModelDescriptor) (ModelDescriptor, error) {
+	if !validModelRef(ref) || !role.Valid() {
+		return ModelDescriptor{}, validationError(CodeInvalidModel, "model_role")
+	}
+	for _, model := range catalog {
+		if err := ValidateModelDescriptor(model); err != nil {
+			return ModelDescriptor{}, err
+		}
+		if model.Ref == ref {
+			if !containsRole(model.Roles, role) {
+				return ModelDescriptor{}, validationError(CodeModelUnavailable, "model_role")
+			}
+			return model, nil
+		}
+	}
+	return ModelDescriptor{}, validationError(CodeModelUnavailable, "model_role")
 }
 
 func modelEligible(model ModelDescriptor, policy ModelPolicy) bool {
@@ -331,8 +362,11 @@ func validOpaqueModelID(value string, max int) bool {
 	return true
 }
 
-func modelRefKey(ref ModelRef) string {
-	return string(ref.Provider) + "/" + string(ref.Model)
+func modelRefLess(left, right ModelRef) bool {
+	if left.Provider != right.Provider {
+		return left.Provider < right.Provider
+	}
+	return left.Model < right.Model
 }
 
 func containsRole(values []ModelRole, target ModelRole) bool {
