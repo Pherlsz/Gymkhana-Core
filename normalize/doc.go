@@ -1,6 +1,11 @@
 // Package normalize provides deterministic, infrastructure-independent
-// canonicalization for text, identifiers, contact values, and profile field
-// formatters used by forms, mass import, and manual create.
+// canonicalization and formatting primitives for text, identifiers, contact
+// values, jurisdiction-aware values, and reusable structured fields.
+//
+// The package is the current Go implementation of normalization semantics that
+// may also be specified under spec/ and exercised through shared conformance
+// vectors. Consumer-specific persistence, transport, UI, and workflow behavior
+// remain outside this package.
 package normalize
 
 // RulesVersion identifies the persisted canonicalization behavior implemented
