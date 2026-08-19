@@ -68,8 +68,8 @@ fuzz-smoke:
 	@$(GO) test -run='^$$' -fuzz='^FuzzFingerprintParse$$' -fuzztime=2s -timeout=30s -parallel=1 ./fingerprint
 	@$(GO) test -run='^$$' -fuzz='^FuzzAssistantMessageJSON$$' -fuzztime=2s -timeout=30s -parallel=1 ./assistant
 	@$(GO) test -run='^$$' -fuzz='^FuzzAssistantDefinitionJSON$$' -fuzztime=2s -timeout=30s -parallel=1 ./assistant
-	@$(GO) test -run='^$$' -fuzz='^FuzzPortableJSONObject$$' -fuzztime=2s -timeout=30s -parallel=1 ./assistant
-	@$(GO) test -run='^$$' -fuzz='^FuzzPortableJSONSchema$$' -fuzztime=2s -timeout=30s -parallel=1 ./assistant
+	@$(GO) test -run='^$$' -fuzz='^FuzzValue$$' -fuzztime=2s -timeout=30s -parallel=1 ./portablejson
+	@$(GO) test -run='^$$' -fuzz='^FuzzSchema$$' -fuzztime=2s -timeout=30s -parallel=1 ./portablejson
 
 vuln:
 	@"$(GOVULNCHECK)" ./...
