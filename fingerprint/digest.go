@@ -9,23 +9,23 @@ import (
 // Digest is a SHA-256 fingerprint.
 type Digest [sha256.Size]byte
 
-// Bytes fingerprints value exactly as supplied.
-func Bytes(value []byte) Digest {
+// Sum fingerprints value exactly as supplied.
+func Sum(value []byte) Digest {
 	return Digest(sha256.Sum256(value))
 }
 
-// String fingerprints the exact UTF-8 bytes of value without normalization.
+// SumText fingerprints the exact UTF-8 bytes of value without normalization.
 // Invalid UTF-8 is rejected so the operation has the same semantics in
 // runtimes whose string types cannot represent arbitrary byte sequences.
-func String(value string) (Digest, error) {
+func SumText(value string) (Digest, error) {
 	if !utf8.ValidString(value) {
 		return Digest{}, validationError(CodeInvalidUTF8)
 	}
-	return Bytes([]byte(value)), nil
+	return Sum([]byte(value)), nil
 }
 
 // Parse decodes a 64-character hexadecimal SHA-256 digest. Uppercase input is
-// accepted; String always returns the canonical lowercase form.
+// accepted; Digest.String always returns the canonical lowercase form.
 func Parse(value string) (Digest, error) {
 	if len(value) != sha256.Size*2 {
 		return Digest{}, validationError(CodeInvalidLength)
