@@ -28,6 +28,17 @@ func CanonicalCPF(value string) (string, error) {
 	return digits, nil
 }
 
+// MaskCPF returns a display-safe form of a canonical CPF by hiding its first
+// three digits: "***.XXX.XXX-XX". The input must be exactly eleven ASCII
+// digits (the output of CanonicalCPF); any other input is returned unchanged
+// so callers can safely pass user-supplied text without panicking.
+func MaskCPF(canonical string) string {
+	if len(canonical) != 11 || !containsOnly(canonical, func(r rune) bool { return r >= '0' && r <= '9' }) {
+		return canonical
+	}
+	return "***." + canonical[3:6] + "." + canonical[6:9] + "-" + canonical[9:11]
+}
+
 // CanonicalCNPJ strips accepted formatting, uppercases ASCII letters, validates
 // the Receita Federal check digits, and returns fourteen characters. The first
 // twelve may be digits or A–Z; the last two are always digits. Numeric CNPJs
