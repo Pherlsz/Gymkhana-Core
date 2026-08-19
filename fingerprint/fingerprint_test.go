@@ -7,45 +7,45 @@ import (
 	"github.com/Pherlsz/Gymkhana-Core/fingerprint"
 )
 
-func TestStringSHA256(t *testing.T) {
+func TestSumTextSHA256(t *testing.T) {
 	t.Parallel()
 
-	digest, err := fingerprint.String("abc")
+	digest, err := fingerprint.SumText("abc")
 	if err != nil {
-		t.Fatalf("String() error = %v", err)
+		t.Fatalf("SumText() error = %v", err)
 	}
 	got := digest.String()
 	const want = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 	if got != want {
-		t.Fatalf("String() = %q, want %q", got, want)
+		t.Fatalf("SumText() = %q, want %q", got, want)
 	}
 }
 
-func TestFramedStringsPortableVector(t *testing.T) {
+func TestSumFramedTextPortableVector(t *testing.T) {
 	t.Parallel()
 
-	got, err := fingerprint.FramedStrings("query.plan/v1", "alpha", "beta")
+	got, err := fingerprint.SumFramedText("query.plan/v1", "alpha", "beta")
 	if err != nil {
-		t.Fatalf("FramedStrings() error = %v", err)
+		t.Fatalf("SumFramedText() error = %v", err)
 	}
 	const want = "8f92cbf0d8c72b614311eadbf43c8842fc53e77f5a3943448db7a1f12ea470fd"
 	if got.String() != want {
-		t.Fatalf("FramedStrings() = %q, want %q", got, want)
+		t.Fatalf("SumFramedText() = %q, want %q", got, want)
 	}
 }
 
 func TestFramedPreservesBoundariesAndNamespace(t *testing.T) {
 	t.Parallel()
 
-	left, err := fingerprint.FramedStrings("query.plan/v1", "ab", "c")
+	left, err := fingerprint.SumFramedText("query.plan/v1", "ab", "c")
 	if err != nil {
 		t.Fatal(err)
 	}
-	right, err := fingerprint.FramedStrings("query.plan/v1", "a", "bc")
+	right, err := fingerprint.SumFramedText("query.plan/v1", "a", "bc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherNamespace, err := fingerprint.FramedStrings("task.spec/v1", "ab", "c")
+	otherNamespace, err := fingerprint.SumFramedText("task.spec/v1", "ab", "c")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,11 +61,11 @@ func TestFramedPreservesBoundariesAndNamespace(t *testing.T) {
 func TestFramedDistinguishesZeroPartsFromEmptyPart(t *testing.T) {
 	t.Parallel()
 
-	zero, err := fingerprint.FramedStrings("empty/v1")
+	zero, err := fingerprint.SumFramedText("empty/v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	empty, err := fingerprint.FramedStrings("empty/v1", "")
+	empty, err := fingerprint.SumFramedText("empty/v1", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,36 +80,36 @@ func TestFramedDistinguishesZeroPartsFromEmptyPart(t *testing.T) {
 	}
 }
 
-func TestFramedBytesMatchesStrings(t *testing.T) {
+func TestFramedBytesMatchesText(t *testing.T) {
 	t.Parallel()
 
-	stringsDigest, err := fingerprint.FramedStrings("example/v1", "João", "東京")
+	textDigest, err := fingerprint.SumFramedText("example/v1", "João", "東京")
 	if err != nil {
 		t.Fatal(err)
 	}
-	bytesDigest, err := fingerprint.Framed("example/v1", []byte("João"), []byte("東京"))
+	bytesDigest, err := fingerprint.SumFramed("example/v1", []byte("João"), []byte("東京"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stringsDigest != bytesDigest {
-		t.Fatalf("string and byte framing differ: %s != %s", stringsDigest, bytesDigest)
+	if textDigest != bytesDigest {
+		t.Fatalf("text and byte framing differ: %s != %s", textDigest, bytesDigest)
 	}
 }
 
-func TestStringAPIsRejectInvalidUTF8(t *testing.T) {
+func TestTextAPIsRejectInvalidUTF8(t *testing.T) {
 	t.Parallel()
 
 	invalid := string([]byte{0xff, 'a'})
-	if _, err := fingerprint.String(invalid); !fingerprint.IsCode(err, fingerprint.CodeInvalidUTF8) {
-		t.Fatalf("String invalid UTF-8 error = %v", err)
+	if _, err := fingerprint.SumText(invalid); !fingerprint.IsCode(err, fingerprint.CodeInvalidUTF8) {
+		t.Fatalf("SumText invalid UTF-8 error = %v", err)
 	}
-	if _, err := fingerprint.FramedStrings("example/v1", invalid); !fingerprint.IsCode(err, fingerprint.CodeInvalidUTF8) {
-		t.Fatalf("FramedStrings invalid UTF-8 error = %v", err)
+	if _, err := fingerprint.SumFramedText("example/v1", invalid); !fingerprint.IsCode(err, fingerprint.CodeInvalidUTF8) {
+		t.Fatalf("SumFramedText invalid UTF-8 error = %v", err)
 	}
 
 	// Arbitrary binary data remains valid through the byte API.
-	if _, err := fingerprint.Framed("example/v1", []byte{0xff, 'a'}); err != nil {
-		t.Fatalf("Framed binary input error = %v", err)
+	if _, err := fingerprint.SumFramed("example/v1", []byte{0xff, 'a'}); err != nil {
+		t.Fatalf("SumFramed binary input error = %v", err)
 	}
 }
 
@@ -120,7 +120,7 @@ func TestFramedRejectsInvalidNamespace(t *testing.T) {
 		namespace := namespace
 		t.Run(namespace, func(t *testing.T) {
 			t.Parallel()
-			_, err := fingerprint.FramedStrings(namespace, "value")
+			_, err := fingerprint.SumFramedText(namespace, "value")
 			if !fingerprint.IsCode(err, fingerprint.CodeInvalidNamespace) {
 				t.Fatalf("error = %v, want invalid_namespace", err)
 			}
@@ -167,7 +167,7 @@ func TestDigestParseRejectsMalformedValues(t *testing.T) {
 func TestDigestBytesReturnsCopy(t *testing.T) {
 	t.Parallel()
 
-	digest, err := fingerprint.String("abc")
+	digest, err := fingerprint.SumText("abc")
 	if err != nil {
 		t.Fatal(err)
 	}
