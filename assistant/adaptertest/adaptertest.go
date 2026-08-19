@@ -106,7 +106,7 @@ func Run(t *testing.T, config Config) {
 		return
 	}
 
-	t.Run("generate/text", func(t *testing.T) {
+	if !t.Run("generate/text", func(t *testing.T) {
 		_, err := registry.Generate(operationContext(t, config.Timeout), assistant.GenerationRequest{
 			Model: config.Model,
 			Messages: []assistant.Message{{
@@ -118,7 +118,9 @@ func Run(t *testing.T, config Config) {
 		if err != nil {
 			t.Fatalf("Generate(text) = %v", err)
 		}
-	})
+	}) {
+		return
+	}
 
 	for _, probe := range config.Probes {
 		probe := probe
