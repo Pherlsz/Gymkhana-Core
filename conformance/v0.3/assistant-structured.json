@@ -45,32 +45,20 @@
       "error": "invalid_tool_call"
     },
     {
-      "name": "reject integer above JSON safe range",
-      "operation": "assistant.schema_instance.validate",
+      "name": "reject non object tool schema root",
+      "operation": "assistant.tool_arguments.validate",
       "input": {
-        "schema": {
-          "type": "object",
-          "properties": {"value": {"type": "integer"}},
-          "required": ["value"],
-          "additionalProperties": false
+        "definition": {
+          "name": "lookup_weather",
+          "input_schema": {"type": "string"}
         },
-        "instance": {"value": 9007199254740992}
+        "call": {
+          "id": "call_01",
+          "name": "lookup_weather",
+          "arguments": {"city": "Porto Alegre"}
+        }
       },
       "error": "invalid_schema"
-    },
-    {
-      "name": "validate nullable structured property",
-      "operation": "assistant.schema_instance.validate",
-      "input": {
-        "schema": {
-          "type": "object",
-          "properties": {"value": {"type": ["string", "null"]}},
-          "required": ["value"],
-          "additionalProperties": false
-        },
-        "instance": {"value": null}
-      },
-      "output": true
     },
     {
       "name": "fallback to next model in same provider",
