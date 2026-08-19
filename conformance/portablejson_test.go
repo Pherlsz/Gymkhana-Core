@@ -15,29 +15,13 @@ func TestPortableJSONConformance(t *testing.T) {
 func executePortableJSON(testCase vector) (any, string) {
 	switch testCase.Operation {
 	case "portablejson.object.validate":
-		var raw json.RawMessage
-		if err := json.Unmarshal(testCase.Input, &raw); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return portableJSONValidationResult(portablejson.ValidateObject(raw))
+		return portableJSONValidationResult(portablejson.ValidateObject(testCase.Input))
 	case "portablejson.value.validate":
-		var raw json.RawMessage
-		if err := json.Unmarshal(testCase.Input, &raw); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return portableJSONValidationResult(portablejson.ValidateValue(raw))
+		return portableJSONValidationResult(portablejson.ValidateValue(testCase.Input))
 	case "portablejson.schema.validate":
-		var raw json.RawMessage
-		if err := json.Unmarshal(testCase.Input, &raw); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return portableJSONValidationResult(portablejson.ValidateSchema(raw))
+		return portableJSONValidationResult(portablejson.ValidateSchema(testCase.Input))
 	case "portablejson.object_schema.validate":
-		var raw json.RawMessage
-		if err := json.Unmarshal(testCase.Input, &raw); err != nil {
-			return nil, "invalid_conformance_input"
-		}
-		return portableJSONValidationResult(portablejson.ValidateObjectSchema(raw))
+		return portableJSONValidationResult(portablejson.ValidateObjectSchema(testCase.Input))
 	case "portablejson.instance.validate":
 		var value portableJSONInstanceInput
 		if err := json.Unmarshal(testCase.Input, &value); err != nil {
