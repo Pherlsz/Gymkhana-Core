@@ -20,6 +20,10 @@ func TestAssistantConfigConformance(t *testing.T) {
 	runSuite(t, "assistant-config.json", executeAssistantConfig)
 }
 
+func TestAssistantHardeningConformance(t *testing.T) {
+	runSuite(t, "assistant-hardening.json", executeAssistantHardening)
+}
+
 func executeAssistant(testCase vector) (any, string) {
 	switch testCase.Operation {
 	case "assistant.message.validate":
@@ -110,6 +114,89 @@ func executeAssistantConfig(testCase vector) (any, string) {
 	}
 }
 
+func executeAssistantHardening(testCase vector) (any, string) {
+	switch testCase.Operation {
+	case "assistant.conversation.validate":
+		var value []assistant.Message
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateConversation(value))
+	case "assistant.json_object.validate":
+		input, ok := stringInput(testCase.Input)
+		if !ok {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidatePortableJSONObject(json.RawMessage(input)))
+	case "assistant.schema.validate":
+		input, ok := stringInput(testCase.Input)
+		if !ok {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidatePortableJSONSchema(json.RawMessage(input)))
+	case "assistant.tool_policy.validate":
+		var value assistant.ToolPolicy
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateToolPolicy(value))
+	case "assistant.memory.validate":
+		var value assistant.MemoryPolicy
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateMemoryPolicy(value))
+	case "assistant.learning_policy.validate":
+		var value assistant.LearningPolicy
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateLearningPolicy(value))
+	case "assistant.learning.validate":
+		var value assistant.SkillLearningProposal
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateSkillLearningProposal(value))
+	case "assistant.quota.validate":
+		var value assistant.QuotaState
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateQuotaState(value))
+	case "assistant.usage_ledger.validate":
+		var value assistant.UsageLedgerEntry
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateUsageLedgerEntry(value))
+	case "assistant.trace.validate":
+		var value assistant.RunTrace
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateRunTrace(value))
+	case "assistant.retrieval_evidence.validate":
+		var value assistant.RetrievalEvidence
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		return assistantValidationResult(assistant.ValidateRetrievalEvidence(value))
+	case "assistant.credential.next":
+		var value credentialFallbackInput
+		if err := json.Unmarshal(testCase.Input, &value); err != nil {
+			return nil, "invalid_conformance_input"
+		}
+		credential, index, err := assistant.NextCredential(value.Overrides, value.Provider, value.Current, value.Failure)
+		if err != nil {
+			return assistantValidationResult(err)
+		}
+		return credentialFallbackOutput{Credential: credential, Index: index}, ""
+	default:
+		return nil, "unsupported_operation"
+	}
+}
+
 type modelResolutionInput struct {
 	Policy  assistant.ModelPolicy       `json:"policy"`
 	Catalog []assistant.ModelDescriptor `json:"catalog"`
@@ -118,6 +205,18 @@ type modelResolutionInput struct {
 type assistantResolutionInput struct {
 	Assistant assistant.AssistantDefinition `json:"assistant"`
 	Catalog   []assistant.ModelDescriptor   `json:"catalog"`
+}
+
+type credentialFallbackInput struct {
+	Overrides assistant.RunOverrides `json:"overrides"`
+	Provider  assistant.ProviderID   `json:"provider"`
+	Current   int                    `json:"current"`
+	Failure   assistant.FailureClass `json:"failure"`
+}
+
+type credentialFallbackOutput struct {
+	Credential assistant.CredentialRef `json:"credential"`
+	Index      int                     `json:"index"`
 }
 
 func assistantValidationResult(err error) (any, string) {
