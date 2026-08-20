@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [0.7.0] - 2026-08-19
+
+### Added
+
+- Reusable Go `assistant/adaptertest` integration harness for exercising external `ProviderAdapter` implementations through the public `AdapterRegistry` boundary.
+- Low-cost text generation smoke coverage plus adapter-declared capability probes, optional quota checks, and representative failure-classification checks without embedding provider SDKs or credentials in Core.
+
+### Changed
+
+- Provider-adapter validation now has a shared Go harness while concrete OpenAI-compatible, Anthropic/Google-family, gateway, and local-runtime adapters remain independent integration work.
+- Core Spec remains `0.4`; this release adds implementation/testing infrastructure and does not change portable Assistant semantics.
+
 ## [0.6.0] - 2026-08-19
 
 ### Added
