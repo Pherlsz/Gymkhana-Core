@@ -46,6 +46,22 @@ The adapter boundary should be stress-tested against at least three materially d
 
 A gateway such as OpenRouter or a second local/runtime family can be added when it exposes a materially different behavior rather than merely increasing provider count.
 
+## Current protocol stress coverage
+
+Core's Go tests include test-only HTTP adapters backed by local `httptest` servers for three materially different wire families. These adapters exist only in `_test.go` files and therefore do not add provider HTTP payloads or production adapter APIs to the Core module.
+
+The hermetic coverage currently exercises:
+
+- **OpenAI-compatible** — `/v1/models`, `/v1/chat/completions`, Bearer/BYOK resolution through an opaque `CredentialRef`, text generation, function tools, JSON-schema response format, usage normalization, and representative auth/rate-limit/quota/network/unavailable failure classes;
+- **Google Gemini** — `/v1beta/models`, `generateContent`, `x-goog-api-key`, provider-specific content/role translation, `functionDeclarations`, JSON-schema response configuration, usage normalization, and representative auth/rate-limit/timeout/invalid-request failure classes;
+- **Ollama** — `/api/tags`, `/api/show`, `/api/chat`, credential-free local access, capability discovery, function tools, schema-based structured output, usage normalization, and representative missing-model/unavailable failures.
+
+Every family is executed through `adaptertest.Run`, so normalized requests/responses still pass through the same public `AdapterRegistry` and Core exchange validation used by external adapters.
+
+This protocol-level suite is intentionally hermetic: it makes no provider network calls, uses no real API keys, and does not prove that a currently deployed provider/runtime accepts every exercised shape. It is a compatibility stress test of the portable boundary against materially different wire models, not a substitute for live-provider validation.
+
+Live execution remains required before roadmap step 6 is complete. At minimum, an external adapter/runtime test should exercise one real BYOK cloud provider and one real credential-free local runtime; a third materially different family must also be exercised so provider quirks can reveal portability gaps that fixtures cannot.
+
 ## Suggested external test shape
 
 ```go
