@@ -196,7 +196,9 @@ func TestGeminiAdapterProtocol(t *testing.T) {
 		case request.Method == http.MethodPost && request.URL.Path == "/v1beta/models/gemini-test:generateContent":
 			var payload map[string]json.RawMessage
 			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
-				t.Fatalf("decode generateContent request: %v", err)
+				t.Errorf("decode generateContent request: %v", err)
+				http.Error(writer, "invalid test request", http.StatusBadRequest)
+				return
 			}
 			if len(payload["tools"]) > 0 {
 				_, _ = writer.Write([]byte(`{"candidates":[{"finishReason":"STOP","content":{"role":"model","parts":[{"functionCall":{"id":"call_1","name":"lookup_weather","args":{"city":"Porto Alegre"}}}]}}],"usageMetadata":{"promptTokenCount":8,"candidatesTokenCount":3}}`))
