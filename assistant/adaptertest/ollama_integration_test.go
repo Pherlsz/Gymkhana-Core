@@ -158,7 +158,9 @@ func TestOllamaAdapterProtocol(t *testing.T) {
 		case request.Method == http.MethodPost && request.URL.Path == "/api/chat":
 			var payload map[string]json.RawMessage
 			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
-				t.Fatalf("decode chat request: %v", err)
+				t.Errorf("decode chat request: %v", err)
+				http.Error(writer, "invalid test request", http.StatusBadRequest)
+				return
 			}
 			if len(payload["tools"]) > 0 {
 				_, _ = writer.Write([]byte(`{"model":"llama-test","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"lookup_weather","arguments":{"city":"Porto Alegre"}}}]},"done":true,"done_reason":"stop","prompt_eval_count":8,"eval_count":3}`))
