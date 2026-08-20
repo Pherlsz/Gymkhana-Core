@@ -122,6 +122,10 @@ func genericFailureClass(err error) assistant.FailureClass {
 	return assistant.FailureUnknown
 }
 
+func networkFailure() error {
+	return &url.Error{Op: "Post", URL: "http://provider.invalid", Err: errors.New("connection refused")}
+}
+
 func commonProbes() []adaptertest.Probe {
 	return []adaptertest.Probe{
 		{
