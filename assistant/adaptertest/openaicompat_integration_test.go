@@ -91,8 +91,8 @@ func (adapter *openAICompatibleAdapter) Generate(ctx context.Context, request as
 				ToolCalls []struct {
 					ID       string `json:"id"`
 					Function struct {
-						Name      string          `json:"name"`
-						Arguments json.RawMessage `json:"arguments"`
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
 					} `json:"function"`
 				} `json:"tool_calls"`
 			} `json:"message"`
@@ -114,7 +114,7 @@ func (adapter *openAICompatibleAdapter) Generate(ctx context.Context, request as
 		parts = append(parts, assistant.ContentPart{Type: assistant.PartText, Text: choice.Message.Content})
 	}
 	for _, call := range choice.Message.ToolCalls {
-		parts = append(parts, assistant.ContentPart{Type: assistant.PartToolCall, ToolCall: &assistant.ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments}})
+		parts = append(parts, assistant.ContentPart{Type: assistant.PartToolCall, ToolCall: &assistant.ToolCall{ID: call.ID, Name: call.Function.Name, Arguments: json.RawMessage(call.Function.Arguments)}})
 	}
 	finish := assistant.FinishOther
 	switch choice.FinishReason {
