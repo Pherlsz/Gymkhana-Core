@@ -153,7 +153,9 @@ func TestOpenAICompatibleAdapterProtocol(t *testing.T) {
 		case request.Method == http.MethodPost && request.URL.Path == "/v1/chat/completions":
 			var payload map[string]json.RawMessage
 			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
-				t.Fatalf("decode chat request: %v", err)
+				t.Errorf("decode chat request: %v", err)
+				http.Error(writer, "invalid test request", http.StatusBadRequest)
+				return
 			}
 			if len(payload["tools"]) > 0 {
 				_, _ = writer.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup_weather","arguments":"{\"city\":\"Porto Alegre\"}"}}]}}],"usage":{"prompt_tokens":8,"completion_tokens":3}}`))
@@ -188,6 +190,7 @@ func TestOpenAICompatibleAdapterProtocol(t *testing.T) {
 			{Name: "rate-limit", Err: providerHTTPError{status: http.StatusTooManyRequests, code: "rate_limit_exceeded"}, Want: assistant.FailureRateLimit},
 			{Name: "quota", Err: providerHTTPError{status: http.StatusTooManyRequests, code: "insufficient_quota"}, Want: assistant.FailureQuota},
 			{Name: "unavailable", Err: providerHTTPError{status: http.StatusServiceUnavailable}, Want: assistant.FailureUnavailable},
+			{Name: "network", Err: networkFailure(), Want: assistant.FailureNetwork},
 		},
 	})
 }
