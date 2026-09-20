@@ -31,13 +31,6 @@ var bloodValues = map[string]string{
 	"ab positivo": "AB+", "ab negativo": "AB-",
 }
 
-var membershipValues = map[string]string{
-	"cartao": "cartao", "socio": "socio", "socia": "socio",
-	"cadastro": "cadastro", "so cadas": "cadastro", "so cadastro": "cadastro",
-	"menor": "infantil", "infantil": "infantil",
-	"senior": "senior",
-}
-
 // FormatGender returns M, F, or Outro. Empty and refusals stay empty.
 func FormatGender(value string) string {
 	if isAbsent(value) {
@@ -72,12 +65,4 @@ func FormatBloodType(value string) string {
 		return label
 	}
 	return bloodValues[SearchText(value)]
-}
-
-// FormatMembershipType returns cartao, socio, cadastro, infantil, or senior.
-func FormatMembershipType(value string) string {
-	if isAbsent(value) {
-		return ""
-	}
-	return membershipValues[SearchText(value)]
 }

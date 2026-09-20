@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The project follows Semantic Versioning. Breaking changes remain explicit before `v1.0.0`.
 
+## [Unreleased]
+
+### Removed
+
+- Gincana-specific catalogs (`FormatTeam`, `FormatSector`, `FormatClub`, `FormatHealthPlan`, `FormatCard`, `FormatCollection`, `FormatAnimal`, `FormatVehicle*`, `FormatMembershipType`). Consumers own those lists.
+
 ## [0.7.0] - 2026-08-19
 
 ### Added
