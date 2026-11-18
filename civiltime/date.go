@@ -3,7 +3,6 @@ package civiltime
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 )
 
 // CivilDate is a timezone-free calendar date. Its zero value represents an
@@ -96,15 +95,50 @@ func (d CivilDate) String() string {
 	if d.IsZero() {
 		return ""
 	}
-	return fmt.Sprintf("%04d-%02d-%02d", d.year, d.month, d.day)
+	var buf [10]byte
+	d.formatInto(&buf)
+	return string(buf[:])
+}
+
+func (d CivilDate) formatInto(buf *[10]byte) {
+	y := d.year
+	buf[0] = byte('0' + y/1000)
+	buf[1] = byte('0' + (y/100)%10)
+	buf[2] = byte('0' + (y/10)%10)
+	buf[3] = byte('0' + y%10)
+	buf[4] = '-'
+	m := d.month
+	buf[5] = byte('0' + m/10)
+	buf[6] = byte('0' + m%10)
+	buf[7] = '-'
+	day := d.day
+	buf[8] = byte('0' + day/10)
+	buf[9] = byte('0' + day%10)
 }
 
 func (d CivilDate) ordinal() int {
 	return int(d.year)*10000 + int(d.month)*100 + int(d.day)
 }
 
+// AppendText implements encoding.TextAppender.
+func (d CivilDate) AppendText(b []byte) ([]byte, error) {
+	if d.IsZero() {
+		return b, nil
+	}
+	var buf [10]byte
+	d.formatInto(&buf)
+	return append(b, buf[:]...), nil
+}
+
 // MarshalText implements encoding.TextMarshaler.
-func (d CivilDate) MarshalText() ([]byte, error) { return []byte(d.String()), nil }
+func (d CivilDate) MarshalText() ([]byte, error) {
+	if d.IsZero() {
+		return []byte{}, nil
+	}
+	var buf [10]byte
+	d.formatInto(&buf)
+	return buf[:], nil
+}
 
 // UnmarshalText implements encoding.TextUnmarshaler. Empty input resets to zero.
 func (d *CivilDate) UnmarshalText(text []byte) error {
@@ -125,17 +159,22 @@ func (d CivilDate) MarshalJSON() ([]byte, error) {
 	if d.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(d.String())
+	var buf [12]byte
+	buf[0] = '"'
+	d.formatInto((*[10]byte)(buf[1:11]))
+	buf[11] = '"'
+	return buf[:], nil
 }
 
 // UnmarshalJSON accepts JSON null, an empty string, or a strict ISO date string.
 func (d *CivilDate) UnmarshalJSON(data []byte) error {
-	if bytes.Equal(data, []byte("null")) {
+	trimmed := bytes.TrimSpace(data)
+	if bytes.Equal(trimmed, []byte("null")) {
 		*d = CivilDate{}
 		return nil
 	}
 	var value string
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := json.Unmarshal(trimmed, &value); err != nil {
 		return validationError(KindCivilDate, CodeInvalidFormat)
 	}
 	return d.UnmarshalText([]byte(value))

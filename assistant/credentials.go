@@ -1,6 +1,9 @@
 package assistant
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // CredentialMode describes how a provider adapter obtains authorization.
 type CredentialMode string
@@ -112,12 +115,7 @@ func ValidateCredentialIdentity(identity CredentialIdentity) error {
 
 // Allows reports whether the policy accepts the binding mode.
 func (policy CredentialPolicy) Allows(mode CredentialMode) bool {
-	for _, allowed := range policy.AllowedModes {
-		if allowed == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(policy.AllowedModes, mode)
 }
 
 func validCredentialHandle(value string) bool {

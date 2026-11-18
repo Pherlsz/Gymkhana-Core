@@ -21,7 +21,7 @@ type ValidationError struct {
 
 func (err *ValidationError) Error() string {
 	if err == nil {
-		return ""
+		return "portablejson: validation error"
 	}
 	if err.Field == "" {
 		return string(err.Code)
@@ -32,7 +32,7 @@ func (err *ValidationError) Error() string {
 // IsCode reports whether err contains a portablejson ValidationError with code.
 func IsCode(err error, code ErrorCode) bool {
 	var validation *ValidationError
-	return errors.As(err, &validation) && validation.Code == code
+	return errors.As(err, &validation) && validation != nil && validation.Code == code
 }
 
 func validationError(code ErrorCode, field string) error {

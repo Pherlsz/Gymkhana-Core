@@ -209,17 +209,5 @@ func ResolveAssistantModelsForRun(def AssistantDefinition, overrides RunOverride
 		policy.Candidates = nil
 		policy.PreferredAccess = nil
 	}
-
-	seen := make(map[Capability]struct{}, len(policy.RequiredCapabilities))
-	for _, capability := range policy.RequiredCapabilities {
-		seen[capability] = struct{}{}
-	}
-	for _, capability := range RequiredCapabilitiesForModules(modules) {
-		if _, exists := seen[capability]; exists {
-			continue
-		}
-		policy.RequiredCapabilities = append(policy.RequiredCapabilities, capability)
-		seen[capability] = struct{}{}
-	}
-	return ResolveModelCandidates(policy, catalog)
+	return ResolveModelCandidates(withModuleCapabilities(policy, modules), catalog)
 }

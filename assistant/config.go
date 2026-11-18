@@ -81,14 +81,16 @@ func ValidateAssistantDefinition(def AssistantDefinition) error {
 		return validationError(CodeEmpty, "modules")
 	}
 	allModules := make(map[ModuleID]struct{}, len(def.Modules)+len(def.OptionalModules))
-	for _, module := range append(append([]ModuleID{}, def.Modules...), def.OptionalModules...) {
-		if !module.Valid() {
-			return validationError(CodeInvalidModule, "modules")
+	for _, modules := range [2][]ModuleID{def.Modules, def.OptionalModules} {
+		for _, module := range modules {
+			if !module.Valid() {
+				return validationError(CodeInvalidModule, "modules")
+			}
+			if _, exists := allModules[module]; exists {
+				return validationError(CodeDuplicateModule, "modules")
+			}
+			allModules[module] = struct{}{}
 		}
-		if _, exists := allModules[module]; exists {
-			return validationError(CodeDuplicateModule, "modules")
-		}
-		allModules[module] = struct{}{}
 	}
 	if len(def.Instructions) > 64 {
 		return validationError(CodeInvalidAssistant, "instructions")

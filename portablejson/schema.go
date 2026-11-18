@@ -1,7 +1,6 @@
 package portablejson
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"math/big"
@@ -22,131 +21,208 @@ const (
 	maxSchemaTitle       = 256
 )
 
+var maxSafeIntegerRat = new(big.Rat).SetInt64(MaxSafeInteger)
+
+// CompiledSchema is an immutable, concurrency-safe pre-compiled representation
+// of a SchemaV1 document.
+type CompiledSchema struct {
+	root *compiledNode
+}
+
+type compiledNode struct {
+	unconstrainedObject bool
+	types               []string
+	primary             string
+	properties          map[string]*compiledNode
+	required            map[string]struct{}
+	items               *compiledNode
+	minItems            int64
+	minItemsSet         bool
+	maxItems            int64
+	maxItemsSet         bool
+	minimum             *big.Rat
+	minimumSet          bool
+	maximum             *big.Rat
+	maximumSet          bool
+	hasEnum             bool
+	enumValues          []compiledEnumValue
+}
+
+type compiledEnumValue struct {
+	isNull bool
+	raw    any
+	rat    *big.Rat
+}
+
+// CompileSchema validates and compiles raw into an immutable CompiledSchema.
+func CompileSchema(raw json.RawMessage) (*CompiledSchema, error) {
+	rootMap, err := decodeSchema(raw)
+	if err != nil {
+		return nil, err
+	}
+	compiled, err := compileSchemaNode(rootMap, 0)
+	if err != nil {
+		return nil, err
+	}
+	return &CompiledSchema{root: compiled}, nil
+}
+
+// CompileObjectSchema validates and compiles raw as an object-boundary schema.
+// The `{}` compatibility form is accepted as an unconstrained object; otherwise
+// the root must be non-nullable `object`.
+func CompileObjectSchema(raw json.RawMessage) (*CompiledSchema, error) {
+	compiled, err := CompileSchema(raw)
+	if err != nil {
+		return nil, err
+	}
+	if compiled.root.unconstrainedObject {
+		return compiled, nil
+	}
+	if len(compiled.root.types) != 1 || compiled.root.types[0] != "object" {
+		return nil, validationError(CodeInvalidSchema, "schema.type")
+	}
+	return compiled, nil
+}
+
 // ValidateSchema validates the conservative cross-runtime schema profile used
 // by Core. It intentionally supports less than full JSON Schema so independent
 // language implementations can preserve the same semantics.
 func ValidateSchema(raw json.RawMessage) error {
-	root, err := decodeSchema(raw)
-	if err != nil {
-		return err
-	}
-	return validateSchemaNode(root, 0)
+	_, err := CompileSchema(raw)
+	return err
 }
 
 // ValidateObjectSchema validates a schema intended for a JSON object boundary,
 // such as tool-call arguments. The `{}` compatibility form is accepted as an
 // unconstrained object; otherwise the root must be non-nullable `object`.
 func ValidateObjectSchema(raw json.RawMessage) error {
-	root, err := decodeSchema(raw)
-	if err != nil {
-		return err
-	}
-	if err := validateSchemaNode(root, 0); err != nil {
-		return err
-	}
-	if len(root) == 0 {
-		return nil
-	}
-	types, err := schemaTypes(root["type"])
-	if err != nil || len(types) != 1 || types[0] != "object" {
-		return validationError(CodeInvalidSchema, "schema.type")
-	}
-	return nil
+	_, err := CompileObjectSchema(raw)
+	return err
 }
 
 func decodeSchema(raw json.RawMessage) (map[string]any, error) {
-	if err := ValidateObject(raw); err != nil {
+	decoded, err := decodeStrictValue(raw, true)
+	if err != nil {
 		return nil, validationError(CodeInvalidSchema, "schema")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-	var root map[string]any
-	if err := decoder.Decode(&root); err != nil || root == nil {
+	root, ok := decoded.(map[string]any)
+	if !ok || root == nil {
 		return nil, validationError(CodeInvalidSchema, "schema")
 	}
 	return root, nil
 }
 
-func validateSchemaNode(node map[string]any, depth int) error {
+func compileSchemaNode(node map[string]any, depth int) (*compiledNode, error) {
 	if depth > MaxSchemaDepth {
-		return validationError(CodeInvalidSchema, "schema.depth")
+		return nil, validationError(CodeInvalidSchema, "schema.depth")
 	}
 	// `{}` is the explicit unconstrained-object compatibility form.
 	if len(node) == 0 {
-		return nil
+		return &compiledNode{unconstrainedObject: true}, nil
 	}
 
-	allowed := map[string]struct{}{
-		"type": {}, "properties": {}, "required": {}, "additionalProperties": {},
-		"items": {}, "enum": {}, "description": {}, "title": {},
-		"minimum": {}, "maximum": {}, "minItems": {}, "maxItems": {},
-	}
 	for key := range node {
-		if _, ok := allowed[key]; !ok {
-			return validationError(CodeInvalidSchema, "schema.keyword")
+		if !isAllowedSchemaKeyword(key) {
+			return nil, validationError(CodeInvalidSchema, "schema.keyword")
 		}
 	}
 
 	types, err := schemaTypes(node["type"])
 	if err != nil || len(types) == 0 {
-		return validationError(CodeInvalidSchema, "schema.type")
+		return nil, validationError(CodeInvalidSchema, "schema.type")
 	}
 	primary := types[0]
 
 	if description, ok := node["description"]; ok {
 		value, ok := description.(string)
 		if !ok || !utf8.ValidString(value) || utf8.RuneCountInString(value) > maxSchemaDescription {
-			return validationError(CodeInvalidSchema, "schema.description")
+			return nil, validationError(CodeInvalidSchema, "schema.description")
 		}
 	}
 	if title, ok := node["title"]; ok {
 		value, ok := title.(string)
 		if !ok || !utf8.ValidString(value) || utf8.RuneCountInString(value) > maxSchemaTitle {
-			return validationError(CodeInvalidSchema, "schema.title")
+			return nil, validationError(CodeInvalidSchema, "schema.title")
 		}
 	}
 
 	if err := validateKeywordApplicability(node, primary); err != nil {
-		return err
+		return nil, err
+	}
+
+	compiled := &compiledNode{
+		types:   types,
+		primary: primary,
 	}
 
 	switch primary {
 	case "object":
-		if err := validateObjectSchemaNode(node, depth); err != nil {
-			return err
+		props, req, err := compileObjectSchemaNode(node, depth)
+		if err != nil {
+			return nil, err
 		}
+		compiled.properties = props
+		compiled.required = req
 	case "array":
 		items, ok := node["items"].(map[string]any)
 		if !ok {
-			return validationError(CodeInvalidSchema, "schema.items")
+			return nil, validationError(CodeInvalidSchema, "schema.items")
 		}
-		if err := validateSchemaNode(items, depth+1); err != nil {
-			return err
+		compiledItems, err := compileSchemaNode(items, depth+1)
+		if err != nil {
+			return nil, err
 		}
-		if err := validateSchemaIntegerPair(node, "minItems", "maxItems"); err != nil {
-			return err
+		minVal, minSet, maxVal, maxSet, err := compileSchemaIntegerPair(node, "minItems", "maxItems")
+		if err != nil {
+			return nil, err
 		}
+		compiled.items = compiledItems
+		compiled.minItems = minVal
+		compiled.minItemsSet = minSet
+		compiled.maxItems = maxVal
+		compiled.maxItemsSet = maxSet
 	case "integer", "number":
-		if err := validateSchemaNumberPair(node); err != nil {
-			return err
+		minRat, minSet, maxRat, maxSet, err := compileSchemaNumberPair(node)
+		if err != nil {
+			return nil, err
 		}
+		compiled.minimum = minRat
+		compiled.minimumSet = minSet
+		compiled.maximum = maxRat
+		compiled.maximumSet = maxSet
 	case "string", "boolean", "null":
 	default:
-		return validationError(CodeInvalidSchema, "schema.type")
+		return nil, validationError(CodeInvalidSchema, "schema.type")
 	}
 
 	if enumRaw, ok := node["enum"]; ok {
 		values, ok := enumRaw.([]any)
 		if !ok || len(values) == 0 || len(values) > maxSchemaEnumValues || primary == "object" || primary == "array" {
-			return validationError(CodeInvalidSchema, "schema.enum")
+			return nil, validationError(CodeInvalidSchema, "schema.enum")
 		}
-		for _, value := range values {
-			if !schemaEnumValueMatches(value, types) {
-				return validationError(CodeInvalidSchema, "schema.enum")
+		compiledEnums := make([]compiledEnumValue, len(values))
+		for i, value := range values {
+			ev, ok := compileEnumValue(value, types)
+			if !ok {
+				return nil, validationError(CodeInvalidSchema, "schema.enum")
 			}
+			compiledEnums[i] = ev
 		}
+		compiled.hasEnum = true
+		compiled.enumValues = compiledEnums
 	}
-	return nil
+	return compiled, nil
+}
+
+func isAllowedSchemaKeyword(key string) bool {
+	switch key {
+	case "type", "properties", "required", "additionalProperties",
+		"items", "enum", "description", "title",
+		"minimum", "maximum", "minItems", "maxItems":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateKeywordApplicability(node map[string]any, primary string) error {
@@ -216,66 +292,69 @@ func schemaTypes(raw any) ([]string, error) {
 	}
 }
 
-func validateObjectSchemaNode(node map[string]any, depth int) error {
+func compileObjectSchemaNode(node map[string]any, depth int) (map[string]*compiledNode, map[string]struct{}, error) {
 	propertiesRaw, hasProperties := node["properties"]
 	if !hasProperties {
 		propertiesRaw = map[string]any{}
 	}
 	properties, ok := propertiesRaw.(map[string]any)
 	if !ok || len(properties) > MaxSchemaProperties {
-		return validationError(CodeInvalidSchema, "schema.properties")
+		return nil, nil, validationError(CodeInvalidSchema, "schema.properties")
 	}
+	compiledProps := make(map[string]*compiledNode, len(properties))
 	for name, rawChild := range properties {
 		if name == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 256 {
-			return validationError(CodeInvalidSchema, "schema.properties")
+			return nil, nil, validationError(CodeInvalidSchema, "schema.properties")
 		}
 		child, ok := rawChild.(map[string]any)
 		if !ok {
-			return validationError(CodeInvalidSchema, "schema.properties")
+			return nil, nil, validationError(CodeInvalidSchema, "schema.properties")
 		}
-		if err := validateSchemaNode(child, depth+1); err != nil {
-			return err
+		compiledChild, err := compileSchemaNode(child, depth+1)
+		if err != nil {
+			return nil, nil, err
 		}
+		compiledProps[name] = compiledChild
 	}
 
 	additional, ok := node["additionalProperties"].(bool)
 	if !ok || additional {
-		return validationError(CodeInvalidSchema, "schema.additionalProperties")
+		return nil, nil, validationError(CodeInvalidSchema, "schema.additionalProperties")
 	}
 	requiredRaw, ok := node["required"].([]any)
 	if !ok || len(requiredRaw) != len(properties) {
-		return validationError(CodeInvalidSchema, "schema.required")
+		return nil, nil, validationError(CodeInvalidSchema, "schema.required")
 	}
 	seen := make(map[string]struct{}, len(requiredRaw))
 	for _, item := range requiredRaw {
 		name, ok := item.(string)
 		if !ok {
-			return validationError(CodeInvalidSchema, "schema.required")
+			return nil, nil, validationError(CodeInvalidSchema, "schema.required")
 		}
 		if _, exists := properties[name]; !exists {
-			return validationError(CodeInvalidSchema, "schema.required")
+			return nil, nil, validationError(CodeInvalidSchema, "schema.required")
 		}
 		if _, duplicate := seen[name]; duplicate {
-			return validationError(CodeInvalidSchema, "schema.required")
+			return nil, nil, validationError(CodeInvalidSchema, "schema.required")
 		}
 		seen[name] = struct{}{}
 	}
-	return nil
+	return compiledProps, seen, nil
 }
 
-func validateSchemaIntegerPair(node map[string]any, minKey, maxKey string) error {
+func compileSchemaIntegerPair(node map[string]any, minKey, maxKey string) (int64, bool, int64, bool, error) {
 	minValue, minSet, err := schemaNonNegativeInteger(node[minKey])
 	if err != nil {
-		return validationError(CodeInvalidSchema, "schema."+minKey)
+		return 0, false, 0, false, validationError(CodeInvalidSchema, "schema."+minKey)
 	}
 	maxValue, maxSet, err := schemaNonNegativeInteger(node[maxKey])
 	if err != nil {
-		return validationError(CodeInvalidSchema, "schema."+maxKey)
+		return 0, false, 0, false, validationError(CodeInvalidSchema, "schema."+maxKey)
 	}
 	if (minSet && minValue > MaxSchemaArrayItems) || (maxSet && maxValue > MaxSchemaArrayItems) || (minSet && maxSet && minValue > maxValue) {
-		return validationError(CodeInvalidSchema, "schema."+maxKey)
+		return 0, false, 0, false, validationError(CodeInvalidSchema, "schema."+maxKey)
 	}
-	return nil
+	return minValue, minSet, maxValue, maxSet, nil
 }
 
 func schemaNonNegativeInteger(raw any) (int64, bool, error) {
@@ -293,19 +372,19 @@ func schemaNonNegativeInteger(raw any) (int64, bool, error) {
 	return value, true, nil
 }
 
-func validateSchemaNumberPair(node map[string]any) error {
+func compileSchemaNumberPair(node map[string]any) (*big.Rat, bool, *big.Rat, bool, error) {
 	minimum, minSet, err := schemaNumber(node["minimum"])
 	if err != nil {
-		return validationError(CodeInvalidSchema, "schema.minimum")
+		return nil, false, nil, false, validationError(CodeInvalidSchema, "schema.minimum")
 	}
 	maximum, maxSet, err := schemaNumber(node["maximum"])
 	if err != nil {
-		return validationError(CodeInvalidSchema, "schema.maximum")
+		return nil, false, nil, false, validationError(CodeInvalidSchema, "schema.maximum")
 	}
 	if minSet && maxSet && minimum.Cmp(maximum) > 0 {
-		return validationError(CodeInvalidSchema, "schema.maximum")
+		return nil, false, nil, false, validationError(CodeInvalidSchema, "schema.maximum")
 	}
-	return nil
+	return minimum, minSet, maximum, maxSet, nil
 }
 
 func schemaNumber(raw any) (*big.Rat, bool, error) {
@@ -337,42 +416,42 @@ func parsePortableNumber(text string) (*big.Rat, error) {
 	if !ok {
 		return nil, errors.New("invalid JSON number")
 	}
-	limit := new(big.Rat).SetInt64(MaxSafeInteger)
-	if new(big.Rat).Abs(value).Cmp(limit) > 0 {
+	if new(big.Rat).Abs(value).Cmp(maxSafeIntegerRat) > 0 {
 		return nil, errors.New("non-portable number")
 	}
 	return value, nil
 }
 
-func schemaEnumValueMatches(value any, types []string) bool {
+func compileEnumValue(value any, types []string) (compiledEnumValue, bool) {
 	for _, schemaType := range types {
 		switch schemaType {
 		case "null":
 			if value == nil {
-				return true
+				return compiledEnumValue{isNull: true}, true
 			}
 		case "string":
 			if text, ok := value.(string); ok && utf8.ValidString(text) && utf8.RuneCountInString(text) <= 4096 {
-				return true
+				return compiledEnumValue{raw: text}, true
 			}
 		case "boolean":
-			if _, ok := value.(bool); ok {
-				return true
+			if b, ok := value.(bool); ok {
+				return compiledEnumValue{raw: b}, true
 			}
 		case "integer":
 			if number, ok := value.(json.Number); ok {
 				parsed, err := strconv.ParseInt(number.String(), 10, 64)
 				if err == nil && parsed >= -MaxSafeInteger && parsed <= MaxSafeInteger {
-					return true
+					rat := new(big.Rat).SetInt64(parsed)
+					return compiledEnumValue{raw: number, rat: rat}, true
 				}
 			}
 		case "number":
 			if number, ok := value.(json.Number); ok {
-				if _, err := parsePortableNumber(number.String()); err == nil {
-					return true
+				if rat, err := parsePortableNumber(number.String()); err == nil {
+					return compiledEnumValue{raw: number, rat: rat}, true
 				}
 			}
 		}
 	}
-	return false
+	return compiledEnumValue{}, false
 }

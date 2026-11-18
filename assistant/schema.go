@@ -46,7 +46,7 @@ func mapPortableJSONError(err error, fallback ErrorCode, field string) error {
 		return nil
 	}
 	var validation *portablejson.ValidationError
-	if errors.As(err, &validation) {
+	if errors.As(err, &validation) && validation != nil {
 		switch validation.Code {
 		case portablejson.CodeInvalidJSON:
 			return validationError(CodeInvalidJSON, field)

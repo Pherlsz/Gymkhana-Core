@@ -22,13 +22,16 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
+	if e == nil {
+		return "fingerprint: validation error"
+	}
 	return fmt.Sprintf("fingerprint: %s", e.Code)
 }
 
 // IsCode reports whether err contains the requested stable fingerprint code.
 func IsCode(err error, code ErrorCode) bool {
 	var validationError *ValidationError
-	return errors.As(err, &validationError) && validationError.Code == code
+	return errors.As(err, &validationError) && validationError != nil && validationError.Code == code
 }
 
 func validationError(code ErrorCode) error {

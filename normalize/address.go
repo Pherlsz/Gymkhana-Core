@@ -38,9 +38,13 @@ var houseNumberLabels = map[string]bool{
 	"n": true, "no": true, "num": true, "numero": true,
 }
 
-var blockLabels = []string{"bloco", "blc", "bl"}
+var blockLabelSet = map[string]bool{
+	"bloco": true, "blc": true, "bl": true,
+}
 
-var apartmentLabels = []string{"apartamento", "apart", "apto", "apt", "ap"}
+var apartmentLabelSet = map[string]bool{
+	"apartamento": true, "apart": true, "apto": true, "apt": true, "ap": true,
+}
 
 // FormatStreet returns the persisted logradouro: canonical type prefix plus
 // titled name. "r primavera" and "Rua Primavera" both become "Rua Primavera".
@@ -101,15 +105,15 @@ func FormatHouseNumber(value string) string {
 
 // FormatBlock returns "bl. A" from bloco/bl/blc variants, or empty.
 func FormatBlock(value string) string {
-	return formatPrefixedSlot(value, "bl. ", blockLabels)
+	return formatPrefixedSlot(value, "bl. ", blockLabelSet)
 }
 
 // FormatApartment returns "apt. 202" from ap/apto/apt/apartamento variants, or empty.
 func FormatApartment(value string) string {
-	return formatPrefixedSlot(value, "apt. ", apartmentLabels)
+	return formatPrefixedSlot(value, "apt. ", apartmentLabelSet)
 }
 
-func formatPrefixedSlot(value, prefix string, labels []string) string {
+func formatPrefixedSlot(value, prefix string, labelSet map[string]bool) string {
 	value = DisplayText(value)
 	if value == "" {
 		return ""
@@ -125,11 +129,6 @@ func formatPrefixedSlot(value, prefix string, labels []string) string {
 			return ""
 		}
 		return prefix + canonical
-	}
-
-	labelSet := make(map[string]bool, len(labels))
-	for _, label := range labels {
-		labelSet[label] = true
 	}
 
 	fields := strings.Fields(value)

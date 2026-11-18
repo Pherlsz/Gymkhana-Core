@@ -96,4 +96,68 @@ func TestRetrievalEvidenceValidation(t *testing.T) {
 	}
 	evidence.Score = math.Inf(1)
 	assertAssistantCode(t, assistant.ValidateRetrievalEvidence(evidence), assistant.CodeInvalidRetrieval)
+
+	validSet := []assistant.RetrievalEvidence{
+		{ID: "ev-001", Content: "first", Source: "doc:1", Score: 0.9},
+		{ID: "ev-002", Content: "second", Source: "doc:2", Score: 0.8},
+	}
+	if err := assistant.ValidateEvidenceSet(validSet); err != nil {
+		t.Fatalf("ValidateEvidenceSet(valid) = %v", err)
+	}
+	assertAssistantCode(t, assistant.ValidateEvidenceSet([]assistant.RetrievalEvidence{validSet[0], validSet[0]}), assistant.CodeInvalidRetrieval)
+
+	if err := assistant.ValidateCitation(assistant.Citation{EvidenceID: "ev-001", Label: "[1]"}); err != nil {
+		t.Fatalf("ValidateCitation(valid) = %v", err)
+	}
+	assertAssistantCode(t, assistant.ValidateCitation(assistant.Citation{EvidenceID: ""}), assistant.CodeInvalidRetrieval)
+
+	embRef := assistant.ModelRef{Provider: "openai", Model: "embed-1"}
+	rerankRef := assistant.ModelRef{Provider: "openai", Model: "rerank-1"}
+	ragPolicy := assistant.RetrievalPolicy{
+		Mode:           assistant.RetrievalAlways,
+		Search:         assistant.SearchHybrid,
+		QueryTransform: assistant.QueryRewrite,
+		CandidateLimit: 20,
+		ContextLimit:   5,
+		Rerank:         true,
+		Grounding:      assistant.GroundingRequired,
+		EmbeddingModel: &embRef,
+		RerankingModel: &rerankRef,
+	}
+	catalog := []assistant.ModelDescriptor{
+		{Ref: embRef, Access: assistant.AccessPaid, Roles: []assistant.ModelRole{assistant.ModelRoleEmbedding}},
+		{Ref: rerankRef, Access: assistant.AccessPaid, Roles: []assistant.ModelRole{assistant.ModelRoleReranking}},
+	}
+	if err := assistant.ValidateRetrievalModels(ragPolicy, catalog); err != nil {
+		t.Fatalf("ValidateRetrievalModels(valid) = %v", err)
+	}
+	assertAssistantCode(t, assistant.ValidateRetrievalModels(ragPolicy, catalog[:1]), assistant.CodeModelUnavailable)
+
+	// Verify DefaultRoutingFallbackPolicy via MaxAttempts == 0 and ResolveToolPolicy explicit match + typed-nil IsCode.
+	defPolicy := assistant.DefaultRoutingFallbackPolicy()
+	defPolicy.MaxAttempts = 0
+	candidates := []assistant.ModelRef{
+		{Provider: "openai", Model: "m1"},
+		{Provider: "google", Model: "m2"},
+	}
+	if _, idx, err := assistant.NextModelCandidate(candidates, 0, 1, assistant.FailureRateLimit, defPolicy); err != nil || idx != 1 {
+		t.Fatalf("default MaxAttempts fallback = idx %d, err %v", idx, err)
+	}
+	if _, _, err := assistant.NextModelCandidate(candidates, 0, 4, assistant.FailureRateLimit, defPolicy); !assistant.IsCode(err, assistant.CodeModelUnavailable) {
+		t.Fatalf("expected budget exhaustion at 4 attempts, got %v", err)
+	}
+
+	explicitPolicy := assistant.ToolPolicy{Name: "read_doc", Effect: assistant.ToolEffectReadOnly, Confirmation: assistant.ToolConfirmNever}
+	resolved, err := assistant.ResolveToolPolicy("read_doc", []assistant.ToolPolicy{explicitPolicy})
+	if err != nil || resolved != explicitPolicy {
+		t.Fatalf("ResolveToolPolicy(explicit) = %#v, %v", resolved, err)
+	}
+	if _, err := assistant.ResolveToolPolicy("bad name!", nil); !assistant.IsCode(err, assistant.CodeInvalidToolName) {
+		t.Fatalf("ResolveToolPolicy(invalid name) = %v", err)
+	}
+
+	var typedNil *assistant.ValidationError
+	if assistant.IsCode(error(typedNil), "") {
+		t.Fatal("IsCode matched typed-nil *ValidationError")
+	}
 }

@@ -137,3 +137,27 @@ func TestCanonicalBrazilPhone(t *testing.T) {
 		})
 	}
 }
+
+func TestValidationErrorFormattingAndNilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var nilErr *normalize.ValidationError
+	if got := nilErr.Error(); got != "normalize: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "normalize: validation error")
+	}
+
+	noKind := &normalize.ValidationError{Code: normalize.CodeInvalidFormat}
+	if got := noKind.Error(); got != "normalize: invalid_format" {
+		t.Fatalf("empty-kind ValidationError.Error() = %q, want %q", got, "normalize: invalid_format")
+	}
+
+	withKind := &normalize.ValidationError{Kind: normalize.KindCPF, Code: normalize.CodeInvalidChecksum}
+	if got := withKind.Error(); got != "cpf: invalid_checksum" {
+		t.Fatalf("ValidationError.Error() = %q, want %q", got, "cpf: invalid_checksum")
+	}
+
+	var nilAsError error = nilErr
+	if normalize.IsCode(nilAsError, normalize.CodeEmpty) {
+		t.Fatal("IsCode(nil *ValidationError, CodeEmpty) = true, want false")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/portablejson"
@@ -20,7 +21,6 @@ func TestValidateObject(t *testing.T) {
 		"array_root":     json.RawMessage("[1,2,3]"),
 		"trailing_value": json.RawMessage("{} {}"),
 	} {
-		name, raw := name, raw
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			if err := portablejson.ValidateObject(raw); err == nil {
@@ -117,5 +117,110 @@ func TestObjectSchemaRequiresObjectRoot(t *testing.T) {
 	}
 	if err := portablejson.ValidateObjectSchema(json.RawMessage("{\"type\":\"string\"}")); err == nil {
 		t.Fatal("object schema accepted string root")
+	}
+}
+
+func TestCompiledSchemaConcurrencyAndNilSafety(t *testing.T) {
+	t.Parallel()
+
+	var nilErr *portablejson.ValidationError
+	if got := nilErr.Error(); got != "portablejson: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "portablejson: validation error")
+	}
+	if portablejson.IsCode(error(nilErr), "") {
+		t.Fatal("IsCode matched typed-nil *ValidationError")
+	}
+	if got := (&portablejson.ValidationError{Code: portablejson.CodeInvalidJSON}).Error(); got != "invalid_json" {
+		t.Fatalf("ValidationError without field = %q", got)
+	}
+	if got := (&portablejson.ValidationError{Code: portablejson.CodeInvalidSchema, Field: "schema.type"}).Error(); got != "schema.type: invalid_schema" {
+		t.Fatalf("ValidationError with field = %q", got)
+	}
+
+	var nilSchema *portablejson.CompiledSchema
+	if err := nilSchema.ValidateInstance(json.RawMessage("{}")); !portablejson.IsCode(err, portablejson.CodeInvalidSchema) {
+		t.Fatalf("nil CompiledSchema.ValidateInstance = %v, want invalid_schema", err)
+	}
+
+	schemaRaw := json.RawMessage(`{
+		"type": "object",
+		"properties": {
+			"id": {"type": "integer", "minimum": 1, "maximum": 1000},
+			"status": {"type": ["string", "null"], "enum": ["pending", "done", null]},
+			"scores": {"type": "array", "items": {"type": "number", "minimum": 0.5, "maximum": 99.5}, "minItems": 1, "maxItems": 4}
+		},
+		"required": ["id", "status", "scores"],
+		"additionalProperties": false
+	}`)
+
+	compiled, err := portablejson.CompileObjectSchema(schemaRaw)
+	if err != nil {
+		t.Fatalf("CompileObjectSchema() error = %v", err)
+	}
+
+	validInstance := json.RawMessage(`{"id": 42, "status": "done", "scores": [1.5, 50.0, 99.5]}`)
+	invalidInstance := json.RawMessage(`{"id": 0, "status": "done", "scores": [1.5]}`)
+
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 50 {
+				if err := compiled.ValidateInstance(validInstance); err != nil {
+					t.Errorf("concurrent valid instance failed: %v", err)
+					return
+				}
+				if err := compiled.ValidateInstance(invalidInstance); !portablejson.IsCode(err, portablejson.CodeInvalidSchema) {
+					t.Errorf("concurrent invalid instance got %v, want invalid_schema", err)
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+func TestUnicodeSurrogateEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	// Valid surrogate pair \uD83D\uDE00 (😀)
+	validPair := json.RawMessage(`{"emoji":"\uD83D\uDE00"}`)
+	if err := portablejson.ValidateObject(validPair); err != nil {
+		t.Fatalf("ValidateObject(valid surrogate pair) = %v", err)
+	}
+
+	for name, raw := range map[string]json.RawMessage{
+		"high_only":          json.RawMessage(`{"bad":"\uD800"}`),
+		"low_only":           json.RawMessage(`{"bad":"\uDC00"}`),
+		"high_followed_text": json.RawMessage(`{"bad":"\uD800abc"}`),
+		"high_followed_high": json.RawMessage(`{"bad":"\uD800\uD800"}`),
+		"truncated_escape":   json.RawMessage(`{"bad":"\u12"}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if err := portablejson.ValidateObject(raw); !portablejson.IsCode(err, portablejson.CodeInvalidJSON) {
+				t.Fatalf("ValidateObject(%s) = %v, want invalid_json", name, err)
+			}
+		})
+	}
+}
+
+func TestUnconstrainedObjectSchemaValidatesNestedPortableNumbers(t *testing.T) {
+	t.Parallel()
+
+	unconstrained := json.RawMessage(`{}`)
+	if err := portablejson.ValidateObjectSchema(unconstrained); err != nil {
+		t.Fatalf("ValidateObjectSchema({}) = %v", err)
+	}
+	validNested := json.RawMessage(`{"items":[1, 2.5, {"count": 42}], "ok": true}`)
+	if err := portablejson.ValidateInstance(unconstrained, validNested); err != nil {
+		t.Fatalf("ValidateInstance({}, validNested) = %v", err)
+	}
+	if err := portablejson.ValidateInstance(unconstrained, json.RawMessage(`[1, 2]`)); !portablejson.IsCode(err, portablejson.CodeInvalidSchema) {
+		t.Fatalf("ValidateInstance({}, array) = %v, want invalid_schema", err)
+	}
+	if err := portablejson.ValidateInstance(unconstrained, json.RawMessage(`{"items":[9007199254740992]}`)); !portablejson.IsCode(err, portablejson.CodeInvalidSchema) {
+		t.Fatalf("ValidateInstance({}, unsafe integer) = %v, want invalid_schema", err)
 	}
 }

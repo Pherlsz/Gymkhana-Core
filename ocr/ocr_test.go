@@ -225,6 +225,14 @@ func TestUnknownSourceAndObservation(t *testing.T) {
 func TestValidationErrorsDoNotEchoSensitiveInput(t *testing.T) {
 	t.Parallel()
 
+	var nilErr *ocr.ValidationError
+	if got := nilErr.Error(); got != "ocr: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "ocr: validation error")
+	}
+	if ocr.IsCode(error(nilErr), "") {
+		t.Fatal("IsCode matched typed-nil *ValidationError")
+	}
+
 	secret := "CPF 123.456.789-09"
 	result := validResult()
 	result.Observations[0].RawText = strings.Repeat("x", ocr.MaxObservationTextBytes+1) + secret
@@ -235,6 +243,105 @@ func TestValidationErrorsDoNotEchoSensitiveInput(t *testing.T) {
 	if strings.Contains(err.Error(), secret) {
 		t.Fatalf("error leaked source content: %v", err)
 	}
+}
+
+func TestWarningsEscapedJSONPointersAndCompositeValueEquality(t *testing.T) {
+	t.Parallel()
+
+	request := ocr.ExtractionRequest{
+		Mode:    ocr.ModeSchemaGuided,
+		Sources: []ocr.SourceRef{{ID: "doc-1", Modality: ocr.SourceDocument}},
+		TargetSchema: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"a/b": {
+					"type": "object",
+					"properties": {
+						"c~d": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"flag": {"type": "boolean"},
+									"note": {"type": ["string", "null"]}
+								},
+								"required": ["flag", "note"],
+								"additionalProperties": false
+							}
+						}
+					},
+					"required": ["c~d"],
+					"additionalProperties": false
+				}
+			},
+			"required": ["a/b"],
+			"additionalProperties": false
+		}`),
+	}
+	result := ocr.ExtractionResult{
+		Mode: ocr.ModeSchemaGuided,
+		Observations: []ocr.Observation{{
+			ID:       "obs-1",
+			Evidence: []ocr.EvidenceRef{{SourceID: "doc-1", Page: 1}},
+			RawText:  "composite",
+		}},
+		Candidates: []ocr.FieldCandidate{
+			{
+				Path:           "/a~1b",
+				State:          ocr.ValuePresent,
+				Value:          json.RawMessage(`{"c~d":[{"flag":true,"note":null}]}`),
+				ObservationIDs: []string{"obs-1"},
+				Basis:          ocr.BasisObserved,
+				Validation:     ocr.ValidationValid,
+				Review:         ocr.ReviewAccepted,
+			},
+			{
+				Path:           "/a~1b/c~0d/0/flag",
+				State:          ocr.ValuePresent,
+				Value:          json.RawMessage(`true`),
+				ObservationIDs: []string{"obs-1"},
+				Basis:          ocr.BasisObserved,
+				Validation:     ocr.ValidationValid,
+				Review:         ocr.ReviewAccepted,
+			},
+			{
+				Path:           "/a~1b/c~0d/0/note",
+				State:          ocr.ValuePresent,
+				Value:          json.RawMessage(`null`),
+				ObservationIDs: []string{"obs-1"},
+				Basis:          ocr.BasisObserved,
+				Validation:     ocr.ValidationValid,
+				Review:         ocr.ReviewAccepted,
+			},
+		},
+		StructuredData: json.RawMessage(`{"a/b":{"c~d":[{"flag":true,"note":null}]}}`),
+		Validation:     ocr.ValidationValid,
+		Review:         ocr.ReviewAccepted,
+		Warnings: []ocr.Warning{
+			{Code: ocr.WarningPartialExtraction, Path: "/a~1b/c~0d/0/note"},
+		},
+	}
+	if err := ocr.ValidateExtractionExchange(request, result); err != nil {
+		t.Fatalf("ValidateExtractionExchange(composite) = %v", err)
+	}
+
+	badWarning := result
+	badWarning.Warnings = []ocr.Warning{{Code: ocr.WarningCode("unknown_warning")}}
+	assertCode(t, ocr.ValidateExtractionResult(badWarning), ocr.CodeInvalidWarning)
+
+	mismatchNested := result
+	mismatchNested.Candidates = []ocr.FieldCandidate{
+		{
+			Path:           "/a~1b",
+			State:          ocr.ValuePresent,
+			Value:          json.RawMessage(`{"c~d":[{"flag":false,"note":null}]}`),
+			ObservationIDs: []string{"obs-1"},
+			Basis:          ocr.BasisObserved,
+			Validation:     ocr.ValidationValid,
+			Review:         ocr.ReviewAccepted,
+		},
+	}
+	assertCode(t, ocr.ValidateExtractionExchange(request, mismatchNested), ocr.CodeInvalidCandidate)
 }
 
 func assertCode(t *testing.T, err error, code ocr.ErrorCode) {

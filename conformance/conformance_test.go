@@ -253,7 +253,7 @@ func normalizeResult(value string, err error) (any, string) {
 		return value, ""
 	}
 	var validation *normalize.ValidationError
-	if errors.As(err, &validation) {
+	if errors.As(err, &validation) && validation != nil {
 		return nil, string(validation.Code)
 	}
 	return nil, "unknown_error"
@@ -264,7 +264,7 @@ func fingerprintResult(value fingerprint.Digest, err error) (any, string) {
 		return value.String(), ""
 	}
 	var validation *fingerprint.ValidationError
-	if errors.As(err, &validation) {
+	if errors.As(err, &validation) && validation != nil {
 		return nil, string(validation.Code)
 	}
 	return nil, "unknown_error"
@@ -272,7 +272,7 @@ func fingerprintResult(value fingerprint.Digest, err error) (any, string) {
 
 func civiltimeErrorCode(err error) string {
 	var validation *civiltime.ValidationError
-	if errors.As(err, &validation) {
+	if errors.As(err, &validation) && validation != nil {
 		return string(validation.Code)
 	}
 	return "unknown_error"

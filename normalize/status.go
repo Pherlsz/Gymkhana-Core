@@ -24,9 +24,11 @@ var maritalEmpty = map[string]bool{
 var bloodValues = map[string]string{
 	"a+": "A+", "a-": "A-", "b+": "B+", "b-": "B-",
 	"ab+": "AB+", "ab-": "AB-", "o+": "O+", "o-": "O-",
+	"0+": "O+", "0-": "O-",
 	"a": "A", "b": "B", "ab": "AB", "o": "O", "0": "O",
 	"a positivo": "A+", "a negativo": "A-",
 	"o positivo": "O+", "o negativo": "O-",
+	"0 positivo": "O+", "0 negativo": "O-",
 	"b positivo": "B+", "b negativo": "B-",
 	"ab positivo": "AB+", "ab negativo": "AB-",
 }
@@ -52,17 +54,27 @@ func FormatMaritalStatus(value string) string {
 	return maritalValues[key]
 }
 
+var bloodSignReplacer = strings.NewReplacer(
+	"+", " positivo ",
+	"-", " negativo ",
+	"−", " negativo ",
+	"–", " negativo ",
+	"—", " negativo ",
+)
+
 // FormatBloodType returns A+/O- and the other ABO labels.
 func FormatBloodType(value string) string {
-	if isAbsent(value) {
+	baseKey := SearchText(value)
+	if baseKey == "" || (baseKey != "0" && isAbsent(value)) {
 		return ""
 	}
-	key := SearchText(value)
+	raw := bloodSignReplacer.Replace(strings.ToLower(DisplayText(value)))
+	key := SearchText(raw)
 	key = strings.ReplaceAll(key, "positivo", "+")
 	key = strings.ReplaceAll(key, "negativo", "-")
 	key = strings.ReplaceAll(key, " ", "")
 	if label, ok := bloodValues[key]; ok {
 		return label
 	}
-	return bloodValues[SearchText(value)]
+	return bloodValues[baseKey]
 }

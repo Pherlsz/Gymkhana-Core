@@ -1,7 +1,8 @@
 package assistant
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 	"unicode/utf8"
 )
 
@@ -212,19 +213,23 @@ func ResolveAssistantModels(def AssistantDefinition, catalog []ModelDescriptor) 
 	if err := ValidateAssistantDefinition(def); err != nil {
 		return nil, err
 	}
-	policy := def.ModelPolicy
+	return ResolveModelCandidates(withModuleCapabilities(def.ModelPolicy, def.Modules), catalog)
+}
+
+func withModuleCapabilities(policy ModelPolicy, modules []ModuleID) ModelPolicy {
+	policy.RequiredCapabilities = slices.Clone(policy.RequiredCapabilities)
 	seen := make(map[Capability]struct{}, len(policy.RequiredCapabilities))
 	for _, capability := range policy.RequiredCapabilities {
 		seen[capability] = struct{}{}
 	}
-	for _, capability := range RequiredCapabilitiesForModules(def.Modules) {
+	for _, capability := range RequiredCapabilitiesForModules(modules) {
 		if _, exists := seen[capability]; exists {
 			continue
 		}
 		policy.RequiredCapabilities = append(policy.RequiredCapabilities, capability)
 		seen[capability] = struct{}{}
 	}
-	return ResolveModelCandidates(policy, catalog)
+	return policy
 }
 
 // ResolveModelCandidates returns a deterministic ordered list of eligible
@@ -233,18 +238,9 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 	if err := ValidateModelPolicy(policy); err != nil {
 		return nil, err
 	}
-	if len(catalog) > maxModelCatalog {
-		return nil, validationError(CodeInvalidModel, "catalog")
-	}
-	byRef := make(map[ModelRef]ModelDescriptor, len(catalog))
-	for _, model := range catalog {
-		if err := ValidateModelDescriptor(model); err != nil {
-			return nil, err
-		}
-		if _, exists := byRef[model.Ref]; exists {
-			return nil, validationError(CodeInvalidModel, "catalog")
-		}
-		byRef[model.Ref] = model
+	byRef, err := indexModelCatalog(catalog)
+	if err != nil {
+		return nil, err
 	}
 
 	switch policy.Mode {
@@ -279,16 +275,19 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 		for index, tier := range policy.PreferredAccess {
 			preference[tier] = index
 		}
-		sort.Slice(models, func(i, j int) bool {
-			pi, iPreferred := preference[models[i].Access]
-			pj, jPreferred := preference[models[j].Access]
+		slices.SortFunc(models, func(left, right ModelDescriptor) int {
+			pi, iPreferred := preference[left.Access]
+			pj, jPreferred := preference[right.Access]
 			if iPreferred != jPreferred {
-				return iPreferred
+				if iPreferred {
+					return -1
+				}
+				return 1
 			}
 			if iPreferred && pi != pj {
-				return pi < pj
+				return cmp.Compare(pi, pj)
 			}
-			return modelRefLess(models[i].Ref, models[j].Ref)
+			return compareModelRef(left.Ref, right.Ref)
 		})
 		resolved := make([]ModelRef, len(models))
 		for i, model := range models {
@@ -298,6 +297,23 @@ func ResolveModelCandidates(policy ModelPolicy, catalog []ModelDescriptor) ([]Mo
 	default:
 		return nil, validationError(CodeInvalidModelPolicy, "model_policy.mode")
 	}
+}
+
+func indexModelCatalog(catalog []ModelDescriptor) (map[ModelRef]ModelDescriptor, error) {
+	if len(catalog) > maxModelCatalog {
+		return nil, validationError(CodeInvalidModel, "catalog")
+	}
+	byRef := make(map[ModelRef]ModelDescriptor, len(catalog))
+	for _, model := range catalog {
+		if err := ValidateModelDescriptor(model); err != nil {
+			return nil, err
+		}
+		if _, exists := byRef[model.Ref]; exists {
+			return nil, validationError(CodeInvalidModel, "catalog")
+		}
+		byRef[model.Ref] = model
+	}
+	return byRef, nil
 }
 
 // ValidateModelDescriptor validates adapter-supplied catalog metadata.
@@ -333,32 +349,35 @@ func ResolveModelRole(ref ModelRef, role ModelRole, catalog []ModelDescriptor) (
 	if !validModelRef(ref) || !role.Valid() || len(catalog) > maxModelCatalog {
 		return ModelDescriptor{}, validationError(CodeInvalidModel, "model_role")
 	}
-	for _, model := range catalog {
-		if err := ValidateModelDescriptor(model); err != nil {
-			return ModelDescriptor{}, err
-		}
-		if model.Ref == ref {
-			if !containsRole(model.Roles, role) {
-				return ModelDescriptor{}, validationError(CodeModelUnavailable, "model_role")
-			}
-			return model, nil
-		}
+	byRef, err := indexModelCatalog(catalog)
+	if err != nil {
+		return ModelDescriptor{}, err
 	}
-	return ModelDescriptor{}, validationError(CodeModelUnavailable, "model_role")
+	model, ok := byRef[ref]
+	if !ok || !slices.Contains(model.Roles, role) {
+		return ModelDescriptor{}, validationError(CodeModelUnavailable, "model_role")
+	}
+	return cloneModelDescriptor(model), nil
+}
+
+func cloneModelDescriptor(model ModelDescriptor) ModelDescriptor {
+	model.Roles = slices.Clone(model.Roles)
+	model.Capabilities = slices.Clone(model.Capabilities)
+	return model
 }
 
 func modelEligible(model ModelDescriptor, policy ModelPolicy) bool {
-	if !containsRole(model.Roles, ModelRoleGeneration) {
+	if !slices.Contains(model.Roles, ModelRoleGeneration) {
 		return false
 	}
-	if len(policy.AllowedProviders) > 0 && !containsProvider(policy.AllowedProviders, model.Ref.Provider) {
+	if len(policy.AllowedProviders) > 0 && !slices.Contains(policy.AllowedProviders, model.Ref.Provider) {
 		return false
 	}
-	if len(policy.AllowedAccess) > 0 && !containsAccess(policy.AllowedAccess, model.Access) {
+	if len(policy.AllowedAccess) > 0 && !slices.Contains(policy.AllowedAccess, model.Access) {
 		return false
 	}
 	for _, required := range policy.RequiredCapabilities {
-		if !containsCapability(model.Capabilities, required) {
+		if !slices.Contains(model.Capabilities, required) {
 			return false
 		}
 	}
@@ -381,47 +400,11 @@ func validOpaqueModelID(value string, max int) bool {
 	return true
 }
 
-func modelRefLess(left, right ModelRef) bool {
-	if left.Provider != right.Provider {
-		return left.Provider < right.Provider
+func compareModelRef(left, right ModelRef) int {
+	if c := cmp.Compare(left.Provider, right.Provider); c != 0 {
+		return c
 	}
-	return left.Model < right.Model
-}
-
-func containsRole(values []ModelRole, target ModelRole) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func containsProvider(values []ProviderID, target ProviderID) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func containsAccess(values []AccessTier, target AccessTier) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
-
-func containsCapability(values []Capability, target Capability) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return cmp.Compare(left.Model, right.Model)
 }
 
 func validateProviderIDs(values []ProviderID) error {

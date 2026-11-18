@@ -157,6 +157,11 @@ func TestValidateCapabilities(t *testing.T) {
 func TestValidationErrorDoesNotEchoSensitiveInput(t *testing.T) {
 	t.Parallel()
 
+	var nilErr *assistant.ValidationError
+	if got := nilErr.Error(); got != "assistant: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "assistant: validation error")
+	}
+
 	secret := "secret-user-value"
 	message := assistant.Message{Role: assistant.RoleUser, Content: []assistant.ContentPart{{Type: assistant.PartText, Text: ""}}}
 	err := assistant.ValidateMessage(message)

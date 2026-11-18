@@ -7,7 +7,7 @@ import (
 
 var cityHeaderJunk = map[string]bool{
 	"cidade": true, "cidade de nascimento": true, "cidade que reside": true,
-	"cidade que nasceu": true, "municipio": true, "bacanal": true,
+	"cidade que nasceu": true, "municipio": true,
 }
 
 var cityAliases = map[string]string{
@@ -84,20 +84,160 @@ var countryByName = map[string]string{
 	"mexico": "México", "canada": "Canadá",
 }
 
-var cityCanonFold map[string]string
-var cityCompact map[string]string
-
-func init() {
-	cityCanonFold = map[string]string{}
-	cityCompact = map[string]string{}
-	for key, label := range cityAliases {
-		cityCanonFold[SearchText(label)] = label
-		cityCompact[strings.ReplaceAll(key, " ", "")] = label
-	}
+type cityCompactEntry struct {
+	alias     string
+	runes     []rune
+	canonical string
+	ambiguous bool
 }
 
-// FormatCity returns a catalog city, a one-edit match, or a titled name.
-func FormatCity(value string) string {
+// CityCatalog is an immutable, concurrency-safe catalog of canonical city
+// names and their accepted aliases. A nil *CityCatalog behaves as an empty
+// catalog: FormatCity falls back to title-casing non-empty, non-junk inputs
+// and FormatMunicipality always returns "".
+type CityCatalog struct {
+	aliases   map[string]string
+	canonFold map[string]string
+	compact   map[string]string
+	entries   []cityCompactEntry
+}
+
+var defaultCityCatalog = NewCityCatalog(cityAliases)
+
+// NewCityCatalog builds an immutable CityCatalog from an alias-to-canonical-label
+// map. Alias keys are folded through SearchText (and spaces stripped for compact
+// matching) deterministically so caller map iteration order never affects behavior.
+// A nil or empty map produces a valid empty catalog.
+func NewCityCatalog(aliases map[string]string) *CityCatalog {
+	c := &CityCatalog{
+		aliases:   make(map[string]string, len(aliases)),
+		canonFold: make(map[string]string, len(aliases)),
+		compact:   make(map[string]string, len(aliases)),
+	}
+	if len(aliases) == 0 {
+		return c
+	}
+
+	rawKeys := make([]string, 0, len(aliases))
+	for k := range aliases {
+		rawKeys = append(rawKeys, k)
+	}
+	slices.Sort(rawKeys)
+
+	type candidate struct {
+		key       string
+		compact   string
+		canonical string
+	}
+	candidates := make([]candidate, 0, len(rawKeys))
+	keyAmbiguous := make(map[string]bool)
+	compactAmbiguous := make(map[string]bool)
+
+	for _, rawKey := range rawKeys {
+		label := DisplayText(aliases[rawKey])
+		key := SearchText(rawKey)
+		if key == "" || label == "" {
+			continue
+		}
+		canonKey := SearchText(label)
+		if canonKey != "" {
+			if prev, exists := c.canonFold[canonKey]; !exists || label < prev {
+				c.canonFold[canonKey] = label
+			}
+		}
+
+		if prev, exists := c.aliases[key]; exists && prev != label {
+			keyAmbiguous[key] = true
+		} else {
+			c.aliases[key] = label
+		}
+
+		comp := strings.ReplaceAll(key, " ", "")
+		if comp != "" {
+			if prev, exists := c.compact[comp]; exists && prev != label {
+				compactAmbiguous[comp] = true
+			} else {
+				c.compact[comp] = label
+			}
+		}
+
+		candidates = append(candidates, candidate{
+			key:       key,
+			compact:   comp,
+			canonical: label,
+		})
+	}
+
+	// Ensure canonical labels themselves are also resolvable by key and compact form.
+	canonKeys := make([]string, 0, len(c.canonFold))
+	for k := range c.canonFold {
+		canonKeys = append(canonKeys, k)
+	}
+	slices.Sort(canonKeys)
+	for _, canonKey := range canonKeys {
+		label := c.canonFold[canonKey]
+		if prev, exists := c.aliases[canonKey]; exists && prev != label {
+			keyAmbiguous[canonKey] = true
+		} else if !exists {
+			c.aliases[canonKey] = label
+		}
+		comp := strings.ReplaceAll(canonKey, " ", "")
+		if comp != "" {
+			if prev, exists := c.compact[comp]; exists && prev != label {
+				compactAmbiguous[comp] = true
+			} else if !exists {
+				c.compact[comp] = label
+				candidates = append(candidates, candidate{
+					key:       canonKey,
+					compact:   comp,
+					canonical: label,
+				})
+			}
+		}
+	}
+
+	for k := range keyAmbiguous {
+		delete(c.aliases, k)
+	}
+	for comp := range compactAmbiguous {
+		delete(c.compact, comp)
+	}
+
+	byCompact := make(map[string]cityCompactEntry, len(candidates))
+	for _, cand := range candidates {
+		if cand.compact == "" {
+			continue
+		}
+		if existing, ok := byCompact[cand.compact]; ok {
+			if existing.canonical != cand.canonical {
+				existing.ambiguous = true
+				byCompact[cand.compact] = existing
+			}
+			continue
+		}
+		byCompact[cand.compact] = cityCompactEntry{
+			alias:     cand.compact,
+			runes:     []rune(cand.compact),
+			canonical: cand.canonical,
+			ambiguous: compactAmbiguous[cand.compact],
+		}
+	}
+
+	entries := make([]cityCompactEntry, 0, len(byCompact))
+	for _, entry := range byCompact {
+		entries = append(entries, entry)
+	}
+	slices.SortFunc(entries, func(a, b cityCompactEntry) int {
+		return strings.Compare(a.alias, b.alias)
+	})
+	c.entries = entries
+	return c
+}
+
+// FormatCity returns a catalog city from c, a deterministic bounded-edit match
+// (when unambiguous), or a titled name. If c is nil, it behaves as an empty
+// catalog and falls back to titleStreetName for valid inputs.
+func (c *CityCatalog) FormatCity(value string) string {
 	if isAbsent(value) {
 		return ""
 	}
@@ -108,38 +248,80 @@ func FormatCity(value string) string {
 	if key == "" || cityHeaderJunk[key] || containsDigit(key) {
 		return ""
 	}
-	if label, ok := cityAliases[key]; ok {
-		return label
-	}
-	compact := strings.ReplaceAll(key, " ", "")
-	if label, ok := cityCompact[compact]; ok {
-		return label
-	}
-	if len(compact) >= 6 {
-		best, bestD := "", 3
-		for alias, label := range cityCompact {
-			d := levenshtein(compact, alias)
-			if d < bestD {
-				best, bestD = label, d
-			}
+	if c != nil {
+		if label, ok := c.aliases[key]; ok {
+			return label
 		}
-		if best != "" && (bestD == 1 || (bestD == 2 && len(compact) >= 10)) {
-			return best
+		compact := strings.ReplaceAll(key, " ", "")
+		if label, ok := c.compact[compact]; ok {
+			return label
+		}
+		var compactStack [64]rune
+		var compactRunes []rune
+		if len(compact) <= len(compactStack) {
+			n := 0
+			for _, r := range compact {
+				compactStack[n] = r
+				n++
+			}
+			compactRunes = compactStack[:n]
+		} else {
+			compactRunes = []rune(compact)
+		}
+		runeLen := len(compactRunes)
+		if runeLen >= 6 && len(c.entries) > 0 {
+			maxDist := 1
+			if runeLen >= 10 {
+				maxDist = 2
+			}
+			best := ""
+			bestD := maxDist + 1
+			ambiguous := false
+			for i := range c.entries {
+				entry := &c.entries[i]
+				d := boundedLevenshteinRunes(compactRunes, entry.runes, maxDist)
+				if d < bestD {
+					bestD = d
+					best = entry.canonical
+					ambiguous = entry.ambiguous
+				} else if d == bestD && d <= maxDist {
+					if entry.ambiguous || entry.canonical != best {
+						ambiguous = true
+					}
+				}
+			}
+			if best != "" && !ambiguous && bestD <= maxDist {
+				return best
+			}
 		}
 	}
 	return titleStreetName(value)
 }
 
-// FormatMunicipality returns FormatCity only when the result is a known city.
-func FormatMunicipality(value string) string {
-	city := FormatCity(value)
+// FormatMunicipality returns c.FormatCity(value) only when the result is a
+// canonical city present in c. If c is nil, FormatMunicipality returns "".
+func (c *CityCatalog) FormatMunicipality(value string) string {
+	if c == nil || len(c.canonFold) == 0 {
+		return ""
+	}
+	city := c.FormatCity(value)
 	if city == "" {
 		return ""
 	}
-	if _, ok := cityCanonFold[SearchText(city)]; ok {
+	if _, ok := c.canonFold[SearchText(city)]; ok {
 		return city
 	}
 	return ""
+}
+
+// FormatCity returns a catalog city, a one-edit match, or a titled name.
+func FormatCity(value string) string {
+	return defaultCityCatalog.FormatCity(value)
+}
+
+// FormatMunicipality returns FormatCity only when the result is a known city.
+func FormatMunicipality(value string) string {
+	return defaultCityCatalog.FormatMunicipality(value)
 }
 
 // FormatNeighborhood canonicalizes known bairros; unknown names are titled.
@@ -190,7 +372,7 @@ func FormatNationality(value string) string {
 	if len(found) == 0 {
 		return ""
 	}
-	sortStrings(found)
+	slices.Sort(found)
 	return strings.Join(found, "; ")
 }
 
@@ -203,32 +385,54 @@ func containsDigit(value string) bool {
 	return false
 }
 
-func levenshtein(a, b string) int {
-	if a == b {
+func boundedLevenshteinRunes(a, b []rune, maxDist int) int {
+	lenA, lenB := len(a), len(b)
+	if abs(lenA-lenB) > maxDist {
+		return maxDist + 1
+	}
+	if slices.Equal(a, b) {
 		return 0
 	}
-	if abs(len(a)-len(b)) > 2 {
-		return 99
+
+	var prevStack, curStack [64]int
+	var prev, cur []int
+	if lenB+1 <= len(prevStack) {
+		prev = prevStack[:lenB+1]
+		cur = curStack[:lenB+1]
+	} else {
+		prev = make([]int, lenB+1)
+		cur = make([]int, lenB+1)
 	}
-	prev := make([]int, len(b)+1)
-	for j := range prev {
+
+	for j := 0; j <= lenB; j++ {
 		prev[j] = j
 	}
-	for i := 0; i < len(a); i++ {
-		cur := make([]int, len(b)+1)
+	for i := 0; i < lenA; i++ {
 		cur[0] = i + 1
-		for j := 0; j < len(b); j++ {
+		rowMin := cur[0]
+		ai := a[i]
+		for j := 0; j < lenB; j++ {
 			ins := cur[j] + 1
 			del := prev[j+1] + 1
 			sub := prev[j]
-			if a[i] != b[j] {
+			if ai != b[j] {
 				sub++
 			}
-			cur[j+1] = min3(ins, del, sub)
+			val := min(ins, del, sub)
+			cur[j+1] = val
+			if val < rowMin {
+				rowMin = val
+			}
 		}
-		prev = cur
+		if rowMin > maxDist {
+			return maxDist + 1
+		}
+		prev, cur = cur, prev
 	}
-	return prev[len(b)]
+	if prev[lenB] > maxDist {
+		return maxDist + 1
+	}
+	return prev[lenB]
 }
 
 func abs(n int) int {
@@ -236,18 +440,4 @@ func abs(n int) int {
 		return -n
 	}
 	return n
-}
-
-func min3(a, b, c int) int {
-	if a <= b && a <= c {
-		return a
-	}
-	if b <= c {
-		return b
-	}
-	return c
-}
-
-func sortStrings(values []string) {
-	slices.Sort(values)
 }

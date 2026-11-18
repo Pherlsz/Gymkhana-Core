@@ -84,22 +84,32 @@ func (trace RunTrace) TotalUsage() (Usage, error) {
 	var total Usage
 	for _, attempt := range trace.Attempts {
 		var err error
-		total.InputTokens, err = safeUsageAdd(total.InputTokens, attempt.Usage.InputTokens)
+		total, err = addUsage(total, attempt.Usage)
 		if err != nil {
 			return Usage{}, err
 		}
-		total.OutputTokens, err = safeUsageAdd(total.OutputTokens, attempt.Usage.OutputTokens)
-		if err != nil {
-			return Usage{}, err
-		}
-		total.CachedInputTokens, err = safeUsageAdd(total.CachedInputTokens, attempt.Usage.CachedInputTokens)
-		if err != nil {
-			return Usage{}, err
-		}
-		total.ReasoningTokens, err = safeUsageAdd(total.ReasoningTokens, attempt.Usage.ReasoningTokens)
-		if err != nil {
-			return Usage{}, err
-		}
+	}
+	return total, nil
+}
+
+func addUsage(left, right Usage) (Usage, error) {
+	var err error
+	var total Usage
+	total.InputTokens, err = safeUsageAdd(left.InputTokens, right.InputTokens)
+	if err != nil {
+		return Usage{}, err
+	}
+	total.OutputTokens, err = safeUsageAdd(left.OutputTokens, right.OutputTokens)
+	if err != nil {
+		return Usage{}, err
+	}
+	total.CachedInputTokens, err = safeUsageAdd(left.CachedInputTokens, right.CachedInputTokens)
+	if err != nil {
+		return Usage{}, err
+	}
+	total.ReasoningTokens, err = safeUsageAdd(left.ReasoningTokens, right.ReasoningTokens)
+	if err != nil {
+		return Usage{}, err
 	}
 	return total, nil
 }

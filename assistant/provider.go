@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"slices"
 	"sync"
 	"unicode/utf8"
 )
@@ -80,7 +81,7 @@ func NewAdapterRegistry() *AdapterRegistry {
 }
 
 func (registry *AdapterRegistry) Register(adapter ProviderAdapter) error {
-	if isNilProviderAdapter(adapter) {
+	if registry == nil || isNilProviderAdapter(adapter) {
 		return validationError(CodeInvalidProvider, "provider")
 	}
 	descriptor := adapter.Descriptor()
@@ -89,6 +90,9 @@ func (registry *AdapterRegistry) Register(adapter ProviderAdapter) error {
 	}
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
+	if registry.adapters == nil {
+		registry.adapters = make(map[ProviderID]ProviderAdapter)
+	}
 	if _, exists := registry.adapters[descriptor.ID]; exists {
 		return validationError(CodeDuplicateProvider, "provider")
 	}
@@ -97,6 +101,9 @@ func (registry *AdapterRegistry) Register(adapter ProviderAdapter) error {
 }
 
 func (registry *AdapterRegistry) Get(provider ProviderID) (ProviderAdapter, bool) {
+	if registry == nil {
+		return nil, false
+	}
 	registry.mu.RLock()
 	defer registry.mu.RUnlock()
 	adapter, ok := registry.adapters[provider]
@@ -104,13 +111,16 @@ func (registry *AdapterRegistry) Get(provider ProviderID) (ProviderAdapter, bool
 }
 
 func (registry *AdapterRegistry) Providers() []ProviderID {
+	if registry == nil {
+		return nil
+	}
 	registry.mu.RLock()
 	defer registry.mu.RUnlock()
 	result := make([]ProviderID, 0, len(registry.adapters))
 	for provider := range registry.adapters {
 		result = append(result, provider)
 	}
-	sortProviderIDs(result)
+	slices.Sort(result)
 	return result
 }
 
@@ -125,6 +135,9 @@ func (registry *AdapterRegistry) ClassifyFailure(provider ProviderID, err error)
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return FailureTimeout
+	}
+	if registry == nil {
+		return FailureUnknown
 	}
 	adapter, ok := registry.Get(provider)
 	if !ok {
@@ -144,6 +157,9 @@ func (registry *AdapterRegistry) ClassifyFailure(provider ProviderID, err error)
 // ListModels calls one adapter through the validated Core boundary and rejects
 // catalog entries that claim a different provider or duplicate model identity.
 func (registry *AdapterRegistry) ListModels(ctx context.Context, provider ProviderID, credential *CredentialRef) ([]ModelDescriptor, error) {
+	if registry == nil {
+		return nil, validationError(CodeInvalidProvider, "provider")
+	}
 	adapter, ok := registry.Get(provider)
 	if !ok {
 		return nil, validationError(CodeInvalidProvider, "provider")
@@ -164,29 +180,26 @@ func (registry *AdapterRegistry) ListModels(ctx context.Context, provider Provid
 	if err != nil {
 		return nil, err
 	}
-	if len(models) > maxModelCatalog {
-		return nil, validationError(CodeInvalidModel, "catalog")
+	if _, err := indexModelCatalog(models); err != nil {
+		return nil, err
 	}
-	seen := make(map[ModelRef]struct{}, len(models))
-	for _, model := range models {
-		if err := ValidateModelDescriptor(model); err != nil {
-			return nil, err
-		}
+	result := make([]ModelDescriptor, len(models))
+	for i, model := range models {
 		if model.Ref.Provider != provider {
 			return nil, validationError(CodeInvalidProvider, "catalog.provider")
 		}
-		if _, duplicate := seen[model.Ref]; duplicate {
-			return nil, validationError(CodeInvalidModel, "catalog")
-		}
-		seen[model.Ref] = struct{}{}
+		result[i] = cloneModelDescriptor(model)
 	}
-	return models, nil
+	return result, nil
 }
 
 // Generate invokes the selected provider through a validated boundary.
 func (registry *AdapterRegistry) Generate(ctx context.Context, request GenerationRequest) (GenerationResponse, error) {
 	if err := ValidateGenerationRequest(request); err != nil {
 		return GenerationResponse{}, err
+	}
+	if registry == nil {
+		return GenerationResponse{}, validationError(CodeInvalidProvider, "provider")
 	}
 	adapter, ok := registry.Get(request.Model.Provider)
 	if !ok {
@@ -215,6 +228,9 @@ func (registry *AdapterRegistry) Generate(ctx context.Context, request Generatio
 
 // Quota invokes the optional normalized quota capability for a provider.
 func (registry *AdapterRegistry) Quota(ctx context.Context, provider ProviderID, credential *CredentialRef, model *ModelRef) (QuotaState, error) {
+	if registry == nil {
+		return QuotaState{}, validationError(CodeInvalidProvider, "provider")
+	}
 	adapter, ok := registry.Get(provider)
 	if !ok {
 		return QuotaState{}, validationError(CodeInvalidProvider, "provider")
@@ -254,7 +270,7 @@ func (registry *AdapterRegistry) Quota(ctx context.Context, provider ProviderID,
 	if model != nil && state.Model != nil && *state.Model != *model {
 		return QuotaState{}, validationError(CodeInvalidQuota, "quota.model")
 	}
-	return state, nil
+	return cloneQuotaState(state), nil
 }
 
 func ValidateProviderDescriptor(descriptor ProviderDescriptor) error {
@@ -367,12 +383,7 @@ func ValidateGenerationExchange(request GenerationRequest, response GenerationRe
 }
 
 func providerAllowsCredential(descriptor ProviderDescriptor, mode CredentialMode) bool {
-	for _, allowed := range descriptor.CredentialModes {
-		if allowed == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(descriptor.CredentialModes, mode)
 }
 
 func isNilProviderAdapter(adapter ProviderAdapter) bool {
@@ -385,13 +396,5 @@ func isNilProviderAdapter(adapter ProviderAdapter) bool {
 		return value.IsNil()
 	default:
 		return false
-	}
-}
-
-func sortProviderIDs(values []ProviderID) {
-	for i := 1; i < len(values); i++ {
-		for j := i; j > 0 && values[j] < values[j-1]; j-- {
-			values[j], values[j-1] = values[j-1], values[j]
-		}
 	}
 }

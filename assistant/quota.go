@@ -1,5 +1,10 @@
 package assistant
 
+import (
+	"slices"
+	"sync"
+)
+
 // QuotaDimension identifies a normalized provider limit dimension. Providers
 // may expose only a subset.
 type QuotaDimension string
@@ -116,4 +121,123 @@ func ValidateUsageLedgerEntry(entry UsageLedgerEntry) error {
 		}
 	}
 	return ValidateUsage(entry.Usage)
+}
+
+type usageLedgerKey struct {
+	RunID   string
+	Attempt int64
+}
+
+// UsageLedger is a concurrency-safe, idempotent in-memory usage attribution
+// ledger keyed by RunID+Attempt.
+type UsageLedger struct {
+	mu      sync.RWMutex
+	entries []UsageLedgerEntry
+	byKey   map[usageLedgerKey]int
+}
+
+func NewUsageLedger() *UsageLedger {
+	return &UsageLedger{byKey: make(map[usageLedgerKey]int)}
+}
+
+// Record validates and records one usage observation. It returns (true, nil)
+// when recorded for the first time, (false, nil) when an identical RunID+Attempt
+// replay is observed, or CodeInvalidQuota when a conflicting payload reuses the
+// same RunID+Attempt key.
+func (ledger *UsageLedger) Record(entry UsageLedgerEntry) (bool, error) {
+	if ledger == nil {
+		return false, validationError(CodeInvalidQuota, "usage_ledger")
+	}
+	if err := ValidateUsageLedgerEntry(entry); err != nil {
+		return false, err
+	}
+	cloned := cloneUsageLedgerEntry(entry)
+	key := usageLedgerKey{RunID: cloned.RunID, Attempt: cloned.Attempt}
+
+	ledger.mu.Lock()
+	defer ledger.mu.Unlock()
+	if idx, exists := ledger.byKey[key]; exists {
+		if !usageLedgerEntriesEqual(ledger.entries[idx], cloned) {
+			return false, validationError(CodeInvalidQuota, "usage_ledger.attempt")
+		}
+		return false, nil
+	}
+	if ledger.byKey == nil {
+		ledger.byKey = make(map[usageLedgerKey]int)
+	}
+	ledger.byKey[key] = len(ledger.entries)
+	ledger.entries = append(ledger.entries, cloned)
+	return true, nil
+}
+
+// Entries returns a defensive copy of all recorded entries in insertion order.
+func (ledger *UsageLedger) Entries() []UsageLedgerEntry {
+	if ledger == nil {
+		return nil
+	}
+	ledger.mu.RLock()
+	defer ledger.mu.RUnlock()
+	result := make([]UsageLedgerEntry, len(ledger.entries))
+	for i, entry := range ledger.entries {
+		result[i] = cloneUsageLedgerEntry(entry)
+	}
+	return result
+}
+
+// TotalUsageForAssistant sums recorded usage for one AssistantID with portable
+// safe-integer overflow checks.
+func (ledger *UsageLedger) TotalUsageForAssistant(assistantID string) (Usage, error) {
+	if !validPortableID(assistantID, 128) {
+		return Usage{}, validationError(CodeInvalidAssistant, "assistant_id")
+	}
+	if ledger == nil {
+		return Usage{}, nil
+	}
+	ledger.mu.RLock()
+	defer ledger.mu.RUnlock()
+	var total Usage
+	for _, entry := range ledger.entries {
+		if entry.AssistantID != assistantID {
+			continue
+		}
+		var err error
+		if total, err = addUsage(total, entry.Usage); err != nil {
+			return Usage{}, err
+		}
+	}
+	return total, nil
+}
+
+func cloneUsageLedgerEntry(entry UsageLedgerEntry) UsageLedgerEntry {
+	if entry.Credential != nil {
+		cred := *entry.Credential
+		entry.Credential = &cred
+	}
+	return entry
+}
+
+func usageLedgerEntriesEqual(left, right UsageLedgerEntry) bool {
+	if left.RunID != right.RunID || left.Attempt != right.Attempt || left.AssistantID != right.AssistantID || left.Model != right.Model || left.Usage != right.Usage || left.ObservedAtUnix != right.ObservedAtUnix {
+		return false
+	}
+	if (left.Credential == nil) != (right.Credential == nil) {
+		return false
+	}
+	if left.Credential != nil && *left.Credential != *right.Credential {
+		return false
+	}
+	return true
+}
+
+func cloneQuotaState(state QuotaState) QuotaState {
+	if state.Credential != nil {
+		cred := *state.Credential
+		state.Credential = &cred
+	}
+	if state.Model != nil {
+		model := *state.Model
+		state.Model = &model
+	}
+	state.Limits = slices.Clone(state.Limits)
+	return state
 }

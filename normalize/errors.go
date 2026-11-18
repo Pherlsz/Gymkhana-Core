@@ -15,7 +15,6 @@ const (
 	KindBrazilPhone ValueKind = "brazil_phone"
 	KindDocument    ValueKind = "document"
 	KindPostalCode  ValueKind = "postal_code"
-	KindPlate       ValueKind = "vehicle_plate"
 )
 
 // ErrorCode identifies a stable validation failure without exposing the input.
@@ -41,13 +40,19 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
+	if e == nil {
+		return "normalize: validation error"
+	}
+	if e.Kind == "" {
+		return fmt.Sprintf("normalize: %s", e.Code)
+	}
 	return fmt.Sprintf("%s: %s", e.Kind, e.Code)
 }
 
 // IsCode reports whether err contains the requested stable validation code.
 func IsCode(err error, code ErrorCode) bool {
 	var validationError *ValidationError
-	return errors.As(err, &validationError) && validationError.Code == code
+	return errors.As(err, &validationError) && validationError != nil && validationError.Code == code
 }
 
 func validationError(kind ValueKind, code ErrorCode) error {

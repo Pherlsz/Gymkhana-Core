@@ -45,9 +45,8 @@ Deterministic normalization for:
 - Unicode letters and digits;
 - person names;
 - street, house number, block (`bl. A`), apartment (`apt. 202`), CEP, and UF;
-- city, neighborhood, country, and nationality;
-- gender, marital status, blood type, and club membership type;
-- team, sector, football club, health plan, card, collection, animal, and vehicle;
+- city, municipality, neighborhood, country, and nationality, including immutable `CityCatalog` instances (`NewCityCatalog`, `FormatCity`, `FormatMunicipality`) with deterministic, ambiguity-preserving bounded edit-distance matching;
+- gender, marital status, and blood type;
 - CPF validation and canonicalization;
 - CNPJ validation and canonicalization, including the alphanumeric Receita Federal form;
 - catalog document identifiers, formatting, validation, and strong kind inference;
@@ -90,6 +89,7 @@ Generic strict structured-data primitives reusable across Core domains:
 - malformed surrogate, trailing-value, byte/depth/node bounds;
 - conservative `portable_json_schema/v1` validation;
 - explicit object-root schema validation for domains that require structured objects;
+- reusable immutable `CompiledSchema` (`CompileSchema`, `CompileObjectSchema`, `(*CompiledSchema).ValidateInstance`) that pre-parses numeric bounds, array limits, and enum constraints once for concurrency-safe single-pass instance validation;
 - schema-instance validation before structured data is trusted by a consumer;
 - exact rational comparison for portable decimal bounds/enums rather than runtime-dependent binary floating-point equality;
 - bounded numeric lexemes/exponents and JSON-safe portable integer semantics.
@@ -114,8 +114,9 @@ Provider-neutral, modular multimodal Assistant foundation for:
 - automatic model-capability filtering and bounded provider/model fallback;
 - portable RAG policy with lexical/vector/hybrid retrieval, query transformation, candidate/context limits, reranking, grounding, citations, and evidence;
 - bounded execution budgets without autonomous persistent self-modification;
-- content-free run traces for routing/usage diagnostics;
+- content-free run traces and idempotent `UsageLedger` attribution (`NewUsageLedger`, `Record`, `Entries`, `TotalUsageForAssistant`) for routing/usage diagnostics;
 - runtime-local Go provider adapter registration with no provider SDK types crossing the portable contract boundary;
+- reusable `assistant/adaptertest` integration harness for exercising `ProviderAdapter` implementations, capability probes, quota checks, and failure classification through `AdapterRegistry`;
 - stable validation errors without embedding prompt/tool/credential payload data.
 
 Persistent user/tenant memory, task signatures, learning proposals, evaluation evidence, and promotion workflows are host/application concerns. Relevant prior context may be projected through messages or RAG without making persistence or learning part of the portable Assistant contract.
@@ -253,7 +254,7 @@ export GOPRIVATE=github.com/Pherlsz/Gymkhana-Core
 and pin an exact release:
 
 ```sh
-go get github.com/Pherlsz/Gymkhana-Core@v0.6.0
+go get github.com/Pherlsz/Gymkhana-Core@v0.7.0
 ```
 
 Permanent `replace` directives, copied source, submodules, and branch dependencies are not supported as production dependency mechanisms.
@@ -262,7 +263,7 @@ Future language implementations should be published through their normal ecosyst
 
 ## Development governance
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) before changing public contracts.
+Read [CONTRIBUTING.md](CONTRIBUTING.md), [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md), and [docs/ARCHITECTURE-SHOWCASE.md](docs/ARCHITECTURE-SHOWCASE.md) before changing public contracts.
 
 Core owns its own architecture and roadmap. Work may originate from any consumer repository or from an independently approved Core capability. When a consumer drives a change, link that consumer's issue/requirement, but do not make the consumer repository the source of truth for Core semantics.
 

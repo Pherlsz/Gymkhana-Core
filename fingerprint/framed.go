@@ -3,6 +3,8 @@ package fingerprint
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"hash"
+	"io"
 	"unicode/utf8"
 )
 
@@ -17,9 +19,17 @@ func SumFramed(namespace string, parts ...[]byte) (Digest, error) {
 	if err := validateFrame(namespace, len(parts)); err != nil {
 		return Digest{}, err
 	}
-	return framed(namespace, len(parts), func(index int) []byte {
-		return parts[index]
-	}), nil
+	h := sha256.New()
+	var scalar [8]byte
+	writeFrameHeader(h, &scalar, namespace, len(parts))
+	for _, value := range parts {
+		binary.BigEndian.PutUint64(scalar[:], uint64(len(value)))
+		_, _ = h.Write(scalar[:])
+		_, _ = h.Write(value)
+	}
+	var digest Digest
+	h.Sum(digest[:0])
+	return digest, nil
 }
 
 // SumFramedText is SumFramed for exact UTF-8 string bytes. It performs no
@@ -33,9 +43,17 @@ func SumFramedText(namespace string, parts ...string) (Digest, error) {
 			return Digest{}, validationError(CodeInvalidUTF8)
 		}
 	}
-	return framed(namespace, len(parts), func(index int) []byte {
-		return []byte(parts[index])
-	}), nil
+	h := sha256.New()
+	var scalar [8]byte
+	writeFrameHeader(h, &scalar, namespace, len(parts))
+	for _, value := range parts {
+		binary.BigEndian.PutUint64(scalar[:], uint64(len(value)))
+		_, _ = h.Write(scalar[:])
+		_, _ = io.WriteString(h, value)
+	}
+	var digest Digest
+	h.Sum(digest[:0])
+	return digest, nil
 }
 
 func validateFrame(namespace string, partCount int) error {
@@ -48,28 +66,13 @@ func validateFrame(namespace string, partCount int) error {
 	return nil
 }
 
-func framed(namespace string, partCount int, part func(index int) []byte) Digest {
-	hash := sha256.New()
-	_, _ = hash.Write(frameMagic[:])
-
-	var scalar [8]byte
+func writeFrameHeader(h hash.Hash, scalar *[8]byte, namespace string, partCount int) {
+	_, _ = h.Write(frameMagic[:])
 	binary.BigEndian.PutUint16(scalar[:2], uint16(len(namespace)))
-	_, _ = hash.Write(scalar[:2])
-	_, _ = hash.Write([]byte(namespace))
-
+	_, _ = h.Write(scalar[:2])
+	_, _ = io.WriteString(h, namespace)
 	binary.BigEndian.PutUint32(scalar[:4], uint32(partCount))
-	_, _ = hash.Write(scalar[:4])
-
-	for index := 0; index < partCount; index++ {
-		value := part(index)
-		binary.BigEndian.PutUint64(scalar[:], uint64(len(value)))
-		_, _ = hash.Write(scalar[:])
-		_, _ = hash.Write(value)
-	}
-
-	var digest Digest
-	copy(digest[:], hash.Sum(nil))
-	return digest
+	_, _ = h.Write(scalar[:4])
 }
 
 func validNamespace(value string) bool {

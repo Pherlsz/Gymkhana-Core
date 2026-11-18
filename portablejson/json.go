@@ -41,7 +41,7 @@ func validateJSON(raw json.RawMessage, requireObject bool) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
 	nodes := 0
-	if err := scanJSONValue(decoder, 0, &nodes, requireObject); err != nil {
+	if _, err := scanOrBuildJSONValue(decoder, 0, &nodes, requireObject, false); err != nil {
 		return validationError(CodeInvalidJSON, "json")
 	}
 	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
@@ -50,61 +50,103 @@ func validateJSON(raw json.RawMessage, requireObject bool) error {
 	return nil
 }
 
-func scanJSONValue(decoder *json.Decoder, depth int, nodes *int, requireObject bool) error {
+func decodeStrictValue(raw json.RawMessage, requireObject bool) (any, error) {
+	if len(raw) == 0 || len(raw) > MaxBytes || !utf8.Valid(raw) || !validJSONUnicodeEscapes(raw) {
+		return nil, validationError(CodeInvalidJSON, "json")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	nodes := 0
+	value, err := scanOrBuildJSONValue(decoder, 0, &nodes, requireObject, true)
+	if err != nil {
+		return nil, validationError(CodeInvalidJSON, "json")
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, validationError(CodeInvalidJSON, "json")
+	}
+	return value, nil
+}
+
+func scanOrBuildJSONValue(decoder *json.Decoder, depth int, nodes *int, requireObject bool, build bool) (any, error) {
 	if depth > MaxDepth || *nodes >= MaxNodes {
-		return errors.New("json bound exceeded")
+		return nil, errors.New("json bound exceeded")
 	}
 	*nodes = *nodes + 1
 	token, err := decoder.Token()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	delim, isDelim := token.(json.Delim)
 	if requireObject && (!isDelim || delim != '{') {
-		return errors.New("object required")
+		return nil, errors.New("object required")
 	}
 	if !isDelim {
-		return nil
+		return token, nil
 	}
 
 	switch delim {
 	case '{':
-		seen := make(map[string]struct{})
+		var obj map[string]any
+		var seen map[string]struct{}
+		if build {
+			obj = make(map[string]any)
+		} else {
+			seen = make(map[string]struct{})
+		}
 		for decoder.More() {
 			keyToken, err := decoder.Token()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			key, ok := keyToken.(string)
 			if !ok || !utf8.ValidString(key) {
-				return errors.New("invalid object key")
+				return nil, errors.New("invalid object key")
 			}
-			if _, duplicate := seen[key]; duplicate {
-				return errors.New("duplicate object key")
+			if build {
+				if _, duplicate := obj[key]; duplicate {
+					return nil, errors.New("duplicate object key")
+				}
+			} else {
+				if _, duplicate := seen[key]; duplicate {
+					return nil, errors.New("duplicate object key")
+				}
+				seen[key] = struct{}{}
 			}
-			seen[key] = struct{}{}
-			if err := scanJSONValue(decoder, depth+1, nodes, false); err != nil {
-				return err
+			child, err := scanOrBuildJSONValue(decoder, depth+1, nodes, false, build)
+			if err != nil {
+				return nil, err
+			}
+			if build {
+				obj[key] = child
 			}
 		}
 		end, err := decoder.Token()
 		if err != nil || end != json.Delim('}') {
-			return errors.New("invalid object ending")
+			return nil, errors.New("invalid object ending")
 		}
+		return obj, nil
 	case '[':
+		var arr []any
+		if build {
+			arr = []any{}
+		}
 		for decoder.More() {
-			if err := scanJSONValue(decoder, depth+1, nodes, false); err != nil {
-				return err
+			child, err := scanOrBuildJSONValue(decoder, depth+1, nodes, false, build)
+			if err != nil {
+				return nil, err
+			}
+			if build {
+				arr = append(arr, child)
 			}
 		}
 		end, err := decoder.Token()
 		if err != nil || end != json.Delim(']') {
-			return errors.New("invalid array ending")
+			return nil, errors.New("invalid array ending")
 		}
+		return arr, nil
 	default:
-		return errors.New("unexpected delimiter")
+		return nil, errors.New("unexpected delimiter")
 	}
-	return nil
 }
 
 func validJSONUnicodeEscapes(raw []byte) bool {

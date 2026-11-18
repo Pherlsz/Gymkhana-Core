@@ -33,13 +33,16 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
+	if e == nil {
+		return "civiltime: validation error"
+	}
 	return fmt.Sprintf("%s: %s", e.Kind, e.Code)
 }
 
 // IsCode reports whether err contains the requested stable code.
 func IsCode(err error, code ErrorCode) bool {
 	var validationError *ValidationError
-	return errors.As(err, &validationError) && validationError.Code == code
+	return errors.As(err, &validationError) && validationError != nil && validationError.Code == code
 }
 
 func validationError(kind ValueKind, code ErrorCode) error {
