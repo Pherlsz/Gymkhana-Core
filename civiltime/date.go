@@ -161,9 +161,7 @@ func (d CivilDate) MarshalJSON() ([]byte, error) {
 	}
 	var buf [12]byte
 	buf[0] = '"'
-	var inner [10]byte
-	d.formatInto(&inner)
-	copy(buf[1:11], inner[:])
+	d.formatInto((*[10]byte)(buf[1:11]))
 	buf[11] = '"'
 	return buf[:], nil
 }

@@ -11,36 +11,46 @@ import (
 )
 
 func ValidateExtractionRequest(request ExtractionRequest) error {
+	_, err := compileExtractionRequest(request)
+	return err
+}
+
+func compileExtractionRequest(request ExtractionRequest) (*portablejson.CompiledSchema, error) {
 	if !request.Mode.Valid() {
-		return validationError(CodeInvalidMode, "mode")
+		return nil, validationError(CodeInvalidMode, "mode")
 	}
 	if len(request.Sources) == 0 || len(request.Sources) > MaxSources {
-		return validationError(CodeInvalidSource, "sources")
+		return nil, validationError(CodeInvalidSource, "sources")
 	}
 	seen := make(map[string]struct{}, len(request.Sources))
 	for _, source := range request.Sources {
 		if err := validateSource(source); err != nil {
-			return err
+			return nil, err
 		}
 		if _, duplicate := seen[source.ID]; duplicate {
-			return validationError(CodeDuplicateSource, "sources")
+			return nil, validationError(CodeDuplicateSource, "sources")
 		}
 		seen[source.ID] = struct{}{}
 	}
 	if request.MaxCandidates < 0 || request.MaxCandidates > MaxCandidates {
-		return validationError(CodeInvalidLimit, "max_candidates")
+		return nil, validationError(CodeInvalidLimit, "max_candidates")
 	}
 	switch request.Mode {
 	case ModeSchemaGuided:
-		if len(request.TargetSchema) == 0 || portablejson.ValidateObjectSchema(request.TargetSchema) != nil {
-			return validationError(CodeInvalidSchema, "target_schema")
+		if len(request.TargetSchema) == 0 {
+			return nil, validationError(CodeInvalidSchema, "target_schema")
 		}
+		compiled, err := portablejson.CompileObjectSchema(request.TargetSchema)
+		if err != nil {
+			return nil, validationError(CodeInvalidSchema, "target_schema")
+		}
+		return compiled, nil
 	case ModeDiscovery:
 		if len(request.TargetSchema) != 0 {
-			return validationError(CodeInvalidSchema, "target_schema")
+			return nil, validationError(CodeInvalidSchema, "target_schema")
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func validateSource(source SourceRef) error {
@@ -242,7 +252,8 @@ func validateCandidateStrings(values []string, max int, field string) error {
 // ValidateExtractionExchange validates cross-object invariants that require both
 // the original request and provider-produced result.
 func ValidateExtractionExchange(request ExtractionRequest, result ExtractionResult) error {
-	if err := ValidateExtractionRequest(request); err != nil {
+	targetSchema, err := compileExtractionRequest(request)
+	if err != nil {
 		return err
 	}
 	if err := ValidateExtractionResult(result); err != nil {
@@ -278,7 +289,7 @@ func ValidateExtractionExchange(request ExtractionRequest, result ExtractionResu
 		if err := validateCandidatesAgainstStructuredData(result.Candidates, result.StructuredData); err != nil {
 			return err
 		}
-		if err := portablejson.ValidateInstance(request.TargetSchema, result.StructuredData); err == nil {
+		if err := targetSchema.ValidateInstance(result.StructuredData); err == nil {
 			if result.Validation != ValidationValid {
 				return validationError(CodeInvalidValidation, "validation")
 			}

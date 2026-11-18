@@ -54,6 +54,24 @@ func TestFormatCivilStatus(t *testing.T) {
 	if got := normalize.FormatBloodType("AB-"); got != "AB-" {
 		t.Fatalf("FormatBloodType(AB-) = %q, want AB-", got)
 	}
+	for in, want := range map[string]string{
+		"0":          "O",
+		"0+":         "O+",
+		"0-":         "O-",
+		"0 positivo": "O+",
+		"0 negativo": "O-",
+		"O−":         "O-",  // Unicode minus U+2212
+		"AB–":        "AB-", // En-dash U+2013
+		"nao sei":    "",
+	} {
+		if got := normalize.FormatBloodType(in); got != want {
+			t.Fatalf("FormatBloodType(%q) = %q, want %q", in, got, want)
+		}
+	}
+	var typedNil *normalize.ValidationError
+	if normalize.IsCode(error(typedNil), "") {
+		t.Fatal("IsCode matched typed-nil *ValidationError")
+	}
 }
 
 func TestFormatGeo(t *testing.T) {

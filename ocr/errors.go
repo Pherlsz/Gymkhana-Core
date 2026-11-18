@@ -53,5 +53,5 @@ func validationError(code ErrorCode, field string) error {
 // IsCode reports whether err contains the requested stable validation code.
 func IsCode(err error, code ErrorCode) bool {
 	var validation *ValidationError
-	return errors.As(err, &validation) && validation.Code == code
+	return errors.As(err, &validation) && validation != nil && validation.Code == code
 }

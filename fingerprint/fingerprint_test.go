@@ -20,6 +20,13 @@ func TestValidationErrorNilReceiver(t *testing.T) {
 	if got := err.Error(); got != "fingerprint: validation error" {
 		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "fingerprint: validation error")
 	}
+	if fingerprint.IsCode(error(err), "") {
+		t.Fatal("IsCode matched typed-nil *ValidationError")
+	}
+
+	if got := fingerprint.Sum([]byte("abc")).String(); got != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" {
+		t.Fatalf("Sum(abc) = %q", got)
+	}
 
 	nonNil := &fingerprint.ValidationError{Code: fingerprint.CodeInvalidFormat}
 	if got := nonNil.Error(); got != "fingerprint: invalid_format" {

@@ -23,6 +23,9 @@ func TestValidationErrorNilReceiver(t *testing.T) {
 	if got := err.Error(); got != "civiltime: validation error" {
 		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "civiltime: validation error")
 	}
+	if civiltime.IsCode(error(err), "") {
+		t.Fatal("IsCode matched typed-nil *ValidationError")
+	}
 
 	nonNil := &civiltime.ValidationError{Kind: civiltime.KindCivilDate, Code: civiltime.CodeInvalidDay}
 	if got := nonNil.Error(); got != "civil_date: invalid_day" {
@@ -190,5 +193,69 @@ func TestZeroValuesSerializeAsNull(t *testing.T) {
 	monthJSON, err := json.Marshal(civiltime.YearMonth{})
 	if err != nil || string(monthJSON) != "null" {
 		t.Fatalf("YearMonth zero JSON = %s, %v", monthJSON, err)
+	}
+}
+
+func TestComparisonsDaysInMonthAndTextMarshaling(t *testing.T) {
+	t.Parallel()
+
+	d1, _ := civiltime.NewCivilDate(2026, 1, 15)
+	d2, _ := civiltime.NewCivilDate(2026, 2, 1)
+	if !d1.Before(d2) || !d2.After(d1) || d1.Compare(d1) != 0 || !(civiltime.CivilDate{}).Before(d1) {
+		t.Fatal("CivilDate ordering mismatch")
+	}
+	if d1.YearMonth().String() != "2026-01" {
+		t.Fatalf("YearMonth() = %s, want 2026-01", d1.YearMonth())
+	}
+
+	textDate, err := d1.MarshalText()
+	if err != nil || string(textDate) != "2026-01-15" {
+		t.Fatalf("CivilDate.MarshalText = %q, %v", textDate, err)
+	}
+	zeroDateText, err := (civiltime.CivilDate{}).MarshalText()
+	if err != nil || len(zeroDateText) != 0 {
+		t.Fatalf("zero CivilDate.MarshalText = %q, %v", zeroDateText, err)
+	}
+	if err := d1.UnmarshalText(nil); err != nil || !d1.IsZero() {
+		t.Fatalf("CivilDate.UnmarshalText(empty) = %v, zero=%v", err, d1.IsZero())
+	}
+
+	ym1, _ := civiltime.NewYearMonth(2026, 1)
+	ym2, _ := civiltime.NewYearMonth(2026, 3)
+	if !ym1.Before(ym2) || !ym2.After(ym1) || ym1.Compare(ym1) != 0 || !ym1.Equal(ym1) || !(civiltime.YearMonth{}).Before(ym1) {
+		t.Fatal("YearMonth ordering mismatch")
+	}
+	firstDay, err := ym1.FirstDay()
+	if err != nil || firstDay.String() != "2026-01-01" {
+		t.Fatalf("FirstDay = %s, %v", firstDay, err)
+	}
+	ymJSON, err := json.Marshal(ym1)
+	if err != nil || string(ymJSON) != `"2026-01"` {
+		t.Fatalf("YearMonth JSON = %s, %v", ymJSON, err)
+	}
+	var decodedYM civiltime.YearMonth
+	if err := json.Unmarshal(ymJSON, &decodedYM); err != nil || !decodedYM.Equal(ym1) {
+		t.Fatalf("YearMonth JSON round trip = %v, %v", decodedYM, err)
+	}
+	ymText, err := ym1.MarshalText()
+	if err != nil || string(ymText) != "2026-01" {
+		t.Fatalf("YearMonth.MarshalText = %q, %v", ymText, err)
+	}
+	zeroYMText, err := (civiltime.YearMonth{}).MarshalText()
+	if err != nil || len(zeroYMText) != 0 {
+		t.Fatalf("zero YearMonth.MarshalText = %q, %v", zeroYMText, err)
+	}
+	if err := decodedYM.UnmarshalText(nil); err != nil || !decodedYM.IsZero() {
+		t.Fatalf("YearMonth.UnmarshalText(empty) = %v, zero=%v", err, decodedYM.IsZero())
+	}
+
+	if days, err := civiltime.DaysInMonth(2024, 2); err != nil || days != 29 {
+		t.Fatalf("DaysInMonth(2024, 2) = %d, %v", days, err)
+	}
+	if _, err := civiltime.DaysInMonth(0, 2); !civiltime.IsCode(err, civiltime.CodeInvalidYear) {
+		t.Fatalf("DaysInMonth invalid year = %v", err)
+	}
+	if _, err := civiltime.DaysInMonth(2024, 13); !civiltime.IsCode(err, civiltime.CodeInvalidMonth) {
+		t.Fatalf("DaysInMonth invalid month = %v", err)
 	}
 }

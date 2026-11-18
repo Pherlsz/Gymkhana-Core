@@ -172,9 +172,7 @@ func (m YearMonth) MarshalJSON() ([]byte, error) {
 	}
 	var buf [9]byte
 	buf[0] = '"'
-	var inner [7]byte
-	m.formatInto(&inner)
-	copy(buf[1:8], inner[:])
+	m.formatInto((*[7]byte)(buf[1:8]))
 	buf[8] = '"'
 	return buf[:], nil
 }

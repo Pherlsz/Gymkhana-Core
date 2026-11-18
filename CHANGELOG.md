@@ -18,15 +18,15 @@ The project follows Semantic Versioning. Breaking changes remain explicit before
 
 ### Changed
 
-- `portablejson` now performs single-pass strict JSON decoding (`decodeStrictValue`) that validates UTF-8, unpaired UTF-16 surrogates, duplicate object keys, resource limits (`MaxBytes`, `MaxDepth`, `MaxNodes`), and trailing tokens while building the `json.Number` value tree in one pass, and reduces `fingerprint`/`civiltime` heap allocations on hot paths.
+- `portablejson` now performs single-pass strict JSON decoding (`decodeStrictValue`) that validates UTF-8, unpaired UTF-16 surrogates, duplicate object keys, resource limits (`MaxBytes`, `MaxDepth`, `MaxNodes`), and trailing tokens while building the `json.Number` value tree in one pass; `assistant.ValidateGenerationToolArguments` and `ocr.ValidateExtractionExchange` now reuse `portablejson.CompiledSchema` directly, and `fingerprint`/`civiltime` eliminate intermediate heap allocations on hot paths.
 - Adopted Go 1.26 standard-library `slices` and built-in `min` idioms across `normalize`, `assistant`, and `ocr`, and precomputed address slot label sets at package initialization.
 
 ### Fixed
 
-- Deterministic, rune-aware bounded Levenshtein matching in `normalize.FormatCity` that preserves tie ambiguity across distinct canonical cities by falling back deterministically to `titleStreetName` instead of relying on randomized Go map iteration order, plus `normalize.FormatBloodType` idempotency on canonical Rhesus-signed inputs (`"O+"`, `"AB-"`).
+- Deterministic, rune-aware bounded Levenshtein matching in `normalize.FormatCity` that preserves tie ambiguity across distinct canonical cities by falling back deterministically to `titleStreetName` instead of relying on randomized Go map iteration order, plus `normalize.FormatBloodType` idempotency and Rhesus preservation across canonical (`"O+"`, `"AB-"`), Unicode minus/dash (`"O−"`), and zero-digit (`"0"`, `"0+"`, `"0-"`) inputs.
 - Slice-aliasing data race in `assistant.ResolveAssistantModels` and `assistant.ResolveAssistantModelsForRun` when `ModelPolicy.RequiredCapabilities` has spare slice capacity across concurrent goroutines.
 - `assistant.ResolveModelRole` now validates the entire model catalog and rejects duplicate `ModelRef` entries or invalid descriptors even after matching the target reference, sharing unified catalog indexing with `ResolveModelCandidates` and `AdapterRegistry.ListModels`.
-- Nil-receiver safety across `ValidationError.Error()` in `civiltime`, `fingerprint`, `portablejson`, `normalize`, `assistant`, and `ocr`, as well as nil-receiver guards on `assistant.AdapterRegistry`, `assistant.UsageLedger`, `portablejson.CompiledSchema`, and `normalize.CityCatalog`, plus whitespace-tolerant `null` handling in `civiltime` JSON unmarshaling.
+- Nil-receiver and typed-nil `IsCode` safety across `ValidationError` in `civiltime`, `fingerprint`, `portablejson`, `normalize`, `assistant`, and `ocr`, as well as nil-receiver guards on `assistant.AdapterRegistry`, `assistant.UsageLedger`, `portablejson.CompiledSchema`, and `normalize.CityCatalog`, plus whitespace-tolerant `null` handling in `civiltime` JSON unmarshaling.
 - Added missing `conformance/**`, `schemas/**`, and `spec/VERSION` triggers to `.github/workflows/ci.yml` `pull_request.paths` so schema and conformance vector changes cannot bypass CI.
 - Synchronized `README.md`, `spec/assistant/RAG.md`, and `docs/ASSISTANT-HARDENING.md` with Core Spec `0.4` and `v0.7.0`.
 
