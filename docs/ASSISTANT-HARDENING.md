@@ -1,8 +1,8 @@
 # Assistant Foundation hardening review
 
-Status: Core Spec `0.3` / Go `0.5.0` workstream (`feat/assistant-foundation`).
+Status: Historical decision record from the Core Spec `0.3` / Go `0.5.0` workstream (`feat/assistant-foundation`), annotated with Core Spec `0.4` supersession notes.
 
-This document records correctness, security, portability, and performance issues discovered while stress-testing the initial Assistant contracts before the first public release. It is decision history rather than a replacement for normative material under `spec/assistant/` and `spec/json/`.
+This document records correctness, security, portability, and performance issues discovered while stress-testing the initial Assistant contracts before the first public release. It is decision history rather than a replacement for normative material under `spec/assistant/` and `spec/json/`. Where Spec `0.4` (Go `0.6.0+`) narrowed the portable Assistant boundary—specifically by moving persistent memory, `MemoryPolicy`, `TaskSignature`, `SkillLearningProposal`, and `skill_hint` promotion workflows to the host/application layer—explicit supersession notes are provided below.
 
 ## Correctness bugs found and addressed
 
@@ -82,13 +82,17 @@ Resolution: a quota window is unique by `(dimension, window_seconds)`, not dimen
 
 The `memory` module was originally configurable without defining read/write/retention authority.
 
-Resolution: enabling or making memory optional now requires `MemoryPolicy`; persistent writes are disabled, explicit, or confirmation-gated. Spec `0.3` has no unrestricted automatic persistent-write mode.
+Resolution (Spec `0.3`): enabling or making memory optional required `MemoryPolicy`; persistent writes were disabled, explicit, or confirmation-gated, with no unrestricted automatic persistent-write mode.
+
+> **Spec `0.4` supersession note:** Core Spec `0.4` (Go `0.6.0+`) removed the `memory` module and `MemoryPolicy` from the portable Assistant contract altogether. Persistent user/tenant memory, identity, storage, and retention policy are strictly host/application concerns; hosts project selected prior context into portable runs through standard messages or RAG evidence.
 
 ### Learned behavior could become persistent prompt injection
 
 A free-form lesson derived from model/document output could be automatically promoted into future behavior and thereby persist an injected instruction.
 
-Resolution: learning is task-scoped, evidence-backed, advisory, and revisioned. `skill_hint` is never auto-promotable in Spec `0.3`; Core never mutates an `AssistantDefinition` itself.
+Resolution (Spec `0.3`): learning was task-scoped, evidence-backed, advisory, and revisioned. `skill_hint` was never auto-promotable in Spec `0.3`; Core never mutated an `AssistantDefinition` itself.
+
+> **Spec `0.4` supersession note:** Core Spec `0.4` (Go `0.6.0+`) removed `TaskSignature`, `SkillLearningProposal`, `skill_hint`, and learning promotion contracts from Core. Evaluation, learning proposals, and revision promotion workflows are owned entirely by the consuming host/application.
 
 ## Safety boundaries added
 
@@ -160,7 +164,7 @@ Untrusted collection sizes are bounded before expensive traversal/allocation:
 - RAG candidate/context/evidence/metadata sizes;
 - JSON bytes/depth/node count;
 - schema depth/property/array limits;
-- learning evidence count;
+- learning evidence count (Spec `0.3` only; removed from Core in Spec `0.4` when learning workflows moved to the host layer);
 - quota windows.
 
 Dynamic model routing remains deterministic and uses bounded catalog sorting. `assistant/benchmark_test.go` tracks the 10k-model routing path; `portablejson/benchmark_test.go` tracks strict JSON/schema validation. Benchmarks remain local and do not add hosted CI cost.
@@ -192,7 +196,7 @@ It should not put provider cache IDs into the portable Assistant contract.
 
 ### Evaluation contracts
 
-Dynamic routing and Skill Build will eventually need task-scoped eval data rather than price/provider heuristics. A follow-up may standardize portable evaluation observations for schema adherence, groundedness, tool correctness, latency, usage, and application-defined quality.
+Dynamic routing and host-owned evaluation/learning workflows will eventually benefit from task-scoped eval data rather than price/provider heuristics. (Note: Spec `0.4` removed Skill Build/learning contracts from Core, keeping learning and promotion in the host layer.) A follow-up may standardize portable evaluation observations for schema adherence, groundedness, tool correctness, latency, usage, and application-defined quality.
 
 ### MCP adapter
 

@@ -10,6 +10,9 @@ on:
       - "Makefile"
       - "VERSION"
       - "CHANGELOG.md"
+      - "conformance/**"
+      - "schemas/**"
+      - "spec/VERSION"
       - "scripts/release-version.py"
       - ".github/workflows/ci.yml"
   workflow_dispatch:

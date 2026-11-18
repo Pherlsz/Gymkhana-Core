@@ -109,7 +109,7 @@ These parameters should be evaluated against representative domain queries rathe
 
 Useful RAG evaluation dimensions include retrieval recall/relevance, groundedness/faithfulness, citation correctness, latency, token/cost usage, and insufficient-evidence behavior.
 
-Core Spec `0.3` does not define one universal quality score. Task-scoped `SkillLearningProposal` may later reuse evidence-backed retrieval lessons without globally changing every Assistant.
+Core Spec `0.4` does not define one universal quality score. Retrieval evaluation, quality scoring, and task-scoped learning/promotion workflows belong to the host/application layer rather than the portable Assistant contract.
 
 ## Token economy and caching
 

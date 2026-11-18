@@ -14,6 +14,7 @@ conformance/
 ├── assistant_structured_test.go    # Assistant-specific structured/tool routing adapter
 ├── portablejson_test.go            # generic portable JSON/schema adapter
 ├── ocr_test.go                     # OCR/extraction adapter
+├── schema_sync_test.go             # schema/conformance structural & Spec 0.4 sync checks
 ├── v0.1/                           # normalize + temporal
 ├── v0.2/                           # fingerprint + carried-forward suites
 ├── v0.3/                           # Assistant/portablejson + carried-forward suites
