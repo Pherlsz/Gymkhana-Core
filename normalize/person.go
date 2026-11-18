@@ -1,6 +1,7 @@
 package normalize
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -117,17 +118,8 @@ func isCompanyName(value string) bool {
 	if len(tokens) >= 2 && tokens[len(tokens)-2] == "s" && last == "a" {
 		return true
 	}
-	if hasToken(tokens, "filhos") && (hasToken(tokens, "e") || strings.Contains(value, "&")) {
+	if slices.Contains(tokens, "filhos") && (slices.Contains(tokens, "e") || strings.Contains(value, "&")) {
 		return true
-	}
-	return false
-}
-
-func hasToken(tokens []string, want string) bool {
-	for _, token := range tokens {
-		if token == want {
-			return true
-		}
 	}
 	return false
 }
@@ -167,21 +159,24 @@ func isDigitsOnly(value string) bool {
 	if value == "" {
 		return false
 	}
+	hasDigit := false
 	for _, r := range value {
-		if r < '0' || r > '9' {
-			if r == ' ' {
-				continue
-			}
-			return false
+		if r >= '0' && r <= '9' {
+			hasDigit = true
+			continue
 		}
+		if r == ' ' {
+			continue
+		}
+		return false
 	}
-	return strings.ContainsAny(value, "0123456789")
+	return hasDigit
 }
 
 func hasTwoLetters(value string) bool {
 	letters := 0
 	for _, r := range value {
-		if r >= 'a' && r <= 'z' {
+		if unicode.IsLetter(r) {
 			letters++
 			if letters >= 2 {
 				return true

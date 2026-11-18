@@ -57,7 +57,10 @@ func FormatBloodType(value string) string {
 	if isAbsent(value) {
 		return ""
 	}
-	key := SearchText(value)
+	raw := strings.ToLower(DisplayText(value))
+	raw = strings.ReplaceAll(raw, "+", " positivo ")
+	raw = strings.ReplaceAll(raw, "-", " negativo ")
+	key := SearchText(raw)
 	key = strings.ReplaceAll(key, "positivo", "+")
 	key = strings.ReplaceAll(key, "negativo", "-")
 	key = strings.ReplaceAll(key, " ", "")
