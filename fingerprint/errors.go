@@ -22,6 +22,9 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
+	if e == nil {
+		return "fingerprint: validation error"
+	}
 	return fmt.Sprintf("fingerprint: %s", e.Code)
 }
 

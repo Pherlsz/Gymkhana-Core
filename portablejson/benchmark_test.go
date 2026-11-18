@@ -47,3 +47,36 @@ func BenchmarkValidateSchema(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkCompiledSchemaValidateInstance(b *testing.B) {
+	schemaRaw := json.RawMessage("{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":[\"integer\",\"null\"],\"minimum\":0,\"maximum\":200},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":0,\"maxItems\":64}},\"required\":[\"name\",\"age\",\"tags\"],\"additionalProperties\":false}")
+	instanceRaw := json.RawMessage("{\"name\":\"Ana\",\"age\":32,\"tags\":[\"alpha\",\"beta\",\"gamma\"]}")
+
+	compiled, err := portablejson.CompileObjectSchema(schemaRaw)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(int64(len(instanceRaw)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if err := compiled.ValidateInstance(instanceRaw); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkValidateInstanceUncompiled(b *testing.B) {
+	schemaRaw := json.RawMessage("{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"age\":{\"type\":[\"integer\",\"null\"],\"minimum\":0,\"maximum\":200},\"tags\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"minItems\":0,\"maxItems\":64}},\"required\":[\"name\",\"age\",\"tags\"],\"additionalProperties\":false}")
+	instanceRaw := json.RawMessage("{\"name\":\"Ana\",\"age\":32,\"tags\":[\"alpha\",\"beta\",\"gamma\"]}")
+
+	b.SetBytes(int64(len(instanceRaw)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if err := portablejson.ValidateInstance(schemaRaw, instanceRaw); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

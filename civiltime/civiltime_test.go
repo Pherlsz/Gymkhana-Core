@@ -1,12 +1,118 @@
 package civiltime_test
 
 import (
+	"encoding"
 	"encoding/json"
 	"math"
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/civiltime"
 )
+
+var (
+	_ encoding.TextAppender  = civiltime.CivilDate{}
+	_ encoding.TextMarshaler = civiltime.CivilDate{}
+	_ encoding.TextAppender  = civiltime.YearMonth{}
+	_ encoding.TextMarshaler = civiltime.YearMonth{}
+)
+
+func TestValidationErrorNilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var err *civiltime.ValidationError
+	if got := err.Error(); got != "civiltime: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "civiltime: validation error")
+	}
+
+	nonNil := &civiltime.ValidationError{Kind: civiltime.KindCivilDate, Code: civiltime.CodeInvalidDay}
+	if got := nonNil.Error(); got != "civil_date: invalid_day" {
+		t.Fatalf("ValidationError.Error() = %q, want %q", got, "civil_date: invalid_day")
+	}
+}
+
+func TestTextAppenderAndWhitespaceJSON(t *testing.T) {
+	t.Parallel()
+
+	date, err := civiltime.NewCivilDate(2026, 11, 18)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendedDate, err := date.AppendText([]byte("date="))
+	if err != nil || string(appendedDate) != "date=2026-11-18" {
+		t.Fatalf("CivilDate.AppendText = %q, %v", appendedDate, err)
+	}
+	zeroDateAppended, err := (civiltime.CivilDate{}).AppendText([]byte("prefix:"))
+	if err != nil || string(zeroDateAppended) != "prefix:" {
+		t.Fatalf("zero CivilDate.AppendText = %q, %v", zeroDateAppended, err)
+	}
+
+	ym, err := civiltime.NewYearMonth(2026, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendedYM, err := ym.AppendText([]byte("ym="))
+	if err != nil || string(appendedYM) != "ym=2026-11" {
+		t.Fatalf("YearMonth.AppendText = %q, %v", appendedYM, err)
+	}
+	zeroYMAppended, err := (civiltime.YearMonth{}).AppendText([]byte("prefix:"))
+	if err != nil || string(zeroYMAppended) != "prefix:" {
+		t.Fatalf("zero YearMonth.AppendText = %q, %v", zeroYMAppended, err)
+	}
+
+	decodedDate := date
+	if err := decodedDate.UnmarshalJSON([]byte(" \t\nnull\r\n ")); err != nil {
+		t.Fatalf("CivilDate.UnmarshalJSON(padded null) error = %v", err)
+	}
+	if !decodedDate.IsZero() {
+		t.Fatalf("expected zero CivilDate after padded null, got %v", decodedDate)
+	}
+
+	decodedYM := ym
+	if err := decodedYM.UnmarshalJSON([]byte(" \t\nnull\r\n ")); err != nil {
+		t.Fatalf("YearMonth.UnmarshalJSON(padded null) error = %v", err)
+	}
+	if !decodedYM.IsZero() {
+		t.Fatalf("expected zero YearMonth after padded null, got %v", decodedYM)
+	}
+}
+
+func TestZeroValueAndBoundarySemantics(t *testing.T) {
+	t.Parallel()
+
+	var zeroDate civiltime.CivilDate
+	if !zeroDate.IsZero() || zeroDate.Year() != 0 || zeroDate.Month() != 0 || zeroDate.Day() != 0 || !zeroDate.YearMonth().IsZero() {
+		t.Fatalf("unexpected zero CivilDate state: %#v", zeroDate)
+	}
+
+	var zeroYM civiltime.YearMonth
+	if !zeroYM.IsZero() || zeroYM.Year() != 0 || zeroYM.Month() != 0 {
+		t.Fatalf("unexpected zero YearMonth state: %#v", zeroYM)
+	}
+	if _, err := zeroYM.AddMonths(1); !civiltime.IsCode(err, civiltime.CodeZeroValue) {
+		t.Fatalf("zeroYM.AddMonths error = %v", err)
+	}
+	if _, err := zeroYM.FirstDay(); !civiltime.IsCode(err, civiltime.CodeZeroValue) {
+		t.Fatalf("zeroYM.FirstDay error = %v", err)
+	}
+	if _, err := zeroYM.LastDay(); !civiltime.IsCode(err, civiltime.CodeZeroValue) {
+		t.Fatalf("zeroYM.LastDay error = %v", err)
+	}
+
+	minYM, err := civiltime.NewYearMonth(1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := minYM.AddMonths(-1); !civiltime.IsCode(err, civiltime.CodeOutOfRange) {
+		t.Fatalf("0001-01 AddMonths(-1) = %v, want out_of_range", err)
+	}
+	maxYM, err := minYM.AddMonths(9999*12 - 1)
+	if err != nil || maxYM.String() != "9999-12" {
+		t.Fatalf("0001-01 AddMonths(max) = %v, %v", maxYM, err)
+	}
+	if _, err := maxYM.AddMonths(1); !civiltime.IsCode(err, civiltime.CodeOutOfRange) {
+		t.Fatalf("9999-12 AddMonths(1) = %v, want out_of_range", err)
+	}
+}
 
 func TestCivilDateLeapYearAndRoundTrip(t *testing.T) {
 	t.Parallel()

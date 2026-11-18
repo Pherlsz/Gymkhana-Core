@@ -3,6 +3,7 @@ package fingerprint
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"unicode/utf8"
 )
 
@@ -21,7 +22,11 @@ func SumText(value string) (Digest, error) {
 	if !utf8.ValidString(value) {
 		return Digest{}, validationError(CodeInvalidUTF8)
 	}
-	return Sum([]byte(value)), nil
+	hash := sha256.New()
+	_, _ = io.WriteString(hash, value)
+	var digest Digest
+	hash.Sum(digest[:0])
+	return digest, nil
 }
 
 // Parse decodes a 64-character hexadecimal SHA-256 digest. Uppercase input is
@@ -31,19 +36,18 @@ func Parse(value string) (Digest, error) {
 		return Digest{}, validationError(CodeInvalidLength)
 	}
 
-	decoded, err := hex.DecodeString(value)
-	if err != nil {
-		return Digest{}, validationError(CodeInvalidFormat)
-	}
-
 	var digest Digest
-	copy(digest[:], decoded)
+	if err := decodeHexInto(&digest, value); err != nil {
+		return Digest{}, err
+	}
 	return digest, nil
 }
 
 // String returns the canonical lowercase hexadecimal representation.
 func (d Digest) String() string {
-	return hex.EncodeToString(d[:])
+	var buf [sha256.Size * 2]byte
+	hex.Encode(buf[:], d[:])
+	return string(buf[:])
 }
 
 // Bytes returns a copy of the digest bytes.
@@ -53,17 +57,54 @@ func (d Digest) Bytes() []byte {
 	return value
 }
 
+// AppendText implements encoding.TextAppender using canonical lowercase hex.
+func (d Digest) AppendText(b []byte) ([]byte, error) {
+	var buf [sha256.Size * 2]byte
+	hex.Encode(buf[:], d[:])
+	return append(b, buf[:]...), nil
+}
+
 // MarshalText implements encoding.TextMarshaler using canonical lowercase hex.
 func (d Digest) MarshalText() ([]byte, error) {
-	return []byte(d.String()), nil
+	var buf [sha256.Size * 2]byte
+	hex.Encode(buf[:], d[:])
+	return buf[:], nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (d *Digest) UnmarshalText(text []byte) error {
-	parsed, err := Parse(string(text))
-	if err != nil {
-		return err
+	if len(text) != sha256.Size*2 {
+		return validationError(CodeInvalidLength)
+	}
+	var parsed Digest
+	if _, err := hex.Decode(parsed[:], text); err != nil {
+		return validationError(CodeInvalidFormat)
 	}
 	*d = parsed
 	return nil
+}
+
+func decodeHexInto(dst *Digest, value string) error {
+	for i := 0; i < sha256.Size; i++ {
+		hi, okHi := fromHexChar(value[i*2])
+		lo, okLo := fromHexChar(value[i*2+1])
+		if !okHi || !okLo {
+			return validationError(CodeInvalidFormat)
+		}
+		dst[i] = (hi << 4) | lo
+	}
+	return nil
+}
+
+func fromHexChar(c byte) (byte, bool) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', true
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, true
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, true
+	default:
+		return 0, false
+	}
 }

@@ -1,9 +1,8 @@
 package portablejson
 
 import (
-	"bytes"
 	"encoding/json"
-	"reflect"
+	"math/big"
 	"strconv"
 	"unicode/utf8"
 )
@@ -11,54 +10,42 @@ import (
 // ValidateInstance validates an arbitrary JSON value against SchemaV1. It is a
 // deliberately small portable validator, not a general-purpose JSON Schema engine.
 func ValidateInstance(schemaRaw, instanceRaw json.RawMessage) error {
-	root, err := decodeSchema(schemaRaw)
+	compiled, err := CompileSchema(schemaRaw)
 	if err != nil {
 		return err
 	}
-	if err := validateSchemaNode(root, 0); err != nil {
-		return err
-	}
-	if err := ValidateValue(instanceRaw); err != nil {
-		return err
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(instanceRaw))
-	decoder.UseNumber()
-	var instance any
-	if err := decoder.Decode(&instance); err != nil {
-		return validationError(CodeInvalidJSON, "instance")
-	}
-	return validateInstanceNode(root, instance, 0)
+	return compiled.ValidateInstance(instanceRaw)
 }
 
-func validateInstanceNode(schema map[string]any, value any, depth int) error {
+// ValidateInstance validates instanceRaw against the pre-compiled schema.
+// It is safe for concurrent use by multiple goroutines.
+func (s *CompiledSchema) ValidateInstance(instanceRaw json.RawMessage) error {
+	if s == nil || s.root == nil {
+		return validationError(CodeInvalidSchema, "schema")
+	}
+	instance, err := decodeStrictValue(instanceRaw, false)
+	if err != nil {
+		return err
+	}
+	return validateCompiledNode(s.root, instance, 0)
+}
+
+func validateCompiledNode(schema *compiledNode, value any, depth int) error {
 	if depth > MaxSchemaDepth {
 		return validationError(CodeInvalidSchema, "instance.depth")
 	}
-	if len(schema) == 0 {
+	if schema.unconstrainedObject {
 		if _, ok := value.(map[string]any); !ok {
 			return validationError(CodeInvalidSchema, "instance.type")
 		}
 		return validatePortableNumbers(value, depth)
 	}
 
-	types, err := schemaTypes(schema["type"])
-	if err != nil || !instanceTypeMatches(value, types) {
+	if !instanceTypeMatches(value, schema.types) {
 		return validationError(CodeInvalidSchema, "instance.type")
 	}
-	if enumRaw, ok := schema["enum"]; ok {
-		values, ok := enumRaw.([]any)
-		if !ok {
-			return validationError(CodeInvalidSchema, "instance.enum")
-		}
-		matched := false
-		for _, candidate := range values {
-			if scalarEqual(value, candidate) {
-				matched = true
-				break
-			}
-		}
-		if !matched {
+	if schema.hasEnum {
+		if !matchesCompiledEnum(value, schema.enumValues) {
 			return validationError(CodeInvalidSchema, "instance.enum")
 		}
 	}
@@ -66,32 +53,23 @@ func validateInstanceNode(schema map[string]any, value any, depth int) error {
 		return nil
 	}
 
-	primary := types[0]
-	switch primary {
+	switch schema.primary {
 	case "object":
 		object, ok := value.(map[string]any)
 		if !ok {
 			return validationError(CodeInvalidSchema, "instance.type")
 		}
-		properties, _ := schema["properties"].(map[string]any)
-		if properties == nil {
-			properties = map[string]any{}
-		}
-		for name, childSchemaRaw := range properties {
+		for name, childSchema := range schema.properties {
 			childValue, exists := object[name]
 			if !exists {
 				return validationError(CodeInvalidSchema, "instance.required")
 			}
-			childSchema, ok := childSchemaRaw.(map[string]any)
-			if !ok {
-				return validationError(CodeInvalidSchema, "instance.schema")
-			}
-			if err := validateInstanceNode(childSchema, childValue, depth+1); err != nil {
+			if err := validateCompiledNode(childSchema, childValue, depth+1); err != nil {
 				return err
 			}
 		}
 		for name := range object {
-			if _, declared := properties[name]; !declared {
+			if _, declared := schema.properties[name]; !declared {
 				return validationError(CodeInvalidSchema, "instance.additional_properties")
 			}
 		}
@@ -100,23 +78,11 @@ func validateInstanceNode(schema map[string]any, value any, depth int) error {
 		if !ok {
 			return validationError(CodeInvalidSchema, "instance.type")
 		}
-		minItems, minSet, err := schemaNonNegativeInteger(schema["minItems"])
-		if err != nil {
-			return validationError(CodeInvalidSchema, "instance.minItems")
-		}
-		maxItems, maxSet, err := schemaNonNegativeInteger(schema["maxItems"])
-		if err != nil {
-			return validationError(CodeInvalidSchema, "instance.maxItems")
-		}
-		if (minSet && int64(len(array)) < minItems) || (maxSet && int64(len(array)) > maxItems) {
-			return validationError(CodeInvalidSchema, "instance.items")
-		}
-		itemSchema, ok := schema["items"].(map[string]any)
-		if !ok {
+		if (schema.minItemsSet && int64(len(array)) < schema.minItems) || (schema.maxItemsSet && int64(len(array)) > schema.maxItems) {
 			return validationError(CodeInvalidSchema, "instance.items")
 		}
 		for _, item := range array {
-			if err := validateInstanceNode(itemSchema, item, depth+1); err != nil {
+			if err := validateCompiledNode(schema.items, item, depth+1); err != nil {
 				return err
 			}
 		}
@@ -124,14 +90,14 @@ func validateInstanceNode(schema map[string]any, value any, depth int) error {
 		if err := validatePortableInteger(value); err != nil {
 			return err
 		}
-		if err := validateNumericBounds(schema, value); err != nil {
+		if err := validateCompiledNumericBounds(schema, value); err != nil {
 			return err
 		}
 	case "number":
 		if err := validatePortableNumber(value); err != nil {
 			return err
 		}
-		if err := validateNumericBounds(schema, value); err != nil {
+		if err := validateCompiledNumericBounds(schema, value); err != nil {
 			return err
 		}
 	case "string":
@@ -226,7 +192,10 @@ func validatePortableNumber(value any) error {
 	return nil
 }
 
-func validateNumericBounds(schema map[string]any, value any) error {
+func validateCompiledNumericBounds(schema *compiledNode, value any) error {
+	if !schema.minimumSet && !schema.maximumSet {
+		return nil
+	}
 	number, ok := value.(json.Number)
 	if !ok {
 		return validationError(CodeInvalidSchema, "instance.number")
@@ -235,29 +204,47 @@ func validateNumericBounds(schema map[string]any, value any) error {
 	if err != nil {
 		return validationError(CodeInvalidSchema, "instance.number")
 	}
-	if minimum, set, err := schemaNumber(schema["minimum"]); err != nil {
-		return validationError(CodeInvalidSchema, "instance.minimum")
-	} else if set && actual.Cmp(minimum) < 0 {
+	if schema.minimumSet && actual.Cmp(schema.minimum) < 0 {
 		return validationError(CodeInvalidSchema, "instance.minimum")
 	}
-	if maximum, set, err := schemaNumber(schema["maximum"]); err != nil {
-		return validationError(CodeInvalidSchema, "instance.maximum")
-	} else if set && actual.Cmp(maximum) > 0 {
+	if schema.maximumSet && actual.Cmp(schema.maximum) > 0 {
 		return validationError(CodeInvalidSchema, "instance.maximum")
 	}
 	return nil
 }
 
-func scalarEqual(left, right any) bool {
-	leftNumber, leftIsNumber := left.(json.Number)
-	rightNumber, rightIsNumber := right.(json.Number)
-	if leftIsNumber || rightIsNumber {
-		if !leftIsNumber || !rightIsNumber {
-			return false
+func matchesCompiledEnum(value any, candidates []compiledEnumValue) bool {
+	if value == nil {
+		for _, candidate := range candidates {
+			if candidate.isNull {
+				return true
+			}
 		}
-		leftRat, leftErr := parsePortableNumber(leftNumber.String())
-		rightRat, rightErr := parsePortableNumber(rightNumber.String())
-		return leftErr == nil && rightErr == nil && leftRat.Cmp(rightRat) == 0
+		return false
 	}
-	return reflect.DeepEqual(left, right)
+	if number, isNumber := value.(json.Number); isNumber {
+		var actualRat *big.Rat
+		for _, candidate := range candidates {
+			if candidate.rat == nil {
+				continue
+			}
+			if actualRat == nil {
+				parsed, err := parsePortableNumber(number.String())
+				if err != nil {
+					return false
+				}
+				actualRat = parsed
+			}
+			if actualRat.Cmp(candidate.rat) == 0 {
+				return true
+			}
+		}
+		return false
+	}
+	for _, candidate := range candidates {
+		if !candidate.isNull && candidate.rat == nil && value == candidate.raw {
+			return true
+		}
+	}
+	return false
 }

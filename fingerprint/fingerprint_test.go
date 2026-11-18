@@ -1,11 +1,56 @@
 package fingerprint_test
 
 import (
+	"encoding"
 	"strings"
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/fingerprint"
 )
+
+var (
+	_ encoding.TextAppender  = fingerprint.Digest{}
+	_ encoding.TextMarshaler = fingerprint.Digest{}
+)
+
+func TestValidationErrorNilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var err *fingerprint.ValidationError
+	if got := err.Error(); got != "fingerprint: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "fingerprint: validation error")
+	}
+
+	nonNil := &fingerprint.ValidationError{Code: fingerprint.CodeInvalidFormat}
+	if got := nonNil.Error(); got != "fingerprint: invalid_format" {
+		t.Fatalf("ValidationError.Error() = %q, want %q", got, "fingerprint: invalid_format")
+	}
+}
+
+func TestDigestAppendTextAndUnmarshalText(t *testing.T) {
+	t.Parallel()
+
+	digest, err := fingerprint.SumText("abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appended, err := digest.AppendText([]byte("sha256:"))
+	if err != nil {
+		t.Fatalf("AppendText() error = %v", err)
+	}
+	const want = "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+	if string(appended) != want {
+		t.Fatalf("AppendText() = %q, want %q", appended, want)
+	}
+
+	var decoded fingerprint.Digest
+	if err := decoded.UnmarshalText([]byte("short")); !fingerprint.IsCode(err, fingerprint.CodeInvalidLength) {
+		t.Fatalf("UnmarshalText(short) = %v, want invalid_length", err)
+	}
+	if err := decoded.UnmarshalText([]byte(strings.Repeat("g", 64))); !fingerprint.IsCode(err, fingerprint.CodeInvalidFormat) {
+		t.Fatalf("UnmarshalText(invalid hex) = %v, want invalid_format", err)
+	}
+}
 
 func TestSumTextSHA256(t *testing.T) {
 	t.Parallel()

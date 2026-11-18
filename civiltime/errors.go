@@ -33,6 +33,9 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
+	if e == nil {
+		return "civiltime: validation error"
+	}
 	return fmt.Sprintf("%s: %s", e.Kind, e.Code)
 }
 

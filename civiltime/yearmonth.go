@@ -3,7 +3,6 @@ package civiltime
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 )
 
 // YearMonth is a timezone-free calendar month. Its zero value represents an
@@ -111,15 +110,46 @@ func (m YearMonth) String() string {
 	if m.IsZero() {
 		return ""
 	}
-	return fmt.Sprintf("%04d-%02d", m.year, m.month)
+	var buf [7]byte
+	m.formatInto(&buf)
+	return string(buf[:])
+}
+
+func (m YearMonth) formatInto(buf *[7]byte) {
+	y := m.year
+	buf[0] = byte('0' + y/1000)
+	buf[1] = byte('0' + (y/100)%10)
+	buf[2] = byte('0' + (y/10)%10)
+	buf[3] = byte('0' + y%10)
+	buf[4] = '-'
+	mo := m.month
+	buf[5] = byte('0' + mo/10)
+	buf[6] = byte('0' + mo%10)
 }
 
 func (m YearMonth) ordinal() int {
 	return int(m.year)*100 + int(m.month)
 }
 
+// AppendText implements encoding.TextAppender.
+func (m YearMonth) AppendText(b []byte) ([]byte, error) {
+	if m.IsZero() {
+		return b, nil
+	}
+	var buf [7]byte
+	m.formatInto(&buf)
+	return append(b, buf[:]...), nil
+}
+
 // MarshalText implements encoding.TextMarshaler.
-func (m YearMonth) MarshalText() ([]byte, error) { return []byte(m.String()), nil }
+func (m YearMonth) MarshalText() ([]byte, error) {
+	if m.IsZero() {
+		return []byte{}, nil
+	}
+	var buf [7]byte
+	m.formatInto(&buf)
+	return buf[:], nil
+}
 
 // UnmarshalText implements encoding.TextUnmarshaler. Empty input resets to zero.
 func (m *YearMonth) UnmarshalText(text []byte) error {
@@ -140,17 +170,24 @@ func (m YearMonth) MarshalJSON() ([]byte, error) {
 	if m.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(m.String())
+	var buf [9]byte
+	buf[0] = '"'
+	var inner [7]byte
+	m.formatInto(&inner)
+	copy(buf[1:8], inner[:])
+	buf[8] = '"'
+	return buf[:], nil
 }
 
 // UnmarshalJSON accepts JSON null, an empty string, or a strict ISO year-month.
 func (m *YearMonth) UnmarshalJSON(data []byte) error {
-	if bytes.Equal(data, []byte("null")) {
+	trimmed := bytes.TrimSpace(data)
+	if bytes.Equal(trimmed, []byte("null")) {
 		*m = YearMonth{}
 		return nil
 	}
 	var value string
-	if err := json.Unmarshal(data, &value); err != nil {
+	if err := json.Unmarshal(trimmed, &value); err != nil {
 		return validationError(KindYearMonth, CodeInvalidFormat)
 	}
 	return m.UnmarshalText([]byte(value))
