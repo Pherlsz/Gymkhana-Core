@@ -326,8 +326,10 @@ func decodePortableValue(raw json.RawMessage) (any, error) {
 
 func resolveJSONPointer(root any, pointer string) (any, bool) {
 	current := root
-	for _, token := range strings.Split(pointer[1:], "/") {
-		token = strings.ReplaceAll(strings.ReplaceAll(token, "~1", "/"), "~0", "~")
+	for token := range strings.SplitSeq(pointer[1:], "/") {
+		if strings.IndexByte(token, '~') >= 0 {
+			token = strings.ReplaceAll(strings.ReplaceAll(token, "~1", "/"), "~0", "~")
+		}
 		switch value := current.(type) {
 		case map[string]any:
 			var ok bool

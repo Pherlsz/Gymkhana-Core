@@ -225,6 +225,11 @@ func TestUnknownSourceAndObservation(t *testing.T) {
 func TestValidationErrorsDoNotEchoSensitiveInput(t *testing.T) {
 	t.Parallel()
 
+	var nilErr *ocr.ValidationError
+	if got := nilErr.Error(); got != "ocr: validation error" {
+		t.Fatalf("nil ValidationError.Error() = %q, want %q", got, "ocr: validation error")
+	}
+
 	secret := "CPF 123.456.789-09"
 	result := validResult()
 	result.Observations[0].RawText = strings.Repeat("x", ocr.MaxObservationTextBytes+1) + secret

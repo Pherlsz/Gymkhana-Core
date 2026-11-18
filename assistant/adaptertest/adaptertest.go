@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -254,19 +255,9 @@ func findModel(models []assistant.ModelDescriptor, ref assistant.ModelRef) (assi
 }
 
 func hasRole(model assistant.ModelDescriptor, role assistant.ModelRole) bool {
-	for _, candidate := range model.Roles {
-		if candidate == role {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(model.Roles, role)
 }
 
 func hasCapability(model assistant.ModelDescriptor, capability assistant.Capability) bool {
-	for _, candidate := range model.Capabilities {
-		if candidate == capability {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(model.Capabilities, capability)
 }

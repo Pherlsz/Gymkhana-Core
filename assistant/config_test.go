@@ -3,6 +3,7 @@ package assistant_test
 import (
 	"errors"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/Pherlsz/Gymkhana-Core/assistant"
@@ -88,6 +89,96 @@ func TestResolveAssistantModels(t *testing.T) {
 	}
 	if !reflect.DeepEqual(resolved, want) {
 		t.Fatalf("resolved = %#v, want %#v", resolved, want)
+	}
+}
+
+func TestResolveAssistantModelsConcurrentNoMutation(t *testing.T) {
+	t.Parallel()
+
+	required := make([]assistant.Capability, 1, 8)
+	required[0] = assistant.CapabilityText
+
+	definition := validAssistantDefinition()
+	definition.OptionalModules = []assistant.ModuleID{assistant.ModuleAudioInput}
+	definition.ModelPolicy.RequiredCapabilities = required
+
+	overrides := assistant.RunOverrides{
+		EnableModules: []assistant.ModuleID{assistant.ModuleAudioInput},
+	}
+	catalog := []assistant.ModelDescriptor{{
+		Ref:    assistant.ModelRef{Provider: "gateway", Model: "multimodal/full:free"},
+		Access: assistant.AccessFree,
+		Roles:  []assistant.ModelRole{assistant.ModelRoleGeneration},
+		Capabilities: []assistant.Capability{
+			assistant.CapabilityText,
+			assistant.CapabilityImageInput,
+			assistant.CapabilityAudioInput,
+			assistant.CapabilityToolCalling,
+		},
+	}}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if _, err := assistant.ResolveAssistantModels(definition, catalog); err != nil {
+				t.Errorf("ResolveAssistantModels = %v", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if _, err := assistant.ResolveAssistantModelsForRun(definition, overrides, catalog); err != nil {
+				t.Errorf("ResolveAssistantModelsForRun = %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if len(definition.ModelPolicy.RequiredCapabilities) != 1 || definition.ModelPolicy.RequiredCapabilities[0] != assistant.CapabilityText {
+		t.Fatalf("definition.ModelPolicy.RequiredCapabilities mutated: %#v", definition.ModelPolicy.RequiredCapabilities)
+	}
+	if full := required[:cap(required)]; full[1] != "" {
+		t.Fatalf("spare capacity in caller slice was overwritten: %#v", full)
+	}
+}
+
+func TestResolveModelRoleValidatesEntireCatalogAndRejectsDuplicates(t *testing.T) {
+	t.Parallel()
+
+	ref := assistant.ModelRef{Provider: "gateway", Model: "embed/v1"}
+	validEmbed := assistant.ModelDescriptor{
+		Ref:    ref,
+		Access: assistant.AccessPaid,
+		Roles:  []assistant.ModelRole{assistant.ModelRoleEmbedding},
+	}
+
+	duplicateCatalog := []assistant.ModelDescriptor{validEmbed, validEmbed}
+	assertAssistantCode(t, func() error {
+		_, err := assistant.ResolveModelRole(ref, assistant.ModelRoleEmbedding, duplicateCatalog)
+		return err
+	}(), assistant.CodeInvalidModel)
+
+	trailingInvalidCatalog := []assistant.ModelDescriptor{
+		validEmbed,
+		{
+			Ref:    assistant.ModelRef{Provider: "gateway", Model: "broken model id"},
+			Access: assistant.AccessPaid,
+			Roles:  []assistant.ModelRole{assistant.ModelRoleGeneration},
+		},
+	}
+	assertAssistantCode(t, func() error {
+		_, err := assistant.ResolveModelRole(ref, assistant.ModelRoleEmbedding, trailingInvalidCatalog)
+		return err
+	}(), assistant.CodeInvalidModel)
+
+	resolved, err := assistant.ResolveModelRole(ref, assistant.ModelRoleEmbedding, []assistant.ModelDescriptor{validEmbed})
+	if err != nil {
+		t.Fatalf("ResolveModelRole(valid) = %v", err)
+	}
+	resolved.Roles[0] = assistant.ModelRoleGeneration
+	if validEmbed.Roles[0] != assistant.ModelRoleEmbedding {
+		t.Fatal("ResolveModelRole returned aliased Roles slice")
 	}
 }
 

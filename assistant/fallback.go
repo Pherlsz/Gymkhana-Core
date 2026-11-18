@@ -1,5 +1,7 @@
 package assistant
 
+import "slices"
+
 // FailureClass is a provider-neutral execution failure category used by routing,
 // retry, and credential fallback policy. Provider adapters map transport/vendor
 // failures to these semantic classes without leaking provider payloads into Core.
@@ -48,7 +50,7 @@ func ValidateCredentialFallbackPolicy(policy CredentialFallbackPolicy) error {
 }
 
 func (policy CredentialFallbackPolicy) Allows(class FailureClass) bool {
-	return failureSetContains(policy.On, class)
+	return slices.Contains(policy.On, class)
 }
 
 // RoutingFallbackPolicy bounds automatic model/provider failover. It does not
@@ -91,21 +93,28 @@ func ValidateRoutingFallbackPolicy(policy RoutingFallbackPolicy) error {
 	if policy.MaxAttempts < 0 || policy.MaxAttempts > maxPortableJSONInteger {
 		return validationError(CodeInvalidModelPolicy, "routing_fallback.max_attempts")
 	}
-	for _, class := range append(append([]FailureClass{}, policy.ModelOn...), policy.ProviderOn...) {
-		switch class {
-		case FailureAuth, FailureSafety, FailureInvalid, FailureCancelled:
-			return validationError(CodeInvalidModelPolicy, "routing_fallback")
-		}
+	if containsNonFallbackFailure(policy.ModelOn) || containsNonFallbackFailure(policy.ProviderOn) {
+		return validationError(CodeInvalidModelPolicy, "routing_fallback")
 	}
 	return nil
 }
 
+func containsNonFallbackFailure(values []FailureClass) bool {
+	for _, class := range values {
+		switch class {
+		case FailureAuth, FailureSafety, FailureInvalid, FailureCancelled:
+			return true
+		}
+	}
+	return false
+}
+
 func (policy RoutingFallbackPolicy) AllowsModel(class FailureClass) bool {
-	return failureSetContains(policy.ModelOn, class)
+	return slices.Contains(policy.ModelOn, class)
 }
 
 func (policy RoutingFallbackPolicy) AllowsProvider(class FailureClass) bool {
-	return failureSetContains(policy.ProviderOn, class)
+	return slices.Contains(policy.ProviderOn, class)
 }
 
 // NextModelCandidate advances an already-resolved deterministic candidate list.
@@ -161,13 +170,4 @@ func validateFailureSet(values []FailureClass, field string) error {
 		seen[class] = struct{}{}
 	}
 	return nil
-}
-
-func failureSetContains(values []FailureClass, target FailureClass) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }

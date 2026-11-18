@@ -138,6 +138,100 @@ func TestAdapterRegistryRejectsTypedNil(t *testing.T) {
 	assertAssistantCode(t, registry.Register(adapter), assistant.CodeInvalidProvider)
 }
 
+func TestNilAdapterRegistryReceiverSafety(t *testing.T) {
+	t.Parallel()
+
+	var registry *assistant.AdapterRegistry
+	assertAssistantCode(t, registry.Register(fakeAdapter{provider: assistant.ProviderOpenAI}), assistant.CodeInvalidProvider)
+	if adapter, ok := registry.Get(assistant.ProviderOpenAI); ok || adapter != nil {
+		t.Fatalf("nil registry Get = (%#v, %v), want (nil, false)", adapter, ok)
+	}
+	if providers := registry.Providers(); providers != nil {
+		t.Fatalf("nil registry Providers = %#v, want nil", providers)
+	}
+	if got := registry.ClassifyFailure(assistant.ProviderOpenAI, context.Canceled); got != assistant.FailureCancelled {
+		t.Fatalf("nil registry ClassifyFailure(Canceled) = %q, want %q", got, assistant.FailureCancelled)
+	}
+	if got := registry.ClassifyFailure(assistant.ProviderOpenAI, context.DeadlineExceeded); got != assistant.FailureTimeout {
+		t.Fatalf("nil registry ClassifyFailure(DeadlineExceeded) = %q, want %q", got, assistant.FailureTimeout)
+	}
+	if got := registry.ClassifyFailure(assistant.ProviderOpenAI, &assistant.ValidationError{Code: assistant.CodeInvalidProvider}); got != assistant.FailureUnknown {
+		t.Fatalf("nil registry ClassifyFailure(other) = %q, want %q", got, assistant.FailureUnknown)
+	}
+	_, err := registry.ListModels(context.Background(), assistant.ProviderOpenAI, nil)
+	assertAssistantCode(t, err, assistant.CodeInvalidProvider)
+
+	_, err = registry.Generate(context.Background(), assistant.GenerationRequest{
+		Model:    assistant.ModelRef{Provider: assistant.ProviderOpenAI, Model: "gpt-test"},
+		Messages: []assistant.Message{{Role: assistant.RoleUser, Content: []assistant.ContentPart{{Type: assistant.PartText, Text: "hi"}}}},
+	})
+	assertAssistantCode(t, err, assistant.CodeInvalidProvider)
+
+	_, err = registry.Quota(context.Background(), assistant.ProviderOpenAI, nil, nil)
+	assertAssistantCode(t, err, assistant.CodeInvalidProvider)
+}
+
+func TestUsageLedgerConcurrencyAndIdempotency(t *testing.T) {
+	t.Parallel()
+
+	var nilLedger *assistant.UsageLedger
+	if ok, err := nilLedger.Record(assistant.UsageLedgerEntry{}); ok || !assistant.IsCode(err, assistant.CodeInvalidQuota) {
+		t.Fatalf("nil UsageLedger.Record = (%v, %v)", ok, err)
+	}
+	if entries := nilLedger.Entries(); entries != nil {
+		t.Fatalf("nil UsageLedger.Entries = %#v, want nil", entries)
+	}
+	if total, err := nilLedger.TotalUsageForAssistant("coding_assistant"); err != nil || total != (assistant.Usage{}) {
+		t.Fatalf("nil UsageLedger.TotalUsageForAssistant = (%#v, %v)", total, err)
+	}
+
+	ledger := assistant.NewUsageLedger()
+	cred := assistant.CredentialIdentity{ID: "key_01", Provider: "openai", Mode: assistant.CredentialBYOK, QuotaScope: "org:main"}
+	entry := assistant.UsageLedgerEntry{
+		RunID:       "run-100",
+		Attempt:     0,
+		AssistantID: "coding_assistant",
+		Credential:  &cred,
+		Model:       assistant.ModelRef{Provider: "openai", Model: "gpt-test"},
+		Usage:       assistant.Usage{InputTokens: 50, OutputTokens: 10},
+	}
+
+	inserted, err := ledger.Record(entry)
+	if err != nil || !inserted {
+		t.Fatalf("first Record = (%v, %v), want (true, nil)", inserted, err)
+	}
+	// Mutating caller's credential after Record must not mutate ledger state.
+	cred.QuotaScope = "org:mutated"
+
+	replayCred := assistant.CredentialIdentity{ID: "key_01", Provider: "openai", Mode: assistant.CredentialBYOK, QuotaScope: "org:main"}
+	replay := entry
+	replay.Credential = &replayCred
+	inserted, err = ledger.Record(replay)
+	if err != nil || inserted {
+		t.Fatalf("idempotent replay Record = (%v, %v), want (false, nil)", inserted, err)
+	}
+
+	conflict := replay
+	conflict.Usage.OutputTokens = 999
+	if _, err := ledger.Record(conflict); !assistant.IsCode(err, assistant.CodeInvalidQuota) {
+		t.Fatalf("conflicting replay error = %v, want CodeInvalidQuota", err)
+	}
+
+	entries := ledger.Entries()
+	if len(entries) != 1 || entries[0].Credential.QuotaScope != "org:main" {
+		t.Fatalf("Entries = %#v", entries)
+	}
+	entries[0].Credential.QuotaScope = "org:tampered"
+	if ledger.Entries()[0].Credential.QuotaScope != "org:main" {
+		t.Fatal("Entries() leaked internal pointer aliasing")
+	}
+
+	total, err := ledger.TotalUsageForAssistant("coding_assistant")
+	if err != nil || total.InputTokens != 50 || total.OutputTokens != 10 {
+		t.Fatalf("TotalUsageForAssistant = (%#v, %v)", total, err)
+	}
+}
+
 type fakeAdapter struct {
 	provider assistant.ProviderID
 }

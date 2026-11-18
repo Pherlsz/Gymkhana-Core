@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -44,7 +45,7 @@ func (adapter *geminiAdapter) ListModels(ctx context.Context, credential *assist
 	}
 	models := make([]assistant.ModelDescriptor, 0, len(payload.Models))
 	for _, item := range payload.Models {
-		if !containsString(item.SupportedGenerationMethods, "generateContent") {
+		if !slices.Contains(item.SupportedGenerationMethods, "generateContent") {
 			continue
 		}
 		id := assistant.ModelID(strings.TrimPrefix(item.Name, "models/"))
@@ -235,13 +236,4 @@ func TestGeminiAdapterProtocol(t *testing.T) {
 			{Name: "invalid", Err: providerHTTPError{status: http.StatusBadRequest, code: "INVALID_ARGUMENT"}, Want: assistant.FailureInvalid},
 		},
 	})
-}
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }
